@@ -1,0 +1,25 @@
+﻿<h3>ProgressCirkel</h3>
+
+@code {
+    [Parameter]
+    public double Progress { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("initializeProgressBar", Progress / 100);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("updateProgressBar", Progress / 100);
+        }
+    }
+}
+
+<div id="progress-container"></div>
+
+@code {
+    [Inject]
+    IJSRuntime JS { get; set; }
+}

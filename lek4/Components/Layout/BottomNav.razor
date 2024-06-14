@@ -1,0 +1,45 @@
+﻿
+<div class="bottom-nav" >
+    <nav class="nav" >
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+        </NavLink>
+        <NavLink class="nav-link" href="products" >
+            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Products
+        </NavLink>
+        <NavLink class="nav-link" href="stats" >
+            <span class="bi bi-bar-chart-fill-nav-menu" aria-hidden="true"></span> Stats
+        </NavLink>
+    </nav>
+</div>
+
+<style>
+    .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        background-color: mediumpurple;
+        color: white;
+        text-align: center;
+        padding: 10px 0;
+        opacity: 0.8;
+        border-radius: 20px 20px 0px 0px;
+    }
+
+    .nav {
+        display: flex;
+        justify-content: space-around;
+    }
+
+    .nav-link {
+        color: white;
+        text-decoration: none;
+        padding: 10px;
+    }
+
+        .nav-link:hover {
+            background-color: antiquewhite;
+            border-radius: 10px;
+            color:black;
+        }
+</style>

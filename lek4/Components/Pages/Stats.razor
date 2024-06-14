@@ -1,0 +1,39 @@
+﻿@page "/stats"
+
+<h3 class="center-title">Personal Stats</h3>
+<p class="center-subtitle">Welcome to your personal stats page! Here you can see how much you have walked and track your progress.</p>
+
+<div class="stats-container">
+    <div class="stat-item">
+        <h4>Total Steps</h4>
+        <p>@totalSteps</p>
+    </div>
+    <div class="stat-item">
+        <h4>Daily Average</h4>
+        <p>@dailyAverageSteps</p>
+    </div>
+    <div class="stat-item">
+        <h4>Weekly Progress</h4>
+        <div class="progress-bar">
+            <div class="progress" style="width:@weeklyProgress%"></div>
+        </div>
+        <p>@weeklyProgress%</p>
+    </div>
+</div>
+
+@code {
+    private int totalSteps;
+    private int dailyAverageSteps;
+    private double weeklyProgress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var googleFitService = new GoogleFitService();
+        DateTime startDate = DateTime.Now.AddDays(-7);
+        DateTime endDate = DateTime.Now;
+
+        totalSteps = await googleFitService.GetTotalStepsAsync(startDate, endDate);
+        dailyAverageSteps = totalSteps / 7;
+        weeklyProgress = (double)totalSteps / 70000 * 100; // Assuming goal is 10,000 steps/day
+    }
+}

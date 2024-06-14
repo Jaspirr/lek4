@@ -1,0 +1,56 @@
+﻿@page "/"
+
+<div class="container" style="background-color: @(GetBackgroundColor())">
+    <div class="main-number @GetSizeClass() @explodeClass">
+        @number.ToString("0.0")
+    </div>
+    <div class="step-count">
+        Steps: @steps
+    </div>
+</div>
+
+<StepCounter OnStepsChanged="UpdateNumber" />
+
+@code {
+    private double number = 0.0;
+    private int steps = 0;
+    private string explodeClass = string.Empty;
+
+    private void UpdateNumber(int stepCount)
+    {
+        steps = stepCount;
+        number = Math.Round(steps / 1000.0, 1);
+        TriggerExplosionEffect();
+    }
+
+    private void TriggerExplosionEffect()
+    {
+        explodeClass = "explode";
+        StateHasChanged();
+        Task.Delay(600).ContinueWith(_ =>
+        {
+            explodeClass = string.Empty;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private string GetBackgroundColor()
+    {
+        if (number >= 5.0) return "#FF0000"; // Röd
+        if (number >= 4.0) return "#FFA500"; // Orange
+        if (number >= 3.0) return "#FFFF00"; // Gul
+        if (number >= 2.0) return "#ADD8E6"; // Ljusblå
+        if (number >= 1.0) return "#90EE90"; // Ljusgrön
+        return "#fd5c63"; 
+    }
+
+    private string GetSizeClass()
+    {
+        if (number >= 5.0) return "size-5";
+        if (number >= 4.0) return "size-4";
+        if (number >= 3.0) return "size-3";
+        if (number >= 2.0) return "size-2";
+        if (number >= 1.0) return "size-1";
+        return "size-0";
+    }
+}
