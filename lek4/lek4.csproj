@@ -56,6 +56,8 @@
         <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
         <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
+
+ 
 	
 	<ItemGroup>
 		<PackageReference Include="Google.Apis" Version="1.68.0" />
@@ -73,5 +75,6 @@
 		<Folder Include="Components\Service\" />
 		<Folder Include="wwwroot\NewFolder\" />
 	</ItemGroup>
+
 
 </Project>
