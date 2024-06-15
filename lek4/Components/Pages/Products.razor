@@ -29,7 +29,7 @@
     {
         <div class="product product-@(productNumber)">
             <a @onclick="() => GoToProduct(productNumber)">
-                <i class="fa-solid fa-lock"></i>
+                <i class="fas fa-lock"></i> <!-- Hänglåsikon -->
             </a>
         </div>
     }
@@ -39,20 +39,37 @@
     .product-grid {
         display: flex;
         flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
     }
 
     .product {
-        flex: 1 0 21%; /* approximately four items per row */
-        margin: 5px;
+        flex: 0 0 calc(25% - 10px); /* Fyra fyrkanter per rad */
+        box-sizing: border-box;
         padding: 20px;
         border: 1px solid #ddd;
         text-align: center;
         cursor: pointer;
+        width: 150px;
+        height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
         .product a {
             text-decoration: none;
             color: inherit;
             font-size: 2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
         }
+
+            .product a i {
+                font-size: 3em;
+                transform: rotate(0deg); /* Säkra att ikonen är lodrät */
+            }
 </style>
