@@ -72,7 +72,6 @@
 
 	<ItemGroup>
 		<Folder Include="Components\Models\" />
-		<Folder Include="Components\Service\" />
 		<Folder Include="wwwroot\NewFolder\" />
 	</ItemGroup>
 

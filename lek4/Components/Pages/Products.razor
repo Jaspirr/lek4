@@ -1,15 +1,58 @@
-﻿@page "/products"
+﻿@page "/products/{number:double}"
+
+@inject NavigationManager NavigationManager
+@inject lek4.Components.Service.NumberService NumberService
+
+@code {
+    [Parameter]
+    public double number { get; set; }
+
+    private List<int> productNumbers;
+
+    protected override void OnParametersSet()
+    {
+        NumberService.CurrentNumber = number;
+        int maxProductNumber = (int)Math.Floor(number);
+        productNumbers = Enumerable.Range(1, maxProductNumber).ToList();
+    }
+
+    private void GoToProduct(int productNumber)
+    {
+        NavigationManager.NavigateTo($"/product/{productNumber}");
+    }
+}
 
 <h3 class="center-title">Products</h3>
 
 <div class="product-grid">
-    <div class="product product-1"><span>1</span></div>
-    <div class="product product-2"><span>2</span></div>
-    <div class="product product-3"><span>3</span></div>
-    <div class="product product-4"><span>4</span></div>
-    <div class="product product-5"><span>5</span></div>
-    <div class="product product-6"><span>6</span></div>
-    <div class="product product-7"><span>7</span></div>
-    <div class="product product-8"><span>8</span></div>
-    <div class="product product-9"><span>9</span></div>
+    @foreach (var productNumber in productNumbers)
+    {
+        <div class="product product-@(productNumber)">
+            <a @onclick="() => GoToProduct(productNumber)">
+                <i class="fa-solid fa-lock"></i>
+            </a>
+        </div>
+    }
 </div>
+
+<style>
+    .product-grid {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .product {
+        flex: 1 0 21%; /* approximately four items per row */
+        margin: 5px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        text-align: center;
+        cursor: pointer;
+    }
+
+        .product a {
+            text-decoration: none;
+            color: inherit;
+            font-size: 2em;
+        }
+</style>

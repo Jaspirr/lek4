@@ -1,7 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Controls.Hosting;
-using Microsoft.Maui.Hosting;
 
 namespace lek4
 {
@@ -18,9 +16,11 @@ namespace lek4
                 });
 
             builder.Services.AddMauiBlazorWebView();
-
             builder.Services.AddBlazorWebViewDeveloperTools();
             builder.Logging.AddDebug();
+
+            // Register NumberService
+            builder.Services.AddSingleton<Components.Service.NumberService>();
 
             return builder.Build();
         }

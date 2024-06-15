@@ -1,0 +1,49 @@
+﻿@page "/product/{productNumber:int}"
+
+@inject NavigationManager NavigationManager
+@inject lek4.Components.Service.NumberService NumberService
+
+@code {
+    [Parameter]
+    public int productNumber { get; set; }
+
+    private double price;
+
+    protected override void OnParametersSet()
+    {
+        price = productNumber * 10; // Exempel: Priset ökar med 10 för varje produkt
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo($"/products/{NumberService.CurrentNumber:F1}");
+    }
+}
+
+<div class="product-details">
+    <h3>Product @productNumber</h3>
+    <p>Price: $@price</p>
+    <button @onclick="GoBack">Back to Products</button>
+</div>
+
+<style>
+    .product-details {
+        text-align: center;
+        margin: 20px;
+    }
+
+        .product-details h3 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        .product-details p {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+
+        .product-details button {
+            padding: 10px 20px;
+            font-size: 1em;
+        }
+</style>
