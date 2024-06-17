@@ -212,7 +212,7 @@ h1:focus {
 
 /* Add background colors to each product */
 .product-1 {
-    background-color: #ff9999;
+    background-color: #99ff99;
 }
 
 .product-2 {
@@ -220,7 +220,7 @@ h1:focus {
 }
 
 .product-3 {
-    background-color: #99ff99;
+    background-color: #FFFF00;
 }
 
 .product-4 {
@@ -298,7 +298,32 @@ h1:focus {
 .product-grid .product:nth-child(9) {
     grid-column: 3; /* Position ninth product in third column */
 }
+@keyframes shake {
+    0%, 100% {
+        transform: rotate(315deg) translateX(0);
+    }
 
+    25% {
+        transform: rotate(315deg) translateX(-5px);
+    }
+
+    50% {
+        transform: rotate(315deg) translateX(5px);
+    }
+
+    75% {
+        transform: rotate(315deg) translateX(-5px);
+    }
+}
+
+.product.unlocking i {
+    animation: shake 0.5s; /* Skakningsanimation */
+}
+
+.product a i {
+    font-size: 2em; /* Justera storleken på ikonen */
+    transform: rotate(315deg); /* Starta med 315 graders rotation */
+}
 /* Centering titles */
 .center-title {
     text-align: center;

@@ -12,18 +12,28 @@
     protected override void OnParametersSet()
     {
         price = productNumber * 10; // Exempel: Priset ökar med 10 för varje produkt
+        NumberService.UnlockProduct(productNumber); // Lås upp produkten när den öppnas
     }
 
     private void GoBack()
     {
         NavigationManager.NavigateTo($"/products/{NumberService.CurrentNumber:F1}");
     }
+
+    private void LockInPrice()
+    {
+        NumberService.LockInProduct(productNumber);
+        GoBack();
+    }
 }
 
 <div class="product-details">
     <h3>Product @productNumber</h3>
     <p>Price: $@price</p>
-    <button @onclick="GoBack">Back to Products</button>
+    <button @onclick="GoBack" class="icon-button">
+        <i class="fas fa-arrow-left"></i> <!-- Tillbaka ikon -->
+    </button>
+    <button @onclick="LockInPrice">Lock in</button>
 </div>
 
 <style>
@@ -45,5 +55,13 @@
         .product-details button {
             padding: 10px 20px;
             font-size: 1em;
+            margin: 5px;
         }
+
+    .icon-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.5em;
+    }
 </style>
