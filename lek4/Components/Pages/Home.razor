@@ -55,20 +55,26 @@
 
     private string GetBackgroundColor()
     {
-        if (number >= 9.0) return "#66ffcc";
-        if (number >= 8.0) return "#ff9966";
-        if (number >= 7.0) return "#ffff99";
-        if (number >= 6.0) return "#ffccff";
-        if (number >= 5.0) return "#cc99ff";
-        if (number >= 4.0) return "#ffcc99";
-        if (number >= 3.0) return "#FFFF00";
-        if (number >= 2.0) return "#99ccff";
-        if (number >= 1.0) return "#99ff99";
-        return "#ffffff";
-    }
+        if (number >= 9.0) return "#98FB98"; // PaleGreen
+        if (number >= 8.0) return "#FF1493"; // DeepPink
+        if (number >= 7.0) return "#cc99ff"; // LightPurple
+        if (number >= 6.0) return "#7FFF00"; // Chartreuse
+        if (number >= 5.0) return "#FFFF00"; // Yellow
+        if (number >= 4.0) return "#ffcc99"; // Peach
+        if (number >= 3.0) return "#ffff99"; // LightYellow
+        if (number >= 2.0) return "#99ccff"; // LightBlue
+        if (number >= 1.0) return "#99ff99"; // LightGreen
+        return "#ffffff"; // White
 
+    }
+  
+  
     private string GetSizeClass()
     {
+        if (number >= 9.0) return "size-9";
+        if (number >= 8.0) return "size-8";
+        if (number >= 7.0) return "size-7";
+        if (number >= 6.0) return "size-6";
         if (number >= 5.0) return "size-5";
         if (number >= 4.0) return "size-4";
         if (number >= 3.0) return "size-3";
@@ -79,7 +85,7 @@
 
     private void IncrementNumber()
     {
-        number = Math.Min(number + 0.1, 9.9);
+        number = Math.Min(number + 0.1, 9.0);
     }
 
     private void DecrementNumber()

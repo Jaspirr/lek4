@@ -8,11 +8,16 @@
     public int productNumber { get; set; }
 
     private double price;
+    private double winningChance;
+    private double lockInAmount;
+    private string errorMessage;
+    private string successMessage;
 
     protected override void OnParametersSet()
     {
         price = productNumber * 10; // Exempel: Priset ökar med 10 för varje produkt
         NumberService.UnlockProduct(productNumber); // Lås upp produkten när den öppnas
+        winningChance = NumberService.GetWinningChance(productNumber); // Get winning chance
     }
 
     private void GoBack()
@@ -22,17 +27,40 @@
 
     private void LockInPrice()
     {
-        NumberService.LockInProduct(productNumber);
-        GoBack();
+        if (lockInAmount > 0)
+        {
+            if (NumberService.HasEnoughOdds(lockInAmount))
+            {
+                NumberService.LockInProduct(productNumber, lockInAmount);
+                winningChance = NumberService.GetWinningChance(productNumber); // Update winning chance
+                errorMessage = string.Empty;
+                successMessage = "Odds successfully locked in!";
+            }
+            else
+            {
+                errorMessage = "You don't have enough odds left.";
+                successMessage = string.Empty;
+            }
+        }
     }
 }
 
 <div class="product-details">
     <h3>Price: $@price</h3>
+    <p>Winning Chance: @winningChance%</p> <!-- Display winning chance -->
+    <input type="number" @bind="lockInAmount" placeholder="Enter lock-in amount" min="1" />
     <button @onclick="GoBack" class="icon-button">
         <i class="fas fa-arrow-left"></i> <!-- Tillbaka ikon -->
     </button>
     <button @onclick="LockInPrice">LOCK IN</button>
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <p class="error-message">@errorMessage</p>
+    }
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <p class="success-message">@successMessage</p>
+    }
 </div>
 
 <style>
@@ -62,5 +90,23 @@
         border: none;
         cursor: pointer;
         font-size: 1.5em;
+    }
+
+    input[type="number"] {
+        padding: 10px;
+        font-size: 1em;
+        margin-bottom: 10px;
+    }
+
+    .error-message {
+        color: red;
+        font-size: 1em;
+        margin-top: 10px;
+    }
+
+    .success-message {
+        color: green;
+        font-size: 1em;
+        margin-top: 10px;
     }
 </style>

@@ -37,7 +37,7 @@
     }
 }
 
-<h3 class="center-title">Props</h3>
+<h3 class="center-title">Products</h3>
 
 <div class="product-grid">
     @foreach (var productNumber in productNumbers)
@@ -72,25 +72,25 @@
         position: relative;
     }
 
-    .product a {
-        text-decoration: none;
-        color: inherit;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-        position: relative;
-    }
+        .product a {
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
 
-    .product a i {
-        font-size: 2em; /* Justera storleken på ikonen */
-        transform: rotate(315deg); /* Starta med 315 graders rotation */
-    }
+            .product a i {
+                font-size: 2em; /* Justera storleken på ikonen */
+                transform: rotate(315deg); /* Starta med 315 graders rotation */
+            }
 
-    .product.unlocking i {
-        animation: shake 0.5s; /* Skakningsanimation */
-    }
+        .product.unlocking i {
+            animation: shake 0.5s; /* Skakningsanimation */
+        }
 
     .checkmark {
         font-size: 2em;
