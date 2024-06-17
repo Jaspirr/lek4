@@ -1,11 +1,13 @@
 .page {
     position: relative;
-    display: flex;
-    flex-direction: column;
+    display: block; /* Ändra till block istället för flex om det påverkar layouten */
 }
 
 main {
-    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centrera innehållet horisontellt */
+    width: 100%;
 }
 
 .sidebar {
