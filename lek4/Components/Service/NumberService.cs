@@ -5,6 +5,7 @@ namespace lek4.Components.Service
     public class NumberService
     {
         public double CurrentNumber { get; set; }
+        public int MaxProductNumber { get; set; } = 9; // Set a default max product number
         public List<int> UnlockedProducts { get; private set; } = new List<int>();
         public List<int> LockedInProducts { get; private set; } = new List<int>();
 
@@ -66,7 +67,12 @@ namespace lek4.Components.Service
         {
             return CurrentNumber >= amount;
         }
-    }
 
+        // Get the remaining odds
+        public double GetRemainingOdds()
+        {
+            return CurrentNumber;
+        }
+    }
 
 }
