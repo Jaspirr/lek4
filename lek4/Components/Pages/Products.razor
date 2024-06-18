@@ -2,7 +2,6 @@
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
-
 @code {
     [Parameter]
     public double number { get; set; }
@@ -36,32 +35,35 @@
     {
         return NumberService.IsProductLockedIn(productNumber);
     }
+
+    private string GetProductClass(int productNumber)
+    {
+        return NumberService.IsProductLockedIn(productNumber) ? "product locked-in" : "product locked";
+    }
 }
+
 <h3 class="center-title">Products</h3>
-<p class="remaining-odds">Remaining Odds: @remainingOdds</p> <!-- Display remaining odds -->
+<p class="remaining-odds">Odds: @remainingOdds</p> <!-- Display remaining odds -->
 
 <div class="product-grid">
     @foreach (var productNumber in productNumbers)
     {
-        <div class="product-container @(unlockingProduct == productNumber ? "unlocking" : "")">
-            <div class="product product-@(productNumber)">
-                <a @onclick="async () => await GoToProduct(productNumber)">
-                    <div class="icon-wrapper">
-                        @if (!IsProductLockedIn(productNumber))
-                        {
-                            <i class="@GetIconClass(productNumber)"></i> <!-- Hänglåsikon -->
-                        }
-                        @if (IsProductLockedIn(productNumber))
-                        {
-                            <i class="fas fa-check checkmark"></i> <!-- Bock ikon -->
-                        }
-                    </div>
-                </a>
-            </div>
+        <div class="@GetProductClass(productNumber) product-@(productNumber) @(unlockingProduct == productNumber ? "unlocking" : "")">
+            <a @onclick="async () => await GoToProduct(productNumber)">
+                <div class="icon-wrapper">
+                    @if (!IsProductLockedIn(productNumber))
+                    {
+                        <i class="@GetIconClass(productNumber)"></i> <!-- Hänglåsikon -->
+                    }
+                    @if (IsProductLockedIn(productNumber))
+                    {
+                        <i class="fas fa-check checkmark"></i> <!-- Bock ikon -->
+                    }
+                </div>
+            </a>
         </div>
     }
 </div>
-
 
 <style>
    

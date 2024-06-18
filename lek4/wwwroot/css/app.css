@@ -201,19 +201,13 @@ h1:focus {
     grid-template-columns: repeat(5, 1fr);
     gap: 5px;
     justify-items: center;
-    margin: 120px 0;
+    margin: 120px;
     max-width: 300px; /* Justera bredden så att den passar layouten */
     margin-left: auto;
     margin-right: auto;
 }
 
-.product-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.product-grid .product {
+.product {
     border: 1px solid black;
     padding: 2px;
     text-align: center;
@@ -224,16 +218,38 @@ h1:focus {
     justify-content: center;
     transform: rotate(45deg);
     position: relative;
-    opacity: 0.8;
-    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, background-color 0.5s;
 }
 
-    .product-grid .product:hover {
+    .product:hover {
         transform: scale(1.05) rotate(45deg);
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
     }
 
-.product-grid .icon-wrapper {
+.locked {
+    background-color: silver; /* Silvrig färg när låst */
+}
+
+.locked-in {
+    background-color: gold; /* Guldglitter när upplåst */
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        box-shadow: 0 0 5px gold;
+    }
+
+    50% {
+        box-shadow: 0 0 20px gold;
+    }
+
+    100% {
+        box-shadow: 0 0 5px gold;
+    }
+}
+
+.icon-wrapper {
     transform: rotate(-45deg);
     width: 100%;
     height: 100%;
@@ -242,7 +258,7 @@ h1:focus {
     justify-content: center;
 }
 
-.product-grid .product a {
+.product a {
     text-decoration: none;
     color: inherit;
     display: flex;
@@ -254,13 +270,13 @@ h1:focus {
     transition: color 0.3s ease-in-out;
 }
 
-    .product-grid .product a i {
+    .product a i {
         font-size: 2em;
         transition: none; /* Remove any animation from the lock icon */
     }
 
-.product-container.unlocking .product {
-    animation: spinAndScale 1s; /* Snurr- och skalanimation, långsammare */
+.product.unlocking {
+    animation: spinAndScale 1s; /* Snurr- och skalanimation */
 }
 
 @keyframes spinAndScale {
@@ -277,7 +293,7 @@ h1:focus {
     }
 }
 
-.product-grid .product span {
+.product span {
     display: block;
     width: 100%;
     position: absolute;
@@ -323,55 +339,55 @@ h1:focus {
     background-color: rgba(152, 251, 152, 0.8); /* Pale Green */
 }
 
-.product-grid .product:nth-child(1) {
+.product:nth-child(1) {
     grid-column: 3 / span 1; /* Center the first product */
 }
 
-.product-grid .product:nth-child(2),
-.product-grid .product:nth-child(3) {
+.product:nth-child(2),
+.product:nth-child(3) {
     grid-column: span 1;
 }
 
-.product-grid .product:nth-child(2) {
+.product:nth-child(2) {
     grid-column: 2; /* Position second product in second column */
 }
 
-.product-grid .product:nth-child(3) {
+.product:nth-child(3) {
     grid-column: 4; /* Position third product in fourth column */
 }
 
-.product-grid .product:nth-child(4),
-.product-grid .product:nth-child(5),
-.product-grid .product:nth-child(6) {
+.product:nth-child(4),
+.product:nth-child(5),
+.product:nth-child(6) {
     grid-column: span 1;
 }
 
-.product-grid .product:nth-child(4) {
+.product:nth-child(4) {
     grid-column: 1; /* Position fourth product in first column */
 }
 
-.product-grid .product:nth-child(5) {
+.product:nth-child(5) {
     grid-column: 3; /* Position fifth product in third column */
 }
 
-.product-grid .product:nth-child(6) {
+.product:nth-child(6) {
     grid-column: 5; /* Position sixth product in fifth column */
 }
 
-.product-grid .product:nth-child(7),
-.product-grid .product:nth-child(8) {
+.product:nth-child(7),
+.product:nth-child(8) {
     grid-column: span 1;
 }
 
-.product-grid .product:nth-child(7) {
+.product:nth-child(7) {
     grid-column: 2; /* Position seventh product in second column */
 }
 
-.product-grid .product:nth-child(8) {
+.product:nth-child(8) {
     grid-column: 4; /* Position eighth product in fourth column */
 }
 
-.product-grid .product:nth-child(9) {
+.product:nth-child(9) {
     grid-column: 3; /* Position ninth product in third column */
 }
 
@@ -386,7 +402,7 @@ h1:focus {
 
 .checkmark {
     font-size: 2em;
-    color: green;
+    color: black;
 }
 /* Centering titles */
 .center-title {
