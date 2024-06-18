@@ -3,9 +3,10 @@
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
+
 @code {
     [Parameter]
-    public double number { get; set; }
+    public double? number { get; set; }
 
     private List<int> productNumbers;
     private int unlockingProduct = -1; // Håller reda på vilken produkt som håller på att låsas upp
@@ -13,7 +14,12 @@
 
     protected override void OnParametersSet()
     {
-        NumberService.CurrentNumber = number;
+        if (!number.HasValue)
+        {
+            number = NumberService.CurrentNumber;
+        }
+
+        NumberService.CurrentNumber = number.Value;
         remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0); // Limit to 100
         productNumbers = Enumerable.Range(1, NumberService.MaxProductNumber).ToList(); // Use MaxProductNumber to display products
     }
@@ -44,7 +50,7 @@
 }
 
 <h3 class="center-title">Products</h3>
-<p class="remaining-odds">Odds: @remainingOdds</p> <!-- Display remaining odds -->
+<p class="remaining-odds">Odds: @remainingOdds.ToString("0.0")x</p> <!-- Display remaining odds -->
 
 <div class="product-grid">
     @foreach (var productNumber in productNumbers)
@@ -67,5 +73,5 @@
 </div>
 
 <style>
-   
+
 </style>

@@ -15,16 +15,57 @@
     private string errorMessage;
     private bool isSuccess;
     private bool exceedsTotalOdds;
+    private string timeRemaining;
+    private Timer timer;
+
+    protected override void OnInitialized()
+    {
+        timer = new Timer(UpdateTimer, null, 0, 1000);
+    }
 
     protected override void OnParametersSet()
     {
         price = productNumber * 10; // Exempel: Priset ökar med 10 för varje produkt
         NumberService.UnlockProduct(productNumber); // Lås upp produkten när den öppnas
         winningChance = NumberService.GetWinningChance(productNumber); // Get winning chance
-        totalOdds = NumberService.GetRemainingOdds(); // Get total odds
+        if (winningChance > 100.0) // Kontrollera och begränsa winningChance till 100%
+        {
+            winningChance = 100.0;
+        }
+        totalOdds = Math.Max(NumberService.GetRemainingOdds(), 0.0); // Get total odds
         lockedInOdds = NumberService.ProductLockAmounts.ContainsKey(productNumber)
             ? NumberService.ProductLockAmounts[productNumber].Sum()
             : 0;
+    }
+
+    private void UpdateTimer(object state)
+    {
+        var now = DateTime.Now;
+        var nextFriday = GetNextFridayAt20();
+        var timeSpan = nextFriday - now;
+
+        if (timeSpan.TotalSeconds <= 0)
+        {
+            nextFriday = GetNextFridayAt20();
+            timeSpan = nextFriday - now;
+        }
+
+        timeRemaining = $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
+        InvokeAsync(StateHasChanged);
+    }
+
+    private DateTime GetNextFridayAt20()
+    {
+        var today = DateTime.Today;
+        var daysUntilFriday = ((int)DayOfWeek.Friday - (int)today.DayOfWeek + 7) % 7;
+        var nextFriday = today.AddDays(daysUntilFriday).AddHours(20);
+
+        if (nextFriday < DateTime.Now)
+        {
+            nextFriday = nextFriday.AddDays(7);
+        }
+
+        return nextFriday;
     }
 
     private void GoBack()
@@ -62,6 +103,11 @@
         lockInAmount = Convert.ToDouble(e.Value);
         exceedsTotalOdds = lockInAmount > totalOdds;
     }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
 }
 
 <div class="product-details">
@@ -69,9 +115,17 @@
         <i class="fas fa-arrow-left"></i> <!-- Tillbaka ikon -->
     </button>
     <h3>Price: $@price</h3>
-    <p>Chance: @winningChance%</p> <!-- Display winning chance -->
-    <p>Odds: @totalOdds</p> <!-- Display total odds -->
-    <p>Locked In: @lockedInOdds</p> <!-- Display locked in odds -->
+    <div class="stats-container">
+        <div class="stat-item">
+            <p class="stat-value">@winningChance.ToString("0.0")%</p>
+        </div>
+        <div class="stat-item">
+            <p class="stat-value">@totalOdds.ToString("0.0")x</p>
+        </div>
+        <div class="stat-item">
+            <p class="stat-value">@lockedInOdds.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
+        </div>
+    </div>
     <input type="range" min="0.0" max="9.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
     <p>Selected Amount: @lockInAmount</p>
     <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
@@ -79,6 +133,10 @@
     {
         <p class="error-message">@errorMessage</p>
     }
+    <div class="countdown-timer">
+        <h4>Fri 20:00</h4>
+        <p>@timeRemaining</p>
+    </div>
 </div>
 
 <style>
@@ -89,6 +147,7 @@
         border: 1px solid #ddd;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         border-radius: 10px;
+        position: relative;
         transition: box-shadow 0.3s ease-in-out;
     }
 
@@ -150,13 +209,46 @@
         left: 8px;
     }
 
+    .stats-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+
+    .stat-item {
+        background-color: mediumpurple;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 10px;
+        max-width: 85px;
+        max-height: 60px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin: 5px; /* Lägg till marginal för utrymme mellan boxarna */
+    }
+
+    .stat-value {
+        font-size: 1.2em;
+        margin: 0;
+        color: black; /* Ändra textfärgen till vit */
+    }
+
+    .stat-label {
+        font-size: 0.9em;
+        color: white; /* Ändra textfärgen till vit */
+    }
+
+    .stat-icon {
+        font-size: 0.7em;
+        color: white; /* Ändra textfärgen till vit */
+    }
     input[type="range"].slider {
         -webkit-appearance: none;
         width: 100%;
         height: 5px;
         background: silver;
         outline: none;
-        opacity: 0.7;
         transition: opacity .2s;
         background: linear-gradient(to right, mediumpurple 0%, mediumpurple var(--value), silver var(--value), silver 100%);
     }
@@ -190,8 +282,32 @@
         font-size: 1em;
         margin-top: 10px;
     }
-</style>
 
+    .countdown-timer {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: mediumpurple;
+        border: 1px solid mediumpurple;
+        padding: 5px 10px;
+        border-radius: 5px;
+        color: white;
+        font-size: 0.9em;
+        text-align: center;
+    }
+
+        .countdown-timer h4 {
+            margin: 0;
+            font-size: 0.9em;
+            font-weight: normal;
+        }
+
+        .countdown-timer p {
+            margin: 0;
+            color: white;
+            font-size: 0.9em;
+        }
+</style>
 <script>
     document.addEventListener('input', function (event) {
         if (event.target.classList.contains('slider')) {

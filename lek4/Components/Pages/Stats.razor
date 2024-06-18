@@ -28,11 +28,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var googleFitService = new GoogleFitService();
-        DateTime startDate = DateTime.Now.AddDays(-7);
-        DateTime endDate = DateTime.Now;
+        
 
-        totalSteps = await googleFitService.GetTotalStepsAsync(startDate, endDate);
         dailyAverageSteps = totalSteps / 7;
         weeklyProgress = (double)totalSteps / 70000 * 100; // Assuming goal is 10,000 steps/day
     }

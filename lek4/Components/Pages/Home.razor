@@ -7,7 +7,7 @@
     <button class="login-button" @onclick="NavigateToLogin">Login</button>
 
     <div class="main-number @GetSizeClass() @explodeClass">
-        @number.ToString("0.0")
+        @number.ToString("0.0x")
     </div>
     <div class="step-count">
         Steps: @steps
@@ -20,9 +20,7 @@
     <button @onclick="DecrementNumber">-</button>
     <span>@number</span>
     <button @onclick="IncrementNumber">+</button>
-    <button @onclick="GoToProducts">Go to Products</button>
 </div>
-
 @code {
     private double number
     {
@@ -80,7 +78,7 @@
         if (number >= 4.0) return "size-4";
         if (number >= 3.0) return "size-3";
         if (number >= 2.0) return "size-2";
-        if (number >= 1.0) return "size-1";
+        if (number >= 0.9) return "size-1";
         return "size-0";
     }
 
