@@ -207,45 +207,59 @@ h1:focus {
     margin-right: auto;
 }
 
-    .product-grid .product {
-        border: 1px solid black;
-        padding: 2px;
-        text-align: center;
-        width: 60px;
-        height: 60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transform: rotate(45deg);
-        position: relative;
-        opacity: 0.8;
-        transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+.product-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.product-grid .product {
+    border: 1px solid black;
+    padding: 2px;
+    text-align: center;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(45deg);
+    position: relative;
+    opacity: 0.8;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+    .product-grid .product:hover {
+        transform: scale(1.05) rotate(45deg);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
     }
 
-        .product-grid .product:hover {
-            transform: scale(1.05) rotate(45deg);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-        }
+.product-grid .icon-wrapper {
+    transform: rotate(-45deg);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-        .product-grid .product a {
-            text-decoration: none;
-            color: inherit;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-            position: relative;
-            transition: color 0.3s ease-in-out;
-        }
+.product-grid .product a {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transition: color 0.3s ease-in-out;
+}
 
-            .product-grid .product a i {
-                font-size: 2em;
-                transform: rotate(-45deg); /* Keep the lock icon upright */
-                transition: none; /* Remove any animation from the lock icon */
-            }
+    .product-grid .product a i {
+        font-size: 2em;
+        transition: none; /* Remove any animation from the lock icon */
+    }
 
-.product.unlocking {
+.product-container.unlocking .product {
     animation: spinAndScale 1s; /* Snurr- och skalanimation, långsammare */
 }
 
@@ -264,13 +278,12 @@ h1:focus {
 }
 
 .product-grid .product span {
-    transform: rotate(-45deg);
     display: block;
     width: 100%;
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) rotate(-45deg);
+    transform: translate(-50%, -50%);
 }
 
 /* Add background colors to each product */
