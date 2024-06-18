@@ -69,9 +69,9 @@
         <i class="fas fa-arrow-left"></i> <!-- Tillbaka ikon -->
     </button>
     <h3>Price: $@price</h3>
-    <p>Winning Chance: @winningChance%</p> <!-- Display winning chance -->
-    <p>Total Odds: @totalOdds</p> <!-- Display total odds -->
-    <p>Locked In Odds: @lockedInOdds</p> <!-- Display locked in odds -->
+    <p>Chance: @winningChance%</p> <!-- Display winning chance -->
+    <p>Odds: @totalOdds</p> <!-- Display total odds -->
+    <p>Locked In: @lockedInOdds</p> <!-- Display locked in odds -->
     <input type="range" min="0.0" max="9.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
     <p>Selected Amount: @lockInAmount</p>
     <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>

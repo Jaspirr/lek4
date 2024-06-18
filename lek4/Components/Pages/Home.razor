@@ -4,6 +4,8 @@
 @inject lek4.Components.Service.NumberService NumberService
 
 <div class="container" style="background-color: @(GetBackgroundColor())">
+    <button class="login-button" @onclick="NavigateToLogin">Login</button>
+
     <div class="main-number @GetSizeClass() @explodeClass">
         @number.ToString("0.0")
     </div>
@@ -63,11 +65,10 @@
         if (number >= 4.0) return "#ffcc99"; // Peach
         if (number >= 3.0) return "#ffff99"; // LightYellow
         if (number >= 2.0) return "#99ccff"; // LightBlue
-        if (number >= 1.0) return "#99ff99"; // LightGreen
+        if (number >= 0.9) return "#99ff99"; // LightGreen
         return "#ffffff"; // White
 
     }
-  
   
     private string GetSizeClass()
     {
@@ -97,4 +98,43 @@
     {
         NavigationManager.NavigateTo(GetProductUrl());
     }
+
+    private void NavigateToLogin()
+    {
+        NavigationManager.NavigateTo("/login");
+    }
 }
+
+<style>
+    .container {
+        position: relative;
+        padding-top: 10px;
+        padding-right: 10px;
+    }
+
+    .login-button {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        padding: 10px 20px;
+        background-color: mediumpurple;
+        color: white;
+        border: none;
+        opacity: 0.8;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .login-button:hover {
+            background-color: mediumpurple;
+            opacity: 0.8;
+    }
+
+    .main-number {
+        /* Ditt befintliga CSS-stil för main-number */
+    }
+
+    .step-count {
+        /* Ditt befintliga CSS-stil för step-count */
+    }
+</style>
