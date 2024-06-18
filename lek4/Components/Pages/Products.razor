@@ -46,13 +46,13 @@
     {
         <div class="product product-@(productNumber) @(unlockingProduct == productNumber ? "unlocking" : "")">
             <a @onclick="async () => await GoToProduct(productNumber)">
-                @if (IsProductLockedIn(productNumber))
-                {
-                    <i class="fas fa-check checkmark"></i>  <!-- Bock ikon -->
-                }
-                else
+                @if (!IsProductLockedIn(productNumber))
                 {
                     <i class="@GetIconClass(productNumber)"></i> <!-- Hänglåsikon -->
+                }
+                @if (IsProductLockedIn(productNumber))
+                {
+                    <span class="checkmark">✔</span> <!-- Bock ikon -->
                 }
             </a>
         </div>
@@ -60,52 +60,5 @@
 </div>
 
 <style>
-    .product {
-        width: 150px;
-        height: 150px;
-        box-sizing: border-box;
-        border: 1px solid #ddd;
-        text-align: center;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
-    }
-
-        .product:hover {
-            transform: scale(1.05);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-        }
-
-        .product a {
-            text-decoration: none;
-            color: inherit;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-            position: relative;
-            transition: color 0.3s ease-in-out;
-        }
-
-            .product a i {
-                font-size: 2em;
-                transform: rotate(315deg);
-                transition: transform 0.3s ease-in-out;
-            }
-
-        .product:hover a i {
-            transform: rotate(0deg);
-        }
-
-    .remaining-odds{
-        text-align:center;
-    }
-    .checkmark {
-        font-size: 2em;
-        color: green;
-    }
+   
 </style>

@@ -207,7 +207,6 @@ h1:focus {
     margin-right: auto;
 }
 
-
     .product-grid .product {
         border: 1px solid black;
         padding: 2px;
@@ -220,53 +219,95 @@ h1:focus {
         transform: rotate(45deg);
         position: relative;
         opacity: 0.8;
+        transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
     }
 
-        .product-grid .product span {
-            transform: rotate(-45deg);
-            display: block;
-            width: 100%;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
+        .product-grid .product:hover {
+            transform: scale(1.05) rotate(45deg);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
         }
+
+        .product-grid .product a {
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: color 0.3s ease-in-out;
+        }
+
+            .product-grid .product a i {
+                font-size: 2em;
+                transform: rotate(-45deg); /* Keep the lock icon upright */
+                transition: none; /* Remove any animation from the lock icon */
+            }
+
+.product.unlocking {
+    animation: spinAndScale 1s; /* Snurr- och skalanimation, långsammare */
+}
+
+@keyframes spinAndScale {
+    0% {
+        transform: scale(1) rotate(45deg);
+    }
+
+    50% {
+        transform: scale(1.2) rotate(225deg);
+    }
+
+    100% {
+        transform: scale(1) rotate(405deg);
+    }
+}
+
+.product-grid .product span {
+    transform: rotate(-45deg);
+    display: block;
+    width: 100%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+}
 
 /* Add background colors to each product */
 .product-1 {
-    background-color: #99ff99;
+    background-color: rgba(153, 255, 153, 0.8); /* Light Green */
 }
 
 .product-2 {
-    background-color: #99ccff;
+    background-color: rgba(153, 204, 255, 0.8); /* Light Blue */
 }
 
 .product-3 {
-    background-color: #ffff99 ;
+    background-color: rgba(255, 255, 153, 0.8); /* Light Yellow */
 }
 
 .product-4 {
-    background-color: #FF00FF;
+    background-color: rgba(255, 0, 255, 0.8); /* Magenta */
 }
 
 .product-5 {
-    background-color: #ffccff;
+    background-color: rgba(255, 204, 255, 0.8); /* Light Pink */
 }
 
 .product-6 {
-    background-color: #66CDAA;
+    background-color: rgba(102, 205, 170, 0.8); /* Medium Aquamarine */
 }
 
 .product-7 {
-    background-color: #FFFF00;
+    background-color: rgba(255, 255, 0, 0.8); /* Yellow */
 }
 
 .product-8 {
-    background-color: #FF1493;
+    background-color: rgba(255, 20, 147, 0.8); /* Deep Pink */
 }
 
 .product-9 {
-    background-color: #98FB98;
+    background-color: rgba(152, 251, 152, 0.8); /* Pale Green */
 }
 
 .product-grid .product:nth-child(1) {
@@ -321,32 +362,18 @@ h1:focus {
     grid-column: 3; /* Position ninth product in third column */
 }
 
-
-@keyframes shake {
-    0%, 100% {
-        transform: rotate(315deg) translateX(0);
-    }
-
-    25% {
-        transform: rotate(315deg) translateX(-5px);
-    }
-
-    50% {
-        transform: rotate(315deg) translateX(5px);
-    }
-
-    75% {
-        transform: rotate(315deg) translateX(-5px);
-    }
+.center-title {
+    text-align: center;
+    margin-top: 50px;
 }
 
-.product.unlocking i {
-    animation: shake 0.5s; /* Skakningsanimation */
+.remaining-odds {
+    text-align: center;
 }
 
-.product a i {
-    font-size: 2em; /* Justera storleken på ikonen */
-    transform: rotate(315deg); /* Starta med 315 graders rotation */
+.checkmark {
+    font-size: 2em;
+    color: green;
 }
 /* Centering titles */
 .center-title {
