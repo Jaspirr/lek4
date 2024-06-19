@@ -1,5 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+	<meta-data android:name="com.google.firebase.auth.API_KEY" android:value="AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA" />
+	<activity android:name="com.companyname.lek4.MainActivity"
+		android:configChanges="orientation|screenSize|keyboardHidden"
+		android:label="lek4">
+		<intent-filter>
+			<action android:name="android.intent.action.MAIN" />
+			<category android:name="android.intent.category.LAUNCHER" />
+		</intent-filter>
+	</activity>
 	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:supportsRtl="true"></application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />

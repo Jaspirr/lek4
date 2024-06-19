@@ -1,46 +1,48 @@
 ﻿@page "/login"
-
-@inject NavigationManager NavigationManager
-
-<div class="login-container">
-    <div class="login-form">
-        <h3 class="login-title">Login</h3>
-        <div class="form-group">
-            <label for="username">Username:</label>
-            <input type="text" id="username" @bind="username" />
-        </div>
-        <div class="form-group">
-            <label for="password">Password:</label>
-            <input type="password" id="password" @bind="password" />
-        </div>
-        <button class="login-button" @onclick="HandleLogin">Login</button>
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <p class="error-message">@errorMessage</p>
-        }
-    </div>
-</div>
-
+@using lek4.Components.Service
+@inject NavigationManager Navigation
 @code {
-    private string username;
+    private string email;
     private string password;
-    private string errorMessage;
+    private string message;
 
-    private void HandleLogin()
+    private EmailAuthService authService = new EmailAuthService();
+
+    private async Task SignUp()
     {
-        // Mock authentication for demonstration
-        if (username == "user" && password == "password")
+        var user = await authService.SignUpWithEmailAndPassword(email, password);
+        if (user != null)
         {
-            // Navigate to the home page upon successful login
-            NavigationManager.NavigateTo("/");
+            message = $"Sign Up Successful: {user.Email}";
         }
         else
         {
-            errorMessage = "Invalid username or password";
+            message = "Sign Up Failed";
+        }
+    }
+
+    private async Task SignIn()
+    {
+        var user = await authService.SignInWithEmailAndPassword(email, password);
+        if (user != null)
+        {
+            message = $"Sign In Successful: {user.Email}";
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            message = "Sign In Failed";
         }
     }
 }
-
+<div>
+    <h3>Login</h3>
+    <input @bind="email" placeholder="Email" />
+    <input @bind="password" placeholder="Password" type="password" />
+    <button @onclick="SignUp">Sign Up</button>
+    <button @onclick="SignIn">Sign In</button>
+    <p>@message</p>
+</div>
 <style>
     .login-container {
         display: flex;

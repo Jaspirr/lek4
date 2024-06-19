@@ -50,9 +50,8 @@
 }
 
 <h3 class="center-title">Products</h3>
-<div class="stat-item-product">
-    <p class="stat-value">@remainingOdds.ToString("0.0")x</p>
-</div>
+<p class="remaining-odds">Odds: @remainingOdds.ToString("0.0")x</p> <!-- Display remaining odds -->
+
 <div class="product-grid">
     @foreach (var productNumber in productNumbers)
     {

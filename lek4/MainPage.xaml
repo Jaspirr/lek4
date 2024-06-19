@@ -3,10 +3,22 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:lek4"
              x:Class="lek4.MainPage">
-    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
-        <BlazorWebView.RootComponents>
-            <RootComponent Selector="#app" ComponentType="{x:Type local:Components.Routes}" />
-        </BlazorWebView.RootComponents>
-    </BlazorWebView>
+    <Grid>
+        <!-- Inloggningskontroller -->
+        <StackLayout Padding="30">
+            <Entry x:Name="EmailEntry" Placeholder="Email" />
+            <Entry x:Name="PasswordEntry" Placeholder="Password" IsPassword="True" />
+            <Button Text="Sign Up" Clicked="OnSignUpClicked" />
+            <Button Text="Sign In" Clicked="OnSignInClicked" />
+            <Label x:Name="MessageLabel" TextColor="Red" />
+        </StackLayout>
+
+        <!-- BlazorWebView -->
+        <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
+            <BlazorWebView.RootComponents>
+                <RootComponent Selector="#app" ComponentType="{x:Type local:Components.Routes}" />
+            </BlazorWebView.RootComponents>
+        </BlazorWebView>
+    </Grid>
 
 </ContentPage>
