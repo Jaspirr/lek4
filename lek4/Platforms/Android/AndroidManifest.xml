@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-	<meta-data android:name="com.google.firebase.auth.API_KEY" android:value="AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA" />
+	
 	<activity android:name="com.companyname.lek4.MainActivity"
 		android:configChanges="orientation|screenSize|keyboardHidden"
 		android:label="lek4">
