@@ -60,6 +60,7 @@
  
 	
 	<ItemGroup>
+		<PackageReference Include="FirebaseAuthentication.net" Version="4.1.0" />
 		<PackageReference Include="Google.Apis" Version="1.68.0" />
 		<PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
 		<PackageReference Include="Google.Apis.Fitness.v1" Version="1.68.0.3232" />

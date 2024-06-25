@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Firebase.Auth;
+using Firebase.Auth.Providers;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace lek4
@@ -21,6 +23,16 @@ namespace lek4
 
             // Register NumberService
             builder.Services.AddSingleton<Components.Service.NumberService>();
+
+            builder.Services.AddSingleton(new FirebaseAuthClient(new FirebaseAuthConfig()
+            {
+                ApiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA",
+                AuthDomain = "stega-426008.firebaseapp.com",
+                Providers = new FirebaseAuthProvider []
+                {
+                    new EmailProvider()
+                }
+            }));
 
             return builder.Build();
         }
