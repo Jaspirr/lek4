@@ -28,7 +28,7 @@ namespace lek4
             {
                 ApiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA",
                 AuthDomain = "stega-426008.firebaseapp.com",
-                Providers = new FirebaseAuthProvider []
+                Providers = new FirebaseAuthProvider[]
                 {
                     new EmailProvider()
                 }

@@ -3,6 +3,7 @@
 @using Firebase.Auth
 
 @inject FirebaseAuthClient AuthClient
+@inject NavigationManager NavigationManager
 
 <div class="login-container">
     <div class="login-form">
@@ -32,7 +33,7 @@
 
     protected override void OnInitialized()
     {
-        _viewModel = new LoginFormViewModel();
+        _viewModel = new LoginFormViewModel(NavigationManager);
     }
 
     private void OnLoginClicked()

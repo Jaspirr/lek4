@@ -64,6 +64,7 @@
 		<PackageReference Include="Google.Apis" Version="1.68.0" />
 		<PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
 		<PackageReference Include="Google.Apis.Fitness.v1" Version="1.68.0.3232" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.6" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />

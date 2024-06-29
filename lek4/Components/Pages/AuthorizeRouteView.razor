@@ -1,0 +1,16 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+
+<AuthorizeView>
+    <Authorized>
+        <RouteView RouteData="@RouteData" DefaultLayout="@DefaultLayout" />
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public RouteData RouteData { get; set; }
+    [Parameter] public Type DefaultLayout { get; set; }
+}

@@ -1,5 +1,5 @@
-﻿using System;
-using System.Windows.Input;
+﻿using System.Windows.Input;
+using Microsoft.AspNetCore.Components;
 
 namespace lek4.Features.SignUp
 {
@@ -7,24 +7,34 @@ namespace lek4.Features.SignUp
     {
         private string _email;
         private string _password;
+        private readonly NavigationManager _navigationManager;
 
         public string Email
         {
             get { return _email; }
-            set { _email = value; OnPropertyChanged(nameof(Email)); }
+            set
+            {
+                _email = value;
+                OnPropertyChanged(nameof(Email));
+            }
         }
 
         public string Password
         {
             get { return _password; }
-            set { _password = value; OnPropertyChanged(nameof(Password)); }
+            set
+            {
+                _password = value;
+                OnPropertyChanged(nameof(Password));
+            }
         }
 
         public ICommand LoginCommand { get; }
 
-        public LoginFormViewModel()
+        public LoginFormViewModel(NavigationManager navigationManager)
         {
-            LoginCommand = new LoginCommand(this);
+            _navigationManager = navigationManager;
+            LoginCommand = new LoginCommand(this, navigationManager);
         }
     }
 }
