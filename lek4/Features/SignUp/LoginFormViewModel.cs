@@ -1,5 +1,6 @@
 ﻿using System.Windows.Input;
 using Microsoft.AspNetCore.Components;
+using Firebase.Auth;
 
 namespace lek4.Features.SignUp
 {
@@ -8,6 +9,7 @@ namespace lek4.Features.SignUp
         private string _email;
         private string _password;
         private readonly NavigationManager _navigationManager;
+        private readonly FirebaseAuthClient _authClient;
 
         public string Email
         {
@@ -31,10 +33,11 @@ namespace lek4.Features.SignUp
 
         public ICommand LoginCommand { get; }
 
-        public LoginFormViewModel(NavigationManager navigationManager)
+        public LoginFormViewModel(NavigationManager navigationManager, FirebaseAuthClient authClient)
         {
             _navigationManager = navigationManager;
-            LoginCommand = new LoginCommand(this, navigationManager);
+            _authClient = authClient;
+            LoginCommand = new LoginCommand(this, navigationManager, authClient);
         }
     }
 }

@@ -3,7 +3,11 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using System.Text;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Dispatching;
+using System.Net;
 using Microsoft.AspNetCore.Components;
+using Firebase.Auth;
 
 namespace lek4.Features.SignUp
 {
@@ -11,12 +15,14 @@ namespace lek4.Features.SignUp
     {
         private readonly LoginFormViewModel _viewModel;
         private readonly NavigationManager _navigationManager;
+        private readonly FirebaseAuthClient _authClient;
         private static readonly HttpClient httpClient = new HttpClient();
 
-        public LoginCommand(LoginFormViewModel viewModel, NavigationManager navigationManager)
+        public LoginCommand(LoginFormViewModel viewModel, NavigationManager navigationManager, FirebaseAuthClient authClient)
         {
             _viewModel = viewModel;
             _navigationManager = navigationManager;
+            _authClient = authClient;
         }
 
         protected override async Task ExecuteAsync(object parameter)
@@ -30,12 +36,11 @@ namespace lek4.Features.SignUp
                 var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
                 var response = await httpClient.PostAsync(requestUri, content);
 
-                var requestBody = JObject.FromObject(payload).ToString();
                 var responseBody = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var errorMessage = $"Error: {response.StatusCode}\nResponse Body: {responseBody}";
+                    var errorMessage = GetErrorMessage(responseBody);
                     await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
                     return;
                 }
@@ -48,6 +53,9 @@ namespace lek4.Features.SignUp
                     await Application.Current.MainPage.DisplayAlert("Verification Required", "Please verify your email address before logging in.", "Ok");
                     return;
                 }
+
+                await _authClient.SignInWithEmailAndPasswordAsync(_viewModel.Email, _viewModel.Password);
+
                 await Application.Current.MainPage.DisplayAlert("Success", "Successfully logged in!", "Ok");
 
                 // Use NavigationManager to navigate to Home.razor
@@ -75,6 +83,19 @@ namespace lek4.Features.SignUp
                 return (bool)users[0]["emailVerified"];
             }
             return false;
+        }
+
+        private string GetErrorMessage(string responseBody)
+        {
+            var responseJson = JObject.Parse(responseBody);
+            var error = responseJson["error"]?["message"]?.ToString();
+            return error switch
+            {
+                "EMAIL_NOT_FOUND" => "The user does not exist. Please check your email or sign up.",
+                "INVALID_PASSWORD" => "The password is invalid. Please try again.",
+                "USER_DISABLED" => "The user account has been disabled.",
+                _ => "An error occurred during login. Please try again."
+            };
         }
     }
 }

@@ -1,7 +1,7 @@
 ﻿@page "/stats"
 
 <h3 class="center-title">Personal Stats</h3>
-<p class="center-subtitle">Welcome to your personal stats page! Here you can see how much you have walked and track your progress.</p>
+<p class="center-subtitle">Welcome to your personal stats page!</p>
 
 <div class="stats-container">
     <div class="stat-item">
@@ -21,16 +21,70 @@
     </div>
 </div>
 
+<button @onclick="NavigateToSettings" class="settings-button">
+    <i class="fas fa-cog"></i>
+</button>
+
 @code {
     private int totalSteps;
     private int dailyAverageSteps;
     private double weeklyProgress;
 
+    [Inject]
+    private NavigationManager NavigationManager { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
-        
-
+        totalSteps = 50000; // This is a placeholder value. Replace with your actual logic.
         dailyAverageSteps = totalSteps / 7;
         weeklyProgress = (double)totalSteps / 70000 * 100; // Assuming goal is 10,000 steps/day
     }
+
+    private void NavigateToSettings()
+    {
+        NavigationManager.NavigateTo("/settings");
+    }
 }
+
+<style>
+    .stats-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .stat-item {
+        margin: 10px 0;
+        text-align: center;
+    }
+
+    .progress-bar {
+        width: 100%;
+        background-color: #e0e0e0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress {
+        height: 20px;
+        background-color: #76c7c0;
+    }
+
+    .settings-button {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 24px;
+    }
+
+        .settings-button .fa-cog {
+            color: #666;
+        }
+
+        .settings-button:hover .fa-cog {
+            color: #333;
+        }
+</style>

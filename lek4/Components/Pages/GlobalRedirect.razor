@@ -1,0 +1,15 @@
+﻿@page "/redirect"
+@using Firebase.Auth
+@inject NavigationManager NavigationManager
+@inject FirebaseAuthClient AuthClient
+
+@code {
+    protected override void OnInitialized()
+    {
+        var user = AuthClient.User;
+        if (user == null && !NavigationManager.Uri.EndsWith("login"))
+        {
+            NavigationManager.NavigateTo("/login");
+        }
+    }
+}

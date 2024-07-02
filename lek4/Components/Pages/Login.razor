@@ -1,25 +1,24 @@
 ﻿@page "/login"
-@using lek4.Features.SignUp
 @using Firebase.Auth
-
+@using System.Text.Json
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
 
 <div class="login-container">
     <div class="login-form">
         <h3 class="login-title">Login</h3>
-        <EditForm Model="_viewModel">
+        <EditForm Model="loginModel" OnValidSubmit="LoginUser">
             <DataAnnotationsValidator />
             <ValidationSummary />
             <div class="form-group">
                 <label for="email">Email:</label>
-                <InputText id="email" @bind-Value="_viewModel.Email" placeholder="Email" />
+                <InputText id="email" @bind-Value="loginModel.Email" placeholder="Email" />
             </div>
             <div class="form-group">
                 <label for="password">Password:</label>
-                <InputText id="password" @bind-Value="_viewModel.Password" type="password" placeholder="Password" />
+                <InputText id="password" @bind-Value="loginModel.Password" type="password" placeholder="Password" />
             </div>
-            <button class="login-button" @onclick="OnLoginClicked">Login</button>
+            <button type="submit" class="login-button">Login</button>
             <div class="error-message">
                 <!-- You can display error messages here if needed -->
             </div>
@@ -29,16 +28,47 @@
 </div>
 
 @code {
-    private LoginFormViewModel _viewModel;
+    private LoginModel loginModel = new LoginModel();
 
-    protected override void OnInitialized()
+    private async Task LoginUser()
     {
-        _viewModel = new LoginFormViewModel(NavigationManager);
+        try
+        {
+            var userCredential = await AuthClient.SignInWithEmailAndPasswordAsync(loginModel.Email, loginModel.Password);
+            await Application.Current.MainPage.DisplayAlert("Success", "Successfully logged in!", "Ok");
+            NavigationManager.NavigateTo("/"); // Replace with your actual home page route
+        }
+        catch (Exception ex)
+        {
+            var errorMessage = GetErrorMessage(ex.Message);
+            await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
+        }
     }
 
-    private void OnLoginClicked()
+    private string GetErrorMessage(string responseBody)
     {
-        _viewModel.LoginCommand.Execute(null);
+        try
+        {
+            var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
+            var error = responseJson.GetProperty("error").GetProperty("message").GetString();
+            return error switch
+            {
+                "EMAIL_NOT_FOUND" => "The user does not exist. Please check your email or sign up.",
+                "INVALID_PASSWORD" => "The password is invalid. Please try again.",
+                "USER_DISABLED" => "The user account has been disabled.",
+                _ => "An error occurred during login. Please try again."
+            };
+        }
+        catch
+        {
+            return "An error occurred during login. Please try again.";
+        }
+    }
+
+    public class LoginModel
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
     }
 }
 

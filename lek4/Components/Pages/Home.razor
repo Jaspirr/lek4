@@ -4,7 +4,6 @@
 @inject lek4.Components.Service.NumberService NumberService
 
 <div class="container" style="background-color: @(GetBackgroundColor())">
-    <button class="login-button" @onclick="NavigateToLogin">Login</button>
 
     <div class="main-number @GetSizeClass() @explodeClass">
         @number.ToString("0.0x")

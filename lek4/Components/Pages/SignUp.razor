@@ -1,25 +1,28 @@
 ﻿@page "/signup"
-@using lek4.Features.SignUp
 @using Firebase.Auth
-
+@using System.Text.Json
+@using System.Text
+@using System.Net.Http
 @inject FirebaseAuthClient AuthClient
+@inject NavigationManager NavigationManager
+
 
 <div class="login-container">
     <div class="login-form">
         <h3 class="login-title">Sign Up</h3>
-        <EditForm Model="_viewModel">
+        <EditForm Model="signupModel" OnValidSubmit="RegisterUser">
             <DataAnnotationsValidator />
             <ValidationSummary />
             <div class="form-group">
-                <InputText id="email" @bind-Value="_viewModel.Email" placeholder="Email" />
+                <InputText id="email" @bind-Value="signupModel.Email" placeholder="Email" />
             </div>
             <div class="form-group">
-                <InputText id="password" @bind-Value="_viewModel.Password" type="password" placeholder="Password" />
+                <InputText id="password" @bind-Value="signupModel.Password" type="password" placeholder="Password" />
             </div>
             <div class="form-group">
-                <InputText id="confirmPassword" @bind-Value="_viewModel.ConfirmPassword" type="password" placeholder="Confirm Password" />
+                <InputText id="confirmPassword" @bind-Value="signupModel.ConfirmPassword" type="password" placeholder="Confirm Password" />
             </div>
-            <button class="login-button" @onclick="OnSignUpClicked">Sign Up</button>
+            <button class="login-button" type="submit">Sign Up</button>
             <div class="error-message">
                 <!-- You can display error messages here if needed -->
             </div>
@@ -29,16 +32,77 @@
 </div>
 
 @code {
-    private SignUpFormViewModel _viewModel;
+    private SignupModel signupModel = new SignupModel();
 
-    protected override void OnInitialized()
+    private async Task RegisterUser()
     {
-        _viewModel = new SignUpFormViewModel();
+        if (signupModel.Password != signupModel.ConfirmPassword)
+        {
+            await Application.Current.MainPage.DisplayAlert("Error", "Passwords do not match.", "Ok");
+            return;
+        }
+
+        try
+        {
+            var userCredential = await AuthClient.CreateUserWithEmailAndPasswordAsync(signupModel.Email, signupModel.Password);
+            await SendEmailVerificationAsync(userCredential.User);
+            await Application.Current.MainPage.DisplayAlert("Success", "Registration successful! Please verify your email before logging in.", "Ok");
+            NavigationManager.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            var errorMessage = GetErrorMessage(ex.Message);
+            await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
+        }
     }
 
-    private void OnSignUpClicked()
+    private async Task SendEmailVerificationAsync(User user)
     {
-        _viewModel.SignUpCommand.Execute(null);
+        var idToken = await user.GetIdTokenAsync();
+        var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
+        var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={apiKey}";
+        var payload = new
+        {
+            requestType = "VERIFY_EMAIL",
+            idToken = idToken
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await new HttpClient().PostAsync(requestUri, content);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Failed to send verification email: {responseBody}");
+        }
+    }
+
+    private string GetErrorMessage(string responseBody)
+    {
+        try
+        {
+            var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
+            var error = responseJson.GetProperty("error").GetProperty("message").GetString();
+            return error switch
+            {
+                "EMAIL_EXISTS" => "The email address is already in use by another account.",
+                "INVALID_EMAIL" => "The email address is invalid.",
+                "WEAK_PASSWORD : Password should be at least 6 characters" => "The password is too weak. Please use at least 6 characters.",
+                _ => "An error occurred during sign up. Please try again."
+            };
+        }
+        catch
+        {
+            return "An error occurred during sign up. Please try again.";
+        }
+    }
+
+    public class SignupModel
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
+        public string ConfirmPassword { get; set; }
     }
 }
 
