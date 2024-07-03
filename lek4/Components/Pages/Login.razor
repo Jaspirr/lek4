@@ -11,11 +11,9 @@
             <DataAnnotationsValidator />
             <ValidationSummary />
             <div class="form-group">
-                <label for="email">Email:</label>
                 <InputText id="email" @bind-Value="loginModel.Email" placeholder="Email" />
             </div>
             <div class="form-group">
-                <label for="password">Password:</label>
                 <InputText id="password" @bind-Value="loginModel.Password" type="password" placeholder="Password" />
             </div>
             <button type="submit" class="login-button">Login</button>

@@ -6,13 +6,59 @@
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
 
-
 <div class="login-container">
     <div class="login-form">
         <h3 class="login-title">Sign Up</h3>
         <EditForm Model="signupModel" OnValidSubmit="RegisterUser">
             <DataAnnotationsValidator />
             <ValidationSummary />
+            <div class="form-group">
+                <InputText id="firstName" @bind-Value="signupModel.FirstName" placeholder="First Name" />
+            </div>
+            <div class="form-group">
+                <InputText id="lastName" @bind-Value="signupModel.LastName" placeholder="Last Name" />
+            </div>
+            <div class="form-group">
+                <label for="birthDate">Birth Date:</label>
+                <div class="date-picker">
+                    <select @bind="selectedYear">
+                        @foreach (var year in years)
+                        {
+                            <option value="@year">@year</option>
+                        }
+                    </select>
+                    <select @bind="selectedMonth">
+                        @foreach (var month in months)
+                        {
+                            <option value="@month.Value">@month.Key</option>
+                        }
+                    </select>
+                    <select @bind="selectedDay">
+                        @foreach (var day in days)
+                        {
+                            <option value="@day">@day</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="city">City:</label>
+                <InputSelect id="city" @bind-Value="signupModel.City">
+                    @foreach (var city in cities)
+                    {
+                        <option value="@city">@city</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="form-group">
+                <label for="gender">Gender:</label>
+                <InputSelect id="gender" @bind-Value="signupModel.Gender">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Non-binary">Non-binary</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                </InputSelect>
+            </div>
             <div class="form-group">
                 <InputText id="email" @bind-Value="signupModel.Email" placeholder="Email" />
             </div>
@@ -33,9 +79,83 @@
 
 @code {
     private SignupModel signupModel = new SignupModel();
+    private int selectedYear;
+    private int selectedMonth;
+    private int selectedDay;
+
+    private List<int> years = new List<int>();
+    private Dictionary<string, int> months = new Dictionary<string, int>
+    {
+        {"January", 1},
+        {"February", 2},
+        {"March", 3},
+        {"April", 4},
+        {"May", 5},
+        {"June", 6},
+        {"July", 7},
+        {"August", 8},
+        {"September", 9},
+        {"October", 10},
+        {"November", 11},
+        {"December", 12}
+    };
+    private List<int> days = Enumerable.Range(1, 31).ToList();
+
+    private List<string> cities = new List<string>
+    {
+        "Stockholm",
+        "Göteborg",
+        "Malmö",
+        "Uppsala",
+        "Västerås",
+        "Örebro",
+        "Linköping",
+        "Helsingborg",
+        "Jönköping",
+        "Norrköping",
+        "Lund",
+        "Umeå",
+        "Gävle",
+        "Borås",
+        "Eskilstuna",
+        "Södertälje",
+        "Karlstad",
+        "Täby",
+        "Växjö",
+        "Halmstad",
+        "Sundsvall",
+        "Luleå",
+        "Trollhättan",
+        "Östersund",
+        "Borlänge",
+        "Tumba",
+        "Kalmar",
+        "Skövde",
+        "Karlskrona",
+        "Kristianstad"
+    };
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        for (int i = 1900; i <= DateTime.Now.Year; i++)
+        {
+            years.Add(i);
+        }
+        selectedYear = DateTime.Now.Year;
+        selectedMonth = DateTime.Now.Month;
+        selectedDay = DateTime.Now.Day;
+    }
 
     private async Task RegisterUser()
     {
+        signupModel.BirthDate = new DateTime(selectedYear, selectedMonth, selectedDay);
+        if (CalculateAge(signupModel.BirthDate) < 18)
+        {
+            await Application.Current.MainPage.DisplayAlert("Error", "You must be at least 18 years old to sign up.", "Ok");
+            return;
+        }
+
         if (signupModel.Password != signupModel.ConfirmPassword)
         {
             await Application.Current.MainPage.DisplayAlert("Error", "Passwords do not match.", "Ok");
@@ -46,6 +166,7 @@
         {
             var userCredential = await AuthClient.CreateUserWithEmailAndPasswordAsync(signupModel.Email, signupModel.Password);
             await SendEmailVerificationAsync(userCredential.User);
+            await SaveUserProfileToStorage(userCredential.User);
             await Application.Current.MainPage.DisplayAlert("Success", "Registration successful! Please verify your email before logging in.", "Ok");
             NavigationManager.NavigateTo("/login");
         }
@@ -53,6 +174,30 @@
         {
             var errorMessage = GetErrorMessage(ex.Message);
             await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
+        }
+    }
+
+    private async Task SaveUserProfileToStorage(User user)
+    {
+        var profileData = new
+        {
+            FirstName = signupModel.FirstName,
+            LastName = signupModel.LastName,
+            BirthDate = signupModel.BirthDate.ToString("yyyy-MM-dd"),
+            City = signupModel.City,
+            Gender = signupModel.Gender,
+            Email = signupModel.Email
+        };
+
+        var json = JsonSerializer.Serialize(profileData);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var client = new HttpClient();
+        var response = await client.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content); // Replace with your Firebase Storage URL
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Failed to save user profile: {responseBody}");
         }
     }
 
@@ -80,26 +225,32 @@
 
     private string GetErrorMessage(string responseBody)
     {
-        try
+        var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
+        var error = responseJson.GetProperty("error").GetProperty("message").GetString();
+        return error switch
         {
-            var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
-            var error = responseJson.GetProperty("error").GetProperty("message").GetString();
-            return error switch
-            {
-                "EMAIL_EXISTS" => "The email address is already in use by another account.",
-                "INVALID_EMAIL" => "The email address is invalid.",
-                "WEAK_PASSWORD : Password should be at least 6 characters" => "The password is too weak. Please use at least 6 characters.",
-                _ => "An error occurred during sign up. Please try again."
-            };
-        }
-        catch
-        {
-            return "An error occurred during sign up. Please try again.";
-        }
+            "EMAIL_EXISTS" => "The email address is already in use by another account.",
+            "INVALID_EMAIL" => "The email address is invalid.",
+            "WEAK_PASSWORD : Password should be at least 6 characters" => "The password is too weak. Please use at least 6 characters.",
+            _ => "An error occurred during sign up. Please try again."
+        };
+    }
+
+    private int CalculateAge(DateTime birthDate)
+    {
+        var today = DateTime.Today;
+        var age = today.Year - birthDate.Year;
+        if (birthDate.Date > today.AddYears(-age)) age--;
+        return age;
     }
 
     public class SignupModel
     {
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public DateTime BirthDate { get; set; }
+        public string City { get; set; }
+        public string Gender { get; set; }
         public string Email { get; set; }
         public string Password { get; set; }
         public string ConfirmPassword { get; set; }
@@ -138,6 +289,10 @@
             padding: 8px;
             box-sizing: border-box;
         }
+
+    .date-picker select {
+        margin-right: 10px;
+    }
 
     .login-title {
         margin-bottom: 20px;

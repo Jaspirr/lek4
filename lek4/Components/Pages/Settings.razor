@@ -11,55 +11,87 @@
 
     <div class="profile-info">
         <h4>Profile Information</h4>
-        <div class="info-item">
-            <label>Email:</label>
-            <span>@user?.Info.Email</span>
-        </div>
+        @if (profileModel != null)
+        {
+            <div class="info-item">
+                <label>First Name:</label>
+                <span>@profileModel.FirstName</span>
+            </div>
+            <div class="info-item">
+                <label>Last Name:</label>
+                <span>@profileModel.LastName</span>
+            </div>
+            <div class="info-item">
+                <label>Birth Date:</label>
+                <span>@profileModel.BirthDate.ToString("yyyy-MM-dd")</span>
+            </div>
+            <div class="info-item">
+                <label>City:</label>
+                <span>@profileModel.City</span>
+            </div>
+            <div class="info-item">
+                <label>Gender:</label>
+                <span>@profileModel.Gender</span>
+            </div>
+            <div class="info-item">
+                <label>Email:</label>
+                <span>@user?.Info.Email</span>
+            </div>
+        }
+        else
+        {
+            <p>Loading profile information...</p>
+        }
     </div>
 
     <div class="button-group">
-        <button @onclick="ShowChangePassword" class="change-password-toggle-button">Change Password</button>
-    </div>
-
-    @if (showChangePassword)
-    {
-        <div class="change-password">
-            <h4>Change Password</h4>
-            <EditForm Model="passwordModel" OnValidSubmit="ChangePassword">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-                <div class="form-group">
-                    <label for="current-password">Current Password:</label>
-                    <InputText id="current-password" @bind-Value="passwordModel.CurrentPassword" type="password" />
-                </div>
-                <div class="form-group">
-                    <label for="new-password">New Password:</label>
-                    <InputText id="new-password" @bind-Value="passwordModel.NewPassword" type="password" />
-                </div>
-                <button type="submit" class="change-password-button">Submit</button>
-            </EditForm>
-        </div>
-    }
-
-    <div class="button-group">
+        <button @onclick="NavigateToEditProfile" class="edit-profile-button">Edit Profile</button>
         <button @onclick="Logout" class="logout-button">Logout</button>
-        <button @onclick="DeleteAccount" class="delete-button">Delete Account</button>
+    </div>
+
+    <div class="button-group">
+        <button @onclick="NavigateToAccountSettings" class="account-settings-button">Account Settings</button>
     </div>
 </div>
 
 @code {
     private User user;
-    private PasswordModel passwordModel = new PasswordModel();
-    private bool showChangePassword = false;
+    private ProfileModel profileModel = new ProfileModel();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         user = AuthClient.User;
+        await FetchUserProfile();
     }
 
-    private void ShowChangePassword()
+    private async Task FetchUserProfile()
     {
-        showChangePassword = !showChangePassword;
+        try
+        {
+            var client = new HttpClient();
+            var response = await client.GetStringAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json?alt=media"); // Replace YOUR_PROJECT_ID with your actual Firebase project ID
+            profileModel = JsonSerializer.Deserialize<ProfileModel>(response);
+        }
+        catch (HttpRequestException httpEx)
+        {
+            Console.WriteLine($"HTTP Request Error: {httpEx.Message}");
+            await Application.Current.MainPage.DisplayAlert("Error", $"Failed to load profile information: {httpEx.Message}", "Ok");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"General Error: {ex.Message}");
+            await Application.Current.MainPage.DisplayAlert("Error", $"Failed to load profile information: {ex.Message}", "Ok");
+        }
+    }
+
+    private void NavigateToEditProfile()
+    {
+        NavigationManager.NavigateTo("/edit-profile");
+    }
+
+    private void NavigateToAccountSettings()
+    {
+        NavigationManager.NavigateTo("/account-settings");
     }
 
     private void Logout()
@@ -68,80 +100,14 @@
         NavigationManager.NavigateTo("/login");
     }
 
-    private async Task DeleteAccount()
+    public class ProfileModel
     {
-        var confirm = await Application.Current.MainPage.DisplayAlert("Confirm Delete", "Are you sure you want to delete your account? This action cannot be undone.", "Yes", "No");
-        if (confirm)
-        {
-            try
-            {
-                await user.DeleteAsync();
-                await Application.Current.MainPage.DisplayAlert("Deleted", "Your account has been deleted.", "Ok");
-                NavigationManager.NavigateTo("/login");
-            }
-            catch (Exception ex)
-            {
-                await Application.Current.MainPage.DisplayAlert("Error", $"Failed to delete account: {ex.Message}", "Ok");
-            }
-        }
-    }
-
-    private async Task ChangePassword()
-    {
-        try
-        {
-            // Re-authenticate the user with the current password
-            await AuthClient.SignInWithEmailAndPasswordAsync(user.Info.Email, passwordModel.CurrentPassword);
-
-            // Get the ID token
-            var idToken = await user.GetIdTokenAsync();
-
-            // Update the password using the REST API
-            var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
-            var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:update?key={apiKey}";
-            var payload = new
-            {
-                idToken = idToken,
-                password = passwordModel.NewPassword,
-                returnSecureToken = true
-            };
-
-            var json = JsonSerializer.Serialize(payload);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await new HttpClient().PostAsync(requestUri, content);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var responseBody = await response.Content.ReadAsStringAsync();
-                var errorMessage = GetErrorMessage(responseBody);
-                await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
-                return;
-            }
-
-            await Application.Current.MainPage.DisplayAlert("Success", "Your password has been changed.", "Ok");
-        }
-        catch (Exception ex)
-        {
-            await Application.Current.MainPage.DisplayAlert("Error", $"Failed to change password: {ex.Message}", "Ok");
-        }
-    }
-
-    private string GetErrorMessage(string responseBody)
-    {
-        var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
-        var error = responseJson.GetProperty("error").GetProperty("message").GetString();
-        return error switch
-        {
-            "INVALID_ID_TOKEN" => "The user's credential is no longer valid. The user must sign in again.",
-            "WEAK_PASSWORD" => "The password must be 6 characters long or more.",
-            _ => "An error occurred while changing the password. Please try again."
-        };
-    }
-
-    public class PasswordModel
-    {
-        public string CurrentPassword { get; set; }
-        public string NewPassword { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public DateTime BirthDate { get; set; }
+        public string City { get; set; }
+        public string Gender { get; set; }
+        public string Email { get; set; }
     }
 }
 
@@ -187,33 +153,6 @@
             color: #333;
         }
 
-    .change-password {
-        margin-bottom: 20px;
-    }
-
-        .change-password h4 {
-            margin-bottom: 10px;
-            color: #333;
-        }
-
-    .form-group {
-        margin-bottom: 15px;
-    }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-
     .button-group {
         display: flex;
         justify-content: space-around;
@@ -221,8 +160,8 @@
     }
 
     .logout-button,
-    .delete-button,
-    .change-password-button {
+    .edit-profile-button,
+    .account-settings-button {
         background-color: #d8bfea; /* Ljuslila färg */
         color: white;
         border: none;
@@ -234,31 +173,8 @@
     }
 
         .logout-button:hover,
-        .delete-button:hover,
-        .change-password-button:hover {
-            background-color: #c6a3e3; /* Mörkare nyans av ljuslila för hover-effekt */
-        }
-
-    .delete-button {
-        background-color: #ff4d4d; /* Röd färg för radera konto-knappen */
-    }
-
-        .delete-button:hover {
-            background-color: #ff3333; /* Mörkare röd för hover-effekt på radera konto-knappen */
-        }
-
-    .change-password-toggle-button {
-        background-color: #d8bfea; /* Ljuslila färg */
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        font-size: 16px;
-        cursor: pointer;
-        border-radius: 5px;
-        transition: background-color 0.3s ease;
-    }
-
-        .change-password-toggle-button:hover {
+        .edit-profile-button:hover,
+        .account-settings-button:hover {
             background-color: #c6a3e3; /* Mörkare nyans av ljuslila för hover-effekt */
         }
 </style>

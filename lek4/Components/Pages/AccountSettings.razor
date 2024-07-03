@@ -1,0 +1,68 @@
+﻿@page "/account-settings"
+@using Firebase.Auth
+@using System.Text.Json
+@using System.Text
+@using System.Net.Http
+@inject FirebaseAuthClient AuthClient
+@inject NavigationManager NavigationManager
+
+<div class="account-settings">
+    <h4>Account Settings</h4>
+    <div class="button-group">
+        <button @onclick="DeleteAccount" class="delete-button">Delete Account</button>
+    </div>
+</div>
+
+@code {
+    private User user;
+
+    protected override void OnInitialized()
+    {
+        user = AuthClient.User;
+    }
+
+    private async Task DeleteAccount()
+    {
+        var confirm = await Application.Current.MainPage.DisplayAlert("Confirm Delete", "Are you sure you want to delete your account? This action cannot be undone.", "Yes", "No");
+        if (confirm)
+        {
+            try
+            {
+                await user.DeleteAsync();
+                await Application.Current.MainPage.DisplayAlert("Deleted", "Your account has been deleted.", "Ok");
+                NavigationManager.NavigateTo("/login");
+            }
+            catch (Exception ex)
+            {
+                await Application.Current.MainPage.DisplayAlert("Error", $"Failed to delete account: {ex.Message}", "Ok");
+            }
+        }
+    }
+}
+
+<style>
+    .account-settings {
+        text-align: center;
+    }
+
+    .button-group {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .delete-button {
+        background-color: #ff4d4d; /* Röd färg för radera konto-knappen */
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 5px;
+        transition: background-color 0.3s ease;
+    }
+
+        .delete-button:hover {
+            background-color: #ff3333; /* Mörkare röd för hover-effekt på radera konto-knappen */
+        }
+</style>

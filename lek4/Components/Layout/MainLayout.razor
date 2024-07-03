@@ -9,7 +9,7 @@
 
 <GlobalRedirect />
 
-@if (!IsLoginPage)
+@if (!IsLoginPage && !IsSignUpPage)
 {
     <BottomNav />
 }
@@ -22,6 +22,7 @@
 
 @code {
     private bool IsLoginPage => NavigationManager.Uri.EndsWith("/login", StringComparison.OrdinalIgnoreCase);
+    private bool IsSignUpPage => NavigationManager.Uri.EndsWith("/signup", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {
