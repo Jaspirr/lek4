@@ -1,5 +1,6 @@
 ﻿using Firebase.Auth;
 using Firebase.Auth.Providers;
+using lek4.Components.Service;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +21,9 @@ namespace lek4
             builder.Services.AddMauiBlazorWebView();
             builder.Services.AddBlazorWebViewDeveloperTools();
             builder.Logging.AddDebug();
+
+            builder.Services.AddSingleton<GoogleFitService>();
+            builder.Services.AddScoped<AdService>();
 
             // Register NumberService
             builder.Services.AddSingleton<Components.Service.NumberService>();

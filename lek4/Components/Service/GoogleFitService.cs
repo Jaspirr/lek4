@@ -7,30 +7,35 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Maui.Storage;
 
 public class GoogleFitService
 {
     private static string[] Scopes = { FitnessService.Scope.FitnessActivityRead };
-    private static string ApplicationName = "Your Application Name";
+    private static string ApplicationName = "MyFitnessApp";
     private FitnessService service;
+    private UserCredential credential;
 
-    public GoogleFitService()
-    {
-        InitializeService().Wait();
-    }
-
-    private async Task InitializeService()
+    public async Task InitializeServiceAsync()
     {
         try
         {
-            UserCredential credential;
+            string credentialsFileName = "credentials.json";
 
-            string credentialsPath = Path.Combine(Environment.CurrentDirectory, "Resources", "credentials.json");
-            Console.WriteLine($"Attempting to load credentials from: {Path.GetFullPath(credentialsPath)}");
+            // Kolla i AppDataDirectory
+            string credentialsPath = Path.Combine(FileSystem.AppDataDirectory, credentialsFileName);
+            Console.WriteLine($"Attempting to load credentials from: {credentialsPath}");
+
+            // Kasta ett undantag om filen inte hittas
+            if (!File.Exists(credentialsPath))
+            {
+                Console.WriteLine("credentials.json not found.");
+                throw new FileNotFoundException("credentials.json not found.");
+            }
 
             using (var stream = new FileStream(credentialsPath, FileMode.Open, FileAccess.Read))
             {
-                string credPath = Path.Combine(Environment.CurrentDirectory, "token.json");
+                string credPath = Path.Combine(FileSystem.AppDataDirectory, "token.json");
                 credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
                     GoogleClientSecrets.FromStream(stream).Secrets,
                     Scopes,
@@ -44,6 +49,8 @@ public class GoogleFitService
                 HttpClientInitializer = credential,
                 ApplicationName = ApplicationName,
             });
+
+            Console.WriteLine("Google Fit service initialized successfully.");
         }
         catch (Exception ex)
         {
@@ -54,24 +61,32 @@ public class GoogleFitService
 
     public async Task<int> GetTotalStepsAsync(DateTime startDate, DateTime endDate)
     {
-        var dataSources = service.Users.DataSources.List("me");
-        var response = await dataSources.ExecuteAsync();
-
-        var stepDataSource = response.DataSource.FirstOrDefault(ds => ds.DataType.Name == "com.google.step_count.delta");
-
-        if (stepDataSource == null)
+        try
         {
-            throw new Exception("No step data source found.");
+            var dataSources = service.Users.DataSources.List("me");
+            var response = await dataSources.ExecuteAsync();
+
+            var stepDataSource = response.DataSource.FirstOrDefault(ds => ds.DataType.Name == "com.google.step_count.delta");
+
+            if (stepDataSource == null)
+            {
+                throw new Exception("No step data source found.");
+            }
+
+            var datasetId = $"{startDate:yyyyMMdd}000000000-{endDate:yyyyMMdd}000000000";
+            var dataSets = service.Users.DataSources.Datasets.Get("me", stepDataSource.DataStreamId, datasetId);
+            var dataSetResponse = await dataSets.ExecuteAsync();
+
+            int totalSteps = dataSetResponse.Point
+                .Where(p => p.Value != null && p.Value.Count > 0)
+                .Sum(p => p.Value[0].IntVal ?? 0);
+
+            return totalSteps;
         }
-
-        var datasetId = $"{startDate:yyyyMMdd}000000000-{endDate:yyyyMMdd}000000000";
-        var dataSets = service.Users.DataSources.Datasets.Get("me", stepDataSource.DataStreamId, datasetId);
-        var dataSetResponse = await dataSets.ExecuteAsync();
-
-        int totalSteps = dataSetResponse.Point
-            .Where(p => p.Value != null && p.Value.Count > 0)
-            .Sum(p => p.Value[0].IntVal ?? 0);
-
-        return totalSteps;
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting total steps: {ex.Message}");
+            throw;
+        }
     }
 }
