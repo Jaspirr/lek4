@@ -1,25 +1,11 @@
 ﻿using Microsoft.JSInterop;
-using System.Threading.Tasks;
 
-namespace lek4.Components.Service
+public class AdService
 {
-    public class AdService
-    {
-        private readonly IJSRuntime _jsRuntime;
+    private readonly IJSRuntime _jsRuntime;
+    public AdService(IJSRuntime jsRuntime) { _jsRuntime = jsRuntime; }
 
-        public AdService(IJSRuntime jsRuntime)
-        {
-            _jsRuntime = jsRuntime;
-        }
+    public async Task InitializeAdMobAsync() { await _jsRuntime.InvokeVoidAsync("initializeAdMob"); }
 
-        public async Task InitializeAdMobAsync()
-        {
-            await _jsRuntime.InvokeVoidAsync("initializeAdMob");
-        }
-
-        public async Task ShowRewardedAdAsync()
-        {
-            await _jsRuntime.InvokeVoidAsync("showRewardedAd");
-        }
-    }
+    public async Task ShowRewardedAdAsync() { await _jsRuntime.InvokeVoidAsync("showRewardedAd"); }
 }

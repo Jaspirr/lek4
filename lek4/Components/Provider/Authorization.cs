@@ -17,7 +17,7 @@ public class Authorization
     {
         try
         {
-            var apiKey = "YOUR_FIREBASE_API_KEY"; // Replace with your Firebase API key
+            var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
             var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={apiKey}";
 
             var payload = new
@@ -54,7 +54,7 @@ public class Authorization
     {
         try
         {
-            var apiKey = "YOUR_FIREBASE_API_KEY"; // Replace with your Firebase API key
+            var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
             var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={apiKey}";
 
             var payload = new
@@ -91,7 +91,7 @@ public class Authorization
 
     private async Task<bool> IsEmailVerifiedAsync(string idToken)
     {
-        var apiKey = "YOUR_FIREBASE_API_KEY"; // Replace with your Firebase API key
+        var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
         var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={apiKey}";
 
         var payload = new
@@ -117,7 +117,7 @@ public class Authorization
 
     private async Task SendEmailVerificationAsync(string idToken)
     {
-        var apiKey = "YOUR_FIREBASE_API_KEY"; // Replace with your Firebase API key
+        var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
         var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={apiKey}";
 
         var payload = new

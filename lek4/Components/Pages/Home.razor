@@ -6,8 +6,14 @@
 @inject IJSRuntime JSRuntime
 
 <div class="container" style="background-color: @(GetBackgroundColor())">
-    <div class="main-number @GetSizeClass() @explodeClass">
-        @number.ToString("0.0x")
+    <div class="main-number-container">
+        <div class="main-number @GetSizeClass() @explodeClass">
+            @number.ToString("0.0x")
+        </div>
+        @if (!adWatched && number == 0.4)
+        {
+            <i class="fas fa-lock lock-icon" @onclick="ShowAd"></i>
+        }
     </div>
     <div class="step-count">
         Steps: @steps
@@ -23,7 +29,7 @@
 </div>
 
 <button @onclick="FetchStepsFromGoogleFit">Fetch Steps from Google Fit</button>
-<button @onclick="ShowAd">Watch Ad</button> <!-- New button to trigger ad -->
+<button @onclick="ShowAd">Watch Ad</button> <!-- Knapp för att visa annons -->
 
 @if (!string.IsNullOrEmpty(message))
 {
@@ -43,6 +49,14 @@
     private int steps = 0;
     private string explodeClass = string.Empty;
     private string message;
+    private bool adWatched = false; // För att spåra om annonsen har setts
+    private static int instanceIdCounter = 0; // Unik identifierare för instanser
+    private int instanceId;
+
+    protected override void OnInitialized()
+    {
+        instanceId = instanceIdCounter++;
+    }
 
     private void UpdateNumber(int stepCount)
     {
@@ -114,8 +128,16 @@
 
     private void IncrementNumber()
     {
-        number = Math.Min(number + 0.1, 9.0);
-        Console.WriteLine($"Number incremented to: {number}");
+        if (!adWatched && number == 0.4)
+        {
+            ShowAd();
+        }
+        else
+        {
+            number = Math.Min(number + 0.1, 9.0);
+            Console.WriteLine($"Number incremented to: {number}");
+            adWatched = false; // Reset flaggan
+        }
     }
 
     private void DecrementNumber()
@@ -132,7 +154,7 @@
     private void CheckAndShowAd()
     {
         Console.WriteLine($"Checking if ad should be shown for number: {number}");
-        if (number % 0.5 == 0)
+        if (number % 0.5 == 0 && !adWatched)
         {
             ShowAd();
         }
@@ -140,10 +162,16 @@
 
     private async void ShowAd()
     {
-        // Wait for a short time to ensure JavaScript is loaded
-        await Task.Delay(500); // Adjust the delay as necessary
-        Console.WriteLine("Attempting to call showAd");
-        await JSRuntime.InvokeVoidAsync("showAd");
+        await JSRuntime.InvokeVoidAsync("showRewardedAd", instanceId);
+    }
+
+    [JSInvokable]
+    public void OnAdWatched()
+    {
+        // Logik för att hantera att annonsen har setts
+        adWatched = true;
+        JSRuntime.InvokeVoidAsync("startConfetti");
+        StateHasChanged(); // Uppdatera UI:t
     }
 }
 
@@ -172,8 +200,28 @@
             opacity: 0.8;
     }
 
+    .main-number-container {
+        position: relative;
+        display: inline-block;
+    }
+
     .main-number {
         /* Ditt befintliga CSS-stil för main-number */
+    }
+
+    .lock-icon {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 3.5rem;
+        color: darkslategrey;
+        cursor: pointer;
+        z-index: 1; /* Se till att ikonen är överst */
+    }
+
+    .lock-icon:hover {
+        color: darkslategrey;
     }
 
     .step-count {
