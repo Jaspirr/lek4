@@ -1,6 +1,4 @@
-﻿// wwwroot/ads.js
-
-function initializeAdMob() {
+﻿function initializeAdMob() {
     var admobid = {
         banner: 'ca-app-pub-6880261545527455/7437532811', // Ditt Banner Ad Unit ID
         interstitial: 'ca-app-pub-6880261545527455/7437532811', // Ditt Interstitial Ad Unit ID

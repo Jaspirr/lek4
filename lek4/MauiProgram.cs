@@ -3,6 +3,7 @@ using Firebase.Auth.Providers;
 using lek4.Components.Service;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Plugin.MauiMTAdmob;
 
 namespace lek4
 {
@@ -13,6 +14,7 @@ namespace lek4
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseMauiMTAdmob()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -23,7 +25,8 @@ namespace lek4
             builder.Logging.AddDebug();
 
             builder.Services.AddSingleton<GoogleFitService>();
-            builder.Services.AddScoped<AdService>();
+            builder.Services.AddSingleton<AdService>();
+
 
             // Register NumberService
             builder.Services.AddSingleton<Components.Service.NumberService>();

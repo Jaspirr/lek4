@@ -1,5 +1,5 @@
 ﻿@page "/"
-
+@using Plugin.MauiMTAdmob
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
 @inject GoogleFitService GoogleFitService
@@ -29,7 +29,7 @@
 </div>
 
 <button @onclick="FetchStepsFromGoogleFit">Fetch Steps from Google Fit</button>
-<button @onclick="ShowAd">Watch Ad</button> <!-- Knapp för att visa annons -->
+<button @onclick="ShowAd">Watch Ad</button> <!-- Button to show ad -->
 
 @if (!string.IsNullOrEmpty(message))
 {
@@ -49,13 +49,44 @@
     private int steps = 0;
     private string explodeClass = string.Empty;
     private string message;
-    private bool adWatched = false; // För att spåra om annonsen har setts
-    private static int instanceIdCounter = 0; // Unik identifierare för instanser
-    private int instanceId;
+    private bool adWatched = false; // Track if the ad has been watched
 
     protected override void OnInitialized()
     {
-        instanceId = instanceIdCounter++;
+        InitializeAds();
+    }
+
+    private void InitializeAds()
+    {
+        CrossMauiMTAdmob.Current.OnInterstitialLoaded += OnInterstitialAdLoaded;
+        CrossMauiMTAdmob.Current.OnInterstitialFailedToLoad += OnInterstitialAdFailedToLoad;
+        CrossMauiMTAdmob.Current.OnInterstitialOpened += OnInterstitialAdOpened;
+        CrossMauiMTAdmob.Current.OnInterstitialClosed += OnInterstitialAdClosed;
+    }
+
+    private void LoadInterstitialAd()
+    {
+        CrossMauiMTAdmob.Current.LoadInterstitial("ca-app-pub-3940256099942544/1033173712"); // Test Interstitial Ad ID
+    }
+
+    private void OnInterstitialAdLoaded(object sender, EventArgs e)
+    {
+        CrossMauiMTAdmob.Current.ShowInterstitial();
+    }
+
+    private void OnInterstitialAdFailedToLoad(object sender, EventArgs e)
+    {
+        // Handle ad failed to load
+    }
+
+    private void OnInterstitialAdOpened(object sender, EventArgs e)
+    {
+        // Handle ad opened
+    }
+
+    private void OnInterstitialAdClosed(object sender, EventArgs e)
+    {
+        // Handle ad closed
     }
 
     private void UpdateNumber(int stepCount)
@@ -136,7 +167,7 @@
         {
             number = Math.Min(number + 0.1, 9.0);
             Console.WriteLine($"Number incremented to: {number}");
-            adWatched = false; // Reset flaggan
+            adWatched = false; // Reset flag
         }
     }
 
@@ -160,76 +191,8 @@
         }
     }
 
-    private async void ShowAd()
+    private void ShowAd()
     {
-        await JSRuntime.InvokeVoidAsync("showRewardedAd", instanceId);
-    }
-
-    [JSInvokable]
-    public void OnAdWatched()
-    {
-        // Logik för att hantera att annonsen har setts
-        adWatched = true;
-        JSRuntime.InvokeVoidAsync("startConfetti");
-        StateHasChanged(); // Uppdatera UI:t
+        LoadInterstitialAd();
     }
 }
-
-<style>
-    .container {
-        position: relative;
-        padding-top: 10px;
-        padding-right: 10px;
-    }
-
-    .login-button {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        padding: 10px 20px;
-        background-color: mediumpurple;
-        color: white;
-        border: none;
-        opacity: 0.8;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-
-    .login-button:hover {
-            background-color: mediumpurple;
-            opacity: 0.8;
-    }
-
-    .main-number-container {
-        position: relative;
-        display: inline-block;
-    }
-
-    .main-number {
-        /* Ditt befintliga CSS-stil för main-number */
-    }
-
-    .lock-icon {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 3.5rem;
-        color: darkslategrey;
-        cursor: pointer;
-        z-index: 1; /* Se till att ikonen är överst */
-    }
-
-    .lock-icon:hover {
-        color: darkslategrey;
-    }
-
-    .step-count {
-        /* Ditt befintliga CSS-stil för step-count */
-    }
-
-    .alert {
-        color: red;
-        font-weight: bold;
-    }
-</style>
