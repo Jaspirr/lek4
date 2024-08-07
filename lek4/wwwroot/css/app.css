@@ -125,16 +125,49 @@ h1:focus {
     text-align: center;
 }
 
+.main-number-container {
+    position: relative; /* Ensure the container is positioned for the lock icon */
+}
+
 .main-number {
     margin-bottom: 1px;
     transition: transform 0.5s ease-in-out;
     animation: pulse 3s infinite;
+    font-size: 100px; /* Adjust the size of the number as needed */
 }
 
     .main-number.explode {
         animation: explode 0.6s ease;
     }
 
+/* Style the lock icon to be larger and positioned over the number */
+.lock-icon {
+    font-size: 50px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    cursor: pointer;
+}
+
+.unlock-icon {
+    font-size: 50px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    cursor: pointer;
+    color: inherit; /* Ensure it has the same color as the lock icon */
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out; /* Adjust the transition speed */
+    opacity: 0; /* Start hidden */
+}
+
+    .unlock-icon.visible {
+        opacity: 1; /* Make visible with transition */
+        transform: translate(-50%, -50%) scale(1); /* Maintain the same scale */
+    }
 .step-count {
     font-size: 1rem;
     margin-top: 10px;
@@ -412,7 +445,6 @@ h1:focus {
     margin-top: 50px;
 }
 
-
 .center-subtitle {
     text-align: center;
     max-width: 60%;
@@ -449,4 +481,3 @@ h1:focus {
     background-color: #00ffff;
     height: 100%;
 }
-

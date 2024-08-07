@@ -1,12 +1,12 @@
 ﻿using Plugin.MauiMTAdmob;
-using Microsoft.Maui.Controls;
-using System;
 using Plugin.MauiMTAdmob.Extra;
 
 namespace lek4
 {
     public partial class MainPage : ContentPage
     {
+        private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917"; // Replace with your actual ad unit ID
+
         public MainPage()
         {
             InitializeComponent();
@@ -15,35 +15,55 @@ namespace lek4
 
         private void InitializeAds()
         {
-            CrossMauiMTAdmob.Current.OnInterstitialLoaded += OnInterstitialAdLoaded;
-            CrossMauiMTAdmob.Current.OnInterstitialFailedToLoad += OnInterstitialAdFailedToLoad;
-            CrossMauiMTAdmob.Current.OnInterstitialOpened += OnInterstitialAdOpened;
-            CrossMauiMTAdmob.Current.OnInterstitialClosed += OnInterstitialAdClosed;
+            CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
+            CrossMauiMTAdmob.Current.OnRewardedFailedToLoad += OnRewardedAdFailedToLoad;
+            CrossMauiMTAdmob.Current.OnRewardedFailedToShow += OnRewardedFailedToShow;
+            CrossMauiMTAdmob.Current.OnRewardedOpened += OnRewardedOpened;
+            CrossMauiMTAdmob.Current.OnRewardedClosed += OnRewardedClosed;
+            CrossMauiMTAdmob.Current.OnRewardedImpression += OnRewardedImpression;
+            CrossMauiMTAdmob.Current.OnUserEarnedReward += OnUserEarnedReward;
         }
 
-        private void LoadInterstitialAd(object sender, EventArgs e)
+        private void OnRewardedImpression(object sender, EventArgs e)
         {
-            CrossMauiMTAdmob.Current.LoadInterstitial("ca-app-pub-3940256099942544/1033173712"); // Replace with your Ad ID
+            Console.WriteLine("On Reward Impression");
         }
 
-        private void OnInterstitialAdLoaded(object sender, EventArgs e)
+        private void OnRewardedClosed(object sender, EventArgs e)
         {
-            CrossMauiMTAdmob.Current.ShowInterstitial();
+            Console.WriteLine("On Reward Closed");
         }
 
-        private void OnInterstitialAdFailedToLoad(object sender, MTEventArgs e)
+        private void OnRewardedOpened(object sender, EventArgs e)
         {
-            // Handle ad failed to load
+            Console.WriteLine("On Reward Opened");
         }
 
-        private void OnInterstitialAdOpened(object sender, EventArgs e)
+        private void OnUserEarnedReward(object sender, MTEventArgs e)
         {
-            // Handle ad opened
+            Console.WriteLine($"User Earned Reward: {e.RewardType} - {e.RewardAmount}");
+            // Handle user earned reward logic here, if necessary
         }
 
-        private void OnInterstitialAdClosed(object sender, EventArgs e)
+        private void OnRewardedFailedToShow(object sender, MTEventArgs e)
         {
-            // Handle ad closed
+            Console.WriteLine($"Reward Failed To Show: {e.ErrorCode} - {e.ErrorMessage}");
+        }
+
+        private void OnRewardedAdLoaded(object sender, EventArgs e)
+        {
+            Console.WriteLine("Rewarded Ad Loaded");
+            CrossMauiMTAdmob.Current.ShowRewarded();
+        }
+
+        private void OnRewardedAdFailedToLoad(object sender, MTEventArgs e)
+        {
+            Console.WriteLine($"Rewarded Ad Failed To Load: {e.ErrorCode} - {e.ErrorMessage}");
+        }
+
+        public void LoadRewardedAd()
+        {
+            CrossMauiMTAdmob.Current.LoadRewarded(RewardedAdUnitId);
         }
     }
 }

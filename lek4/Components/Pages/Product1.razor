@@ -2,6 +2,11 @@
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
+@inject AdService AdService
+
+@using Plugin.MauiMTAdmob
+@using Plugin.MauiMTAdmob.Extra
+@inject IJSRuntime JSRuntime
 
 @code {
     [Parameter]
@@ -17,10 +22,12 @@
     private bool exceedsTotalOdds;
     private string timeRemaining;
     private Timer timer;
+    private bool shouldLockIn = false;
 
     protected override void OnInitialized()
     {
         timer = new Timer(UpdateTimer, null, 0, 1000);
+        AdService.AdWatched += OnAdWatched;
     }
 
     protected override void OnParametersSet()
@@ -79,11 +86,15 @@
         {
             if (NumberService.HasEnoughOdds(lockInAmount))
             {
-                NumberService.LockInProduct(productNumber, lockInAmount);
-                lockedInOdds += lockInAmount; // Uppdatera locked in odds
-                isSuccess = true;
-                errorMessage = null;
-                GoBack();
+                if (AdService.IsAdReady)
+                {
+                    shouldLockIn = true;
+                    AdService.ShowAd();
+                }
+                else
+                {
+                    errorMessage = "Ad is not ready yet.";
+                }
             }
             else
             {
@@ -98,6 +109,25 @@
         }
     }
 
+    private void CompleteLockInPrice()
+    {
+        if (shouldLockIn)
+        {
+            NumberService.LockInProduct(productNumber, lockInAmount);
+            lockedInOdds += lockInAmount; // Uppdatera locked in odds
+            isSuccess = true;
+            errorMessage = null;
+            shouldLockIn = false;
+            AdService.LoadRewardedAd(); // Load the next ad after the lock-in process is complete
+            GoBack();
+        }
+    }
+
+    private void OnAdWatched(object sender, EventArgs e)
+    {
+        CompleteLockInPrice();
+    }
+
     private void OnSliderChanged(ChangeEventArgs e)
     {
         lockInAmount = Convert.ToDouble(e.Value);
@@ -107,6 +137,7 @@
     public void Dispose()
     {
         timer?.Dispose();
+        AdService.AdWatched -= OnAdWatched;
     }
 }
 
@@ -243,6 +274,7 @@
         font-size: 0.7em;
         color: white; /* Ändra textfärgen till vit */
     }
+
     input[type="range"].slider {
         -webkit-appearance: none;
         width: 100%;

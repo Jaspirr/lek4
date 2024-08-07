@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using Plugin.MauiMTAdmob
+@using Plugin.MauiMTAdmob.Extra
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
 @inject GoogleFitService GoogleFitService
@@ -10,9 +11,13 @@
         <div class="main-number @GetSizeClass() @explodeClass">
             @number.ToString("0.0x")
         </div>
-        @if (!adWatched && number == 0.4)
+        @if (ShouldShowLockIcon())
         {
-            <i class="fas fa-lock lock-icon" @onclick="ShowAd"></i>
+            <i class="fas fa-lock lock-icon" @onclick="UnlockAd"></i>
+        }
+        @if (adReadyToWatch)
+        {
+            <i class="fas fa-unlock unlock-icon visible" @onclick="ShowAd"></i>
         }
     </div>
     <div class="step-count">
@@ -24,7 +29,7 @@
 
 <div>
     <button @onclick="DecrementNumber">-</button>
-    <span>@number</span>
+    <span>@number.ToString("0.0")</span>
     <button @onclick="IncrementNumber">+</button>
 </div>
 
@@ -42,7 +47,7 @@
         get => NumberService.CurrentNumber;
         set
         {
-            NumberService.CurrentNumber = value;
+            NumberService.CurrentNumber = Math.Round(value, 1); // Ensure number is rounded to 1 decimal place
             CheckAndShowAd();
         }
     }
@@ -50,43 +55,70 @@
     private string explodeClass = string.Empty;
     private string message;
     private bool adWatched = false; // Track if the ad has been watched
+    private bool adReadyToWatch = false; // Track if the ad is ready to watch
+    private static readonly HashSet<double> AdTriggerPoints = new HashSet<double>
+    {
+        0.4, 0.9, 1.4, 1.9, 2.4, 2.9, 3.4, 3.9, 4.4, 4.9, 5.4, 5.9, 6.4, 6.9, 7.4, 7.9, 8.4, 8.9
+    };
+    private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917"; // Replace with your actual ad unit ID
 
     protected override void OnInitialized()
     {
+        base.OnInitialized();
         InitializeAds();
     }
 
     private void InitializeAds()
     {
-        CrossMauiMTAdmob.Current.OnInterstitialLoaded += OnInterstitialAdLoaded;
-        CrossMauiMTAdmob.Current.OnInterstitialFailedToLoad += OnInterstitialAdFailedToLoad;
-        CrossMauiMTAdmob.Current.OnInterstitialOpened += OnInterstitialAdOpened;
-        CrossMauiMTAdmob.Current.OnInterstitialClosed += OnInterstitialAdClosed;
+        CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
+        CrossMauiMTAdmob.Current.OnRewardedFailedToLoad += OnRewardedAdFailedToLoad;
+        CrossMauiMTAdmob.Current.OnRewardedFailedToShow += OnRewardedFailedToShow;
+        CrossMauiMTAdmob.Current.OnRewardedOpened += OnRewardedOpened;
+        CrossMauiMTAdmob.Current.OnRewardedClosed += OnRewardedClosed;
+        CrossMauiMTAdmob.Current.OnRewardedImpression += OnRewardedImpression;
+        CrossMauiMTAdmob.Current.OnUserEarnedReward += OnUserEarnedReward;
     }
 
-    private void LoadInterstitialAd()
+    private void OnRewardedImpression(object sender, EventArgs e)
     {
-        CrossMauiMTAdmob.Current.LoadInterstitial("ca-app-pub-3940256099942544/1033173712"); // Test Interstitial Ad ID
+        Console.WriteLine("On Reward Impression");
     }
 
-    private void OnInterstitialAdLoaded(object sender, EventArgs e)
+    private void OnRewardedClosed(object sender, EventArgs e)
     {
-        CrossMauiMTAdmob.Current.ShowInterstitial();
+        Console.WriteLine("On Reward Closed");
+        adReadyToWatch = false;
+        StateHasChanged();
     }
 
-    private void OnInterstitialAdFailedToLoad(object sender, EventArgs e)
+    private void OnRewardedOpened(object sender, EventArgs e)
     {
-        // Handle ad failed to load
+        Console.WriteLine("On Reward Opened");
     }
 
-    private void OnInterstitialAdOpened(object sender, EventArgs e)
+    private void OnUserEarnedReward(object sender, MTEventArgs e)
     {
-        // Handle ad opened
+        Console.WriteLine($"User Earned Reward: {e.RewardType} - {e.RewardAmount}");
+        adWatched = true;
+        adReadyToWatch = false;
+        StateHasChanged(); // Update the UI to reflect the change
     }
 
-    private void OnInterstitialAdClosed(object sender, EventArgs e)
+    private void OnRewardedFailedToShow(object sender, MTEventArgs e)
     {
-        // Handle ad closed
+        Console.WriteLine($"Reward Failed To Show: {e.ErrorCode} - {e.ErrorMessage}");
+    }
+
+    private void OnRewardedAdLoaded(object sender, EventArgs e)
+    {
+        Console.WriteLine("Rewarded Ad Loaded");
+        adReadyToWatch = true;
+        StateHasChanged(); // Update the UI to reflect the change
+    }
+
+    private void OnRewardedAdFailedToLoad(object sender, MTEventArgs e)
+    {
+        Console.WriteLine($"Rewarded Ad Failed To Load: {e.ErrorCode} - {e.ErrorMessage}");
     }
 
     private void UpdateNumber(int stepCount)
@@ -139,7 +171,7 @@
         if (number >= 4.0) return "#ffcc99"; // Peach
         if (number >= 3.0) return "#ffff99"; // LightYellow
         if (number >= 2.0) return "#99ccff"; // LightBlue
-        if (number >= 0.9) return "#99ff99"; // LightGreen
+        if (number >= 1.0) return "#99ff99"; // LightGreen
         return "#ffffff"; // White
     }
 
@@ -153,22 +185,22 @@
         if (number >= 4.0) return "size-4";
         if (number >= 3.0) return "size-3";
         if (number >= 2.0) return "size-2";
-        if (number >= 0.9) return "size-1";
+        if (number >= 1.0) return "size-1";
         return "size-0";
     }
 
     private void IncrementNumber()
     {
-        if (!adWatched && number == 0.4)
+        if (ShouldShowLockIcon())
         {
-            ShowAd();
+            // Do not increment the number if the lock icon is displayed
+            message = "Please watch the ad to continue.";
+            return;
         }
-        else
-        {
-            number = Math.Min(number + 0.1, 9.0);
-            Console.WriteLine($"Number incremented to: {number}");
-            adWatched = false; // Reset flag
-        }
+
+        number = Math.Min(number + 0.1, 9.0);
+        Console.WriteLine($"Number incremented to: {number}");
+        adWatched = false; // Reset flag if number reaches 0.4, 0.9, 1.4, etc.
     }
 
     private void DecrementNumber()
@@ -185,14 +217,31 @@
     private void CheckAndShowAd()
     {
         Console.WriteLine($"Checking if ad should be shown for number: {number}");
-        if (number % 0.5 == 0 && !adWatched)
-        {
-            ShowAd();
-        }
+        // No need to show ad automatically
     }
 
     private void ShowAd()
     {
-        LoadInterstitialAd();
+        ((MainPage)Application.Current.MainPage).LoadRewardedAd();
+    }
+
+    private async void UnlockAd()
+    {
+        adReadyToWatch = true;
+        StateHasChanged();
+        await Task.Delay(1000); // Delay to allow the user to see the unlocked icon
+        ShowAd(); // Show the ad after the delay
+    }
+
+    private bool ShouldShowLockIcon()
+    {
+        // Check if the rounded number is in the list of trigger points
+        return !adWatched && AdTriggerPoints.Contains(number) && !adReadyToWatch;
+    }
+
+    private bool ShouldShowUnlockIcon()
+    {
+        // Show unlock icon if ad is ready to watch
+        return adReadyToWatch;
     }
 }
