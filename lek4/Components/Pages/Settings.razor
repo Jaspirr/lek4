@@ -69,7 +69,7 @@
         try
         {
             var client = new HttpClient();
-            var response = await client.GetStringAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json?alt=media"); // Replace YOUR_PROJECT_ID with your actual Firebase project ID
+            var response = await client.GetStringAsync($"https://firebasestorage.googleapis.com/v0/b/gs://stega-426008.appspot.com/o/users%2F{user.Uid}.json?alt=media"); // Replace YOUR_PROJECT_ID with your actual Firebase project ID
             profileModel = JsonSerializer.Deserialize<ProfileModel>(response);
         }
         catch (HttpRequestException httpEx)

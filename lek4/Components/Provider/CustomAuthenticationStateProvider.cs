@@ -4,21 +4,19 @@ using System.Threading.Tasks;
 
 public class CustomAuthenticationStateProvider : AuthenticationStateProvider
 {
-    private ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
+    private readonly ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
 
     public override Task<AuthenticationState> GetAuthenticationStateAsync()
     {
-        var identity = new ClaimsIdentity(); // Not authenticated by default
-        var user = new ClaimsPrincipal(identity);
-
-        return Task.FromResult(new AuthenticationState(user));
+        return Task.FromResult(new AuthenticationState(_anonymous));
     }
 
-    public void NotifyUserAuthentication(string email)
+    public void NotifyUserAuthentication(string email, bool isAdmin)
     {
         var identity = new ClaimsIdentity(new[]
         {
-            new Claim(ClaimTypes.Name, email)
+            new Claim(ClaimTypes.Name, email),
+            new Claim(ClaimTypes.Role, isAdmin ? "Admin" : "User")
         }, "apiauth_type");
 
         var user = new ClaimsPrincipal(identity);
@@ -27,7 +25,7 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
 
     public void NotifyUserLogout()
     {
-        var user = _anonymous;
-        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_anonymous)));
     }
 }
+

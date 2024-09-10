@@ -8,6 +8,8 @@ namespace lek4.Features.SignUp
         private string _email;
         private string _password;
         private string _confirmPassword;
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
 
         public string Email
         {

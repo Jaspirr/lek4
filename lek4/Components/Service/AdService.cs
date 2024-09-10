@@ -1,5 +1,5 @@
-﻿using Plugin.MauiMTAdmob.Extra;
-using Plugin.MauiMTAdmob;
+﻿using Plugin.MauiMTAdmob;
+using Plugin.MauiMTAdmob.Extra;
 
 public class AdService
 {
@@ -22,7 +22,6 @@ public class AdService
         CrossMauiMTAdmob.Current.OnRewardedClosed += OnRewardedClosed;
         CrossMauiMTAdmob.Current.OnRewardedImpression += OnRewardedImpression;
         CrossMauiMTAdmob.Current.OnUserEarnedReward += OnUserEarnedReward;
-
         LoadRewardedAd();
     }
 

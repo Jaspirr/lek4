@@ -1,19 +1,23 @@
-﻿using System.Net.Http;
+﻿using System;
+using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components.Authorization;
 using Newtonsoft.Json.Linq;
 
 public class Authorization
 {
-    private static readonly HttpClient httpClient = new HttpClient();
+    private readonly HttpClient _httpClient; // Använd en instans av HttpClient som injiceras
     private readonly CustomAuthenticationStateProvider _authStateProvider;
 
-    public Authorization(CustomAuthenticationStateProvider authStateProvider)
+    public Authorization(HttpClient httpClient, CustomAuthenticationStateProvider authStateProvider)
     {
+        _httpClient = httpClient; // Använd den injicerade instansen
         _authStateProvider = authStateProvider;
     }
 
-    public async Task<bool> LoginAsync(string email, string password)
+    public async Task<bool> AdminLoginAsync(string email, string password)
     {
         try
         {
@@ -28,7 +32,7 @@ public class Authorization
             };
 
             var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync(requestUri, content);
+            var response = await _httpClient.PostAsync(requestUri, content);
             response.EnsureSuccessStatusCode();
 
             var responseBody = await response.Content.ReadAsStringAsync();
@@ -41,8 +45,12 @@ public class Authorization
                 return false;
             }
 
-            _authStateProvider.NotifyUserAuthentication(email);
-            return true;
+            // Kontrollera om användaren är admin
+            var isAdmin = await IsAdmin(email);
+
+            // Använd NotifyUserAuthentication med både email och isAdmin
+            _authStateProvider.NotifyUserAuthentication(email, isAdmin);
+            return isAdmin; // Returnera true om användaren är admin
         }
         catch
         {
@@ -50,43 +58,17 @@ public class Authorization
         }
     }
 
-    public async Task<bool> SignUpAsync(string email, string password)
+    private async Task<bool> IsAdmin(string email)
     {
-        try
+        var response = await _httpClient.GetAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{email}.json");
+        if (response.IsSuccessStatusCode)
         {
-            var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
-            var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={apiKey}";
-
-            var payload = new
-            {
-                email = email,
-                password = password,
-                returnSecureToken = true
-            };
-
-            var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync(requestUri, content);
-            response.EnsureSuccessStatusCode();
-
             var responseBody = await response.Content.ReadAsStringAsync();
-            var responseJson = JObject.Parse(responseBody);
-            var idToken = responseJson["idToken"].ToString();
+            var userProfile = JsonSerializer.Deserialize<UserProfile>(responseBody);
 
-            // Send email verification
-            await SendEmailVerificationAsync(idToken);
-
-            _authStateProvider.NotifyUserAuthentication(email);
-            return true;
+            return userProfile?.IsAdmin == true;
         }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public void Logout()
-    {
-        _authStateProvider.NotifyUserLogout();
+        return false;
     }
 
     private async Task<bool> IsEmailVerifiedAsync(string idToken)
@@ -100,7 +82,7 @@ public class Authorization
         };
 
         var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync(requestUri, content);
+        var response = await _httpClient.PostAsync(requestUri, content);
         response.EnsureSuccessStatusCode();
 
         var responseBody = await response.Content.ReadAsStringAsync();
@@ -127,7 +109,15 @@ public class Authorization
         };
 
         var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync(requestUri, content);
+        var response = await _httpClient.PostAsync(requestUri, content);
         response.EnsureSuccessStatusCode();
+    }
+
+    public class UserProfile
+    {
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public string Email { get; set; }
+        public bool IsAdmin { get; set; }
     }
 }

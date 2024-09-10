@@ -176,9 +176,21 @@
             await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
         }
     }
+    private async Task<bool> IsAdminEmail(string email)
+    {
+        // Här kontrollerar vi mot en lista av admin-e-postadresser
+        var adminEmails = new List<string> { "jesper.erlandsson@hotmail.com", "otheradmin@example.com" };
+        return adminEmails.Contains(email.ToLower());
+    }
 
     private async Task SaveUserProfileToStorage(User user)
     {
+        // Hämta användarens e-postadress från user.UserInfo
+        string email = user.Info.Email;
+
+        // Kontrollera om användarens e-post finns i Firebase Security Rules
+        bool isAdmin = await IsAdminEmail(email);
+
         var profileData = new
         {
             FirstName = signupModel.FirstName,
@@ -186,13 +198,14 @@
             BirthDate = signupModel.BirthDate.ToString("yyyy-MM-dd"),
             City = signupModel.City,
             Gender = signupModel.Gender,
-            Email = signupModel.Email
+            Email = email, // Använd den hämtade e-postadressen
+            isAdmin = isAdmin // Tilldela adminstatus
         };
 
         var json = JsonSerializer.Serialize(profileData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         var client = new HttpClient();
-        var response = await client.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content); // Replace with your Firebase Storage URL
+        var response = await client.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -200,6 +213,7 @@
             throw new Exception($"Failed to save user profile: {responseBody}");
         }
     }
+
 
     private async Task SendEmailVerificationAsync(User user)
     {
@@ -225,15 +239,23 @@
 
     private string GetErrorMessage(string responseBody)
     {
-        var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
-        var error = responseJson.GetProperty("error").GetProperty("message").GetString();
-        return error switch
+        try
         {
-            "EMAIL_EXISTS" => "The email address is already in use by another account.",
-            "INVALID_EMAIL" => "The email address is invalid.",
-            "WEAK_PASSWORD : Password should be at least 6 characters" => "The password is too weak. Please use at least 6 characters.",
-            _ => "An error occurred during sign up. Please try again."
-        };
+            var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
+            var error = responseJson.GetProperty("error").GetProperty("message").GetString();
+            return error switch
+            {
+                "EMAIL_EXISTS" => "The email address is already in use by another account.",
+                "INVALID_EMAIL" => "The email address is invalid.",
+                "WEAK_PASSWORD" => "The password is too weak. Please use at least 6 characters.",
+                _ => "An error occurred during sign up. Please try again."
+            };
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Failed to parse JSON: {ex.Message}");
+            return "An unexpected error occurred.";
+        }
     }
 
     private int CalculateAge(DateTime birthDate)
@@ -254,6 +276,7 @@
         public string Email { get; set; }
         public string Password { get; set; }
         public string ConfirmPassword { get; set; }
+        public bool IsAdmin { get; set; } // Lägg till denna rad för adminstatus
     }
 }
 

@@ -30,7 +30,7 @@
         StateHasChanged(); // Uppdatera komponenten för att starta animationen
         await Task.Delay(1000); // Vänta tills animationen är klar (1 sekund)
         NumberService.UnlockProduct(productNumber);
-        NavigationManager.NavigateTo($"/product/{productNumber}");
+        NavigationManager.NavigateTo($"/product/{productNumber}"); // Navigera till produktsidan utan att visa en annons
     }
 
     private string GetIconClass(int productNumber)
@@ -73,5 +73,5 @@
 </div>
 
 <style>
-
+    /* Lägg till relevant CSS för sidan här */
 </style>

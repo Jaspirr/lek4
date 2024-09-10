@@ -2,7 +2,6 @@
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
-@inject AdService AdService
 
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
@@ -23,15 +22,18 @@
     private string timeRemaining;
     private Timer timer;
     private bool shouldLockIn = false;
+    private bool adReadyToWatch = false;
+    private bool adWatched = false;
 
     protected override void OnInitialized()
     {
         timer = new Timer(UpdateTimer, null, 0, 1000);
-        AdService.AdWatched += OnAdWatched;
+        InitializeAds(); // Initiera annonser
     }
 
     protected override void OnParametersSet()
     {
+        ResetState();
         price = productNumber * 10; // Exempel: Priset ökar med 10 för varje produkt
         NumberService.UnlockProduct(productNumber); // Lås upp produkten när den öppnas
         winningChance = NumberService.GetWinningChance(productNumber); // Get winning chance
@@ -43,6 +45,25 @@
         lockedInOdds = NumberService.ProductLockAmounts.ContainsKey(productNumber)
             ? NumberService.ProductLockAmounts[productNumber].Sum()
             : 0;
+    }
+
+    private void InitializeAds()
+    {
+        CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
+        CrossMauiMTAdmob.Current.OnUserEarnedReward += OnUserEarnedReward;
+        CrossMauiMTAdmob.Current.LoadRewarded("ca-app-pub-3940256099942544/5224354917"); // Ersätt med ditt faktiska annons-ID
+    }
+
+    private void OnRewardedAdLoaded(object sender, EventArgs e)
+    {
+        adReadyToWatch = true;
+        StateHasChanged(); // Uppdatera UI
+    }
+
+    private void OnUserEarnedReward(object sender, MTEventArgs e)
+    {
+        adWatched = true;
+        CompleteLockInPrice(); // När användaren har sett klart annonsen, slutför "lock in"
     }
 
     private void UpdateTimer(object state)
@@ -86,10 +107,15 @@
         {
             if (NumberService.HasEnoughOdds(lockInAmount))
             {
-                if (AdService.IsAdReady)
+                shouldLockIn = true;
+
+                if (adReadyToWatch && !adWatched)
                 {
-                    shouldLockIn = true;
-                    AdService.ShowAd();
+                    ShowAd(); // Visa annonsen när den är redo
+                }
+                else if (adWatched)
+                {
+                    CompleteLockInPrice();
                 }
                 else
                 {
@@ -118,14 +144,13 @@
             isSuccess = true;
             errorMessage = null;
             shouldLockIn = false;
-            AdService.LoadRewardedAd(); // Load the next ad after the lock-in process is complete
-            GoBack();
-        }
-    }
 
-    private void OnAdWatched(object sender, EventArgs e)
-    {
-        CompleteLockInPrice();
+            // Här säkerställer vi att vi bara omdirigerar efter att annonsen har visats klart
+            if (adWatched)
+            {
+                GoBack();
+            }
+        }
     }
 
     private void OnSliderChanged(ChangeEventArgs e)
@@ -134,10 +159,27 @@
         exceedsTotalOdds = lockInAmount > totalOdds;
     }
 
+    private void ResetState()
+    {
+        shouldLockIn = false;
+        adWatched = false;
+        adReadyToWatch = false;
+        errorMessage = null;
+    }
+
     public void Dispose()
     {
         timer?.Dispose();
-        AdService.AdWatched -= OnAdWatched;
+        CrossMauiMTAdmob.Current.OnRewardedLoaded -= OnRewardedAdLoaded;
+        CrossMauiMTAdmob.Current.OnUserEarnedReward -= OnUserEarnedReward;
+    }
+
+    private void ShowAd()
+    {
+        if (adReadyToWatch)
+        {
+            CrossMauiMTAdmob.Current.ShowRewarded();
+        }
     }
 }
 
@@ -171,6 +213,7 @@
 </div>
 
 <style>
+    /* CSS styles för komponenten */
     .product-details {
         text-align: center;
         margin: 100px 20px 0px 20px;
@@ -214,7 +257,7 @@
             }
 
     .lock-in-button {
-        background-color: mediumpurple; /* Mediumpurple färg */
+        background-color: mediumpurple;
         color: white;
     }
 
@@ -223,11 +266,11 @@
         }
 
         .lock-in-button.success {
-            background-color: #28a745; /* Grön färg */
+            background-color: #28a745;
         }
 
         .lock-in-button.error, .lock-in-button.exceeds {
-            background-color: red; /* Röd färg */
+            background-color: red;
         }
 
     .icon-button {
@@ -256,23 +299,23 @@
         max-height: 60px;
         text-align: center;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin: 5px; /* Lägg till marginal för utrymme mellan boxarna */
+        margin: 5px;
     }
 
     .stat-value {
         font-size: 1.2em;
         margin: 0;
-        color: black; /* Ändra textfärgen till vit */
+        color: black;
     }
 
     .stat-label {
         font-size: 0.9em;
-        color: white; /* Ändra textfärgen till vit */
+        color: white;
     }
 
     .stat-icon {
         font-size: 0.7em;
-        color: white; /* Ändra textfärgen till vit */
+        color: white;
     }
 
     input[type="range"].slider {
@@ -340,6 +383,7 @@
             font-size: 0.9em;
         }
 </style>
+
 <script>
     document.addEventListener('input', function (event) {
         if (event.target.classList.contains('slider')) {

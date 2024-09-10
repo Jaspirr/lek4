@@ -46,6 +46,7 @@ function showRewardedAd() {
 
         // Simulate a successful ad watch after a short delay
         setTimeout(function () {
+            console.log("Ad watched, invoking DotNet method");
             DotNet.invokeMethodAsync('lek4', 'OnAdWatched');
         }, 3000); // Simulate ad watched after 3 seconds
     } else {

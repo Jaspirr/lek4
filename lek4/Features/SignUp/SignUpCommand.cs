@@ -1,4 +1,5 @@
 ﻿using lek4.Components.Commands;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Net.Http;
@@ -44,9 +45,16 @@ namespace lek4.Features.SignUp
                 var responseBody = await response.Content.ReadAsStringAsync();
                 var responseJson = JObject.Parse(responseBody);
                 var idToken = responseJson["idToken"].ToString();
+                var localId = responseJson["localId"].ToString(); // Firebase UID för användaren
 
                 // Send email verification
                 await SendEmailVerificationAsync(idToken);
+
+                // Bestäm om användaren är admin
+                bool isAdmin = IsAdminEmail(_viewModel.Email);
+
+                // Spara användarprofilen med adminstatus
+                await SaveUserProfileToStorage(localId, isAdmin);
 
                 await Application.Current.MainPage.DisplayAlert("Success", "Successfully signed up! Please verify your email address.", "Ok");
             }
@@ -70,6 +78,34 @@ namespace lek4.Features.SignUp
             var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
             var response = await httpClient.PostAsync(requestUri, content);
             response.EnsureSuccessStatusCode();
+        }
+
+        private bool IsAdminEmail(string email)
+        {
+            // Kontrollera om användaren är admin baserat på e-postadress
+            var adminEmails = new List<string> { "jesper.erlandsson@hotmail.com" }; // Lägg till fler om nödvändigt
+            return adminEmails.Contains(email.ToLower());
+        }
+
+        private async Task SaveUserProfileToStorage(string userId, bool isAdmin)
+        {
+            var profileData = new
+            {
+                Email = _viewModel.Email,
+                FirstName = _viewModel.FirstName,
+                LastName = _viewModel.LastName,
+                isAdmin = isAdmin
+            };
+
+            var json = JsonConvert.SerializeObject(profileData);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userId}.json", content); // Replace with your Firebase Storage URL
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Failed to save user profile: {responseBody}");
+            }
         }
     }
 }

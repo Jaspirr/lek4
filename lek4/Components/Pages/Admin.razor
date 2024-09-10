@@ -1,0 +1,64 @@
+﻿@page "/admin"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject NavigationManager NavigationManager
+
+<div class="admin-container">
+    <h3>Welcome to the Admin Panel</h3>
+    <p>You have admin access. Here you can manage your application settings, users, and more.</p>
+
+    <!-- Exempel på adminfunktioner -->
+    <div class="admin-actions">
+        <button class="action-button" @onclick="ManageUsers">Manage Users</button>
+        <button class="action-button" @onclick="ViewReports">View Reports</button>
+        <button class="action-button" @onclick="Settings">Settings</button>
+    </div>
+</div>
+
+@code {
+    private void ManageUsers()
+    {
+        // Hantera navigering eller logik för att hantera användare
+        NavigationManager.NavigateTo("/manage-users");
+    }
+
+    private void ViewReports()
+    {
+        // Hantera navigering eller logik för att visa rapporter
+        NavigationManager.NavigateTo("/view-reports");
+    }
+
+    private void Settings()
+    {
+        // Hantera navigering eller logik för inställningar
+        NavigationManager.NavigateTo("/settings");
+    }
+}
+
+<style>
+    .admin-container {
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .admin-actions {
+        margin-top: 20px;
+    }
+
+    .action-button {
+        margin-right: 10px;
+        padding: 10px 20px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .action-button:hover {
+        background-color: #45a049;
+    }
+</style>
