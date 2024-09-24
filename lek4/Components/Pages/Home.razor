@@ -35,6 +35,8 @@
 
 <button @onclick="FetchStepsFromGoogleFit">Fetch Steps from Google Fit</button>
 <button @onclick="ShowAd">Watch Ad</button> <!-- Button to show ad -->
+<!-- New Admin Page Button -->
+<button @onclick="GoToAdminPage">Admin Page</button> <!-- Button to navigate to Admin Page -->
 
 @if (!string.IsNullOrEmpty(message))
 {
@@ -224,7 +226,10 @@
     {
         ((MainPage)Application.Current.MainPage).LoadRewardedAd();
     }
-
+    private void GoToAdminPage()
+    {
+        NavigationManager.NavigateTo("/admin"); // Replace with the correct route to your Admin page
+    }
     private async void UnlockAd()
     {
         adReadyToWatch = true;

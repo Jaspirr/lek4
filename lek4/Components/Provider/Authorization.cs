@@ -1,19 +1,18 @@
 ﻿using System;
 using System.Net.Http;
-using System.Text;
-using System.Text.Json;
+using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Authorization;
-using Newtonsoft.Json.Linq;
 
 public class Authorization
 {
-    private readonly HttpClient _httpClient; // Använd en instans av HttpClient som injiceras
+    private readonly HttpClient _httpClient;
     private readonly CustomAuthenticationStateProvider _authStateProvider;
 
     public Authorization(HttpClient httpClient, CustomAuthenticationStateProvider authStateProvider)
     {
-        _httpClient = httpClient; // Använd den injicerade instansen
+        _httpClient = httpClient; // Use the injected instance of HttpClient configured to connect to your Web API
         _authStateProvider = authStateProvider;
     }
 
@@ -21,103 +20,41 @@ public class Authorization
     {
         try
         {
-            var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
-            var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={apiKey}";
+            // Define the payload for admin login
+            var loginModel = new { Email = email, Password = password };
 
-            var payload = new
+            // Send the login request to your Web API
+            var response = await _httpClient.PostAsJsonAsync("/Auth/admin-login", loginModel);
+
+            if (response.IsSuccessStatusCode)
             {
-                email = email,
-                password = password,
-                returnSecureToken = true
-            };
+                // Parse the response from the Web API
+                var responseBody = await response.Content.ReadFromJsonAsync<LoginResponse>();
 
-            var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(requestUri, content);
-            response.EnsureSuccessStatusCode();
-
-            var responseBody = await response.Content.ReadAsStringAsync();
-            var responseJson = JObject.Parse(responseBody);
-            var idToken = responseJson["idToken"].ToString();
-            var emailVerified = await IsEmailVerifiedAsync(idToken);
-
-            if (!emailVerified)
-            {
-                return false;
+                // Check if the login was successful and the user is an admin
+                if (responseBody != null && responseBody.IsAdmin)
+                {
+                    // Notify the app about the successful admin authentication
+                    _authStateProvider.NotifyUserAuthentication(email, isAdmin: true);
+                    return true; // Return true indicating admin login was successful
+                }
             }
 
-            // Kontrollera om användaren är admin
-            var isAdmin = await IsAdmin(email);
-
-            // Använd NotifyUserAuthentication med både email och isAdmin
-            _authStateProvider.NotifyUserAuthentication(email, isAdmin);
-            return isAdmin; // Returnera true om användaren är admin
+            // If the login fails, return false
+            return false;
         }
-        catch
+        catch (Exception ex)
         {
+            // Handle exceptions, such as network errors
+            Console.WriteLine($"An error occurred during login: {ex.Message}");
             return false;
         }
     }
-
-    private async Task<bool> IsAdmin(string email)
-    {
-        var response = await _httpClient.GetAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{email}.json");
-        if (response.IsSuccessStatusCode)
-        {
-            var responseBody = await response.Content.ReadAsStringAsync();
-            var userProfile = JsonSerializer.Deserialize<UserProfile>(responseBody);
-
-            return userProfile?.IsAdmin == true;
-        }
-        return false;
-    }
-
-    private async Task<bool> IsEmailVerifiedAsync(string idToken)
-    {
-        var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
-        var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={apiKey}";
-
-        var payload = new
-        {
-            idToken = idToken
-        };
-
-        var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync(requestUri, content);
-        response.EnsureSuccessStatusCode();
-
-        var responseBody = await response.Content.ReadAsStringAsync();
-        var responseJson = JObject.Parse(responseBody);
-        var users = responseJson["users"] as JArray;
-
-        if (users != null && users.Count > 0)
-        {
-            return (bool)users[0]["emailVerified"];
-        }
-
-        return false;
-    }
-
-    private async Task SendEmailVerificationAsync(string idToken)
-    {
-        var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
-        var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={apiKey}";
-
-        var payload = new
-        {
-            requestType = "VERIFY_EMAIL",
-            idToken = idToken
-        };
-
-        var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync(requestUri, content);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public class UserProfile
-    {
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string Email { get; set; }
-        public bool IsAdmin { get; set; }
-    }
 }
+
+public class LoginResponse
+{
+    public string Message { get; set; }
+    public bool IsAdmin { get; set; }
+}
+
