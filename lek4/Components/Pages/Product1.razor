@@ -2,10 +2,11 @@
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
+@inject lek4.Components.Service.ProductService ProductService
+@inject IJSRuntime JSRuntime
 
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
-@inject IJSRuntime JSRuntime
 
 @code {
     [Parameter]
@@ -24,27 +25,33 @@
     private bool shouldLockIn = false;
     private bool adReadyToWatch = false;
     private bool adWatched = false;
+    private DayOfWeek selectedDay;
+    private bool productExists = true;
+    private TimeSpan remainingTime;
+    private string winner;
+    private bool showPopup = false;
 
     protected override void OnInitialized()
     {
-        timer = new Timer(UpdateTimer, null, 0, 1000);
-        InitializeAds(); // Initiera annonser
-    }
+        // Kontrollera om produkten finns
+        productExists = ProductService.GetProductNumbers().Contains(productNumber);
 
-    protected override void OnParametersSet()
-    {
-        ResetState();
-        price = productNumber * 10; // Exempel: Priset ökar med 10 för varje produkt
-        NumberService.UnlockProduct(productNumber); // Lås upp produkten när den öppnas
-        winningChance = NumberService.GetWinningChance(productNumber); // Get winning chance
-        if (winningChance > 100.0) // Kontrollera och begränsa winningChance till 100%
+        if (!productExists)
         {
-            winningChance = 100.0;
+            // Om produkten inte finns, navigera tillbaka till Change Products
+            NavigationManager.NavigateTo("/change-products");
+            return;
         }
-        totalOdds = Math.Max(NumberService.GetRemainingOdds(), 0.0); // Get total odds
-        lockedInOdds = NumberService.ProductLockAmounts.ContainsKey(productNumber)
-            ? NumberService.ProductLockAmounts[productNumber].Sum()
-            : 0;
+
+        timer = new Timer(UpdateTimer, null, 0, 1000);
+        InitializeAds();
+
+        // Hämta återstående tid och vinnare
+        remainingTime = ProductService.GetTimeRemaining(productNumber);
+        if (remainingTime.TotalSeconds <= 0)
+        {
+            winner = ProductService.GetWinner(productNumber);
+        }
     }
 
     private void InitializeAds()
@@ -66,43 +73,67 @@
         CompleteLockInPrice(); // När användaren har sett klart annonsen, slutför "lock in"
     }
 
+    protected override void OnParametersSet()
+    {
+        if (!productExists) return;
+
+        ResetState();
+        price = ProductService.GetPrice(productNumber);
+        selectedDay = ProductService.GetDay(productNumber);
+
+        NumberService.UnlockProduct(productNumber);
+        winningChance = NumberService.GetWinningChance(productNumber);
+        if (winningChance > 100.0)
+        {
+            winningChance = 100.0;
+        }
+        totalOdds = Math.Max(NumberService.GetRemainingOdds(), 0.0);
+        lockedInOdds = NumberService.ProductLockAmounts.ContainsKey(productNumber)
+            ? NumberService.ProductLockAmounts[productNumber].Sum()
+            : 0;
+    }
+
     private void UpdateTimer(object state)
     {
+        if (!productExists) return;
+
         var now = DateTime.Now;
-        var nextFriday = GetNextFridayAt20();
-        var timeSpan = nextFriday - now;
+        var nextDay = GetNextSelectedDayAt20();
+        var timeSpan = nextDay - now;
 
         if (timeSpan.TotalSeconds <= 0)
         {
-            nextFriday = GetNextFridayAt20();
-            timeSpan = nextFriday - now;
+            nextDay = GetNextSelectedDayAt20();
+            timeSpan = nextDay - now;
         }
 
         timeRemaining = $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
         InvokeAsync(StateHasChanged);
     }
 
-    private DateTime GetNextFridayAt20()
+    private DateTime GetNextSelectedDayAt20()
     {
         var today = DateTime.Today;
-        var daysUntilFriday = ((int)DayOfWeek.Friday - (int)today.DayOfWeek + 7) % 7;
-        var nextFriday = today.AddDays(daysUntilFriday).AddHours(20);
+        var daysUntilSelectedDay = ((int)selectedDay - (int)today.DayOfWeek + 7) % 7;
+        var nextSelectedDay = today.AddDays(daysUntilSelectedDay).AddHours(20);
 
-        if (nextFriday < DateTime.Now)
+        if (nextSelectedDay < DateTime.Now)
         {
-            nextFriday = nextFriday.AddDays(7);
+            nextSelectedDay = nextSelectedDay.AddDays(7);
         }
 
-        return nextFriday;
+        return nextSelectedDay;
     }
 
     private void GoBack()
     {
-        NavigationManager.NavigateTo($"/products/{NumberService.CurrentNumber:F1}");
+        NavigationManager.NavigateTo("/change-products");
     }
 
     private void LockInPrice()
     {
+        if (!productExists) return;
+
         if (lockInAmount > 0 && lockInAmount <= 9.0)
         {
             if (NumberService.HasEnoughOdds(lockInAmount))
@@ -111,7 +142,7 @@
 
                 if (adReadyToWatch && !adWatched)
                 {
-                    ShowAd(); // Visa annonsen när den är redo
+                    ShowAd();
                 }
                 else if (adWatched)
                 {
@@ -140,12 +171,11 @@
         if (shouldLockIn)
         {
             NumberService.LockInProduct(productNumber, lockInAmount);
-            lockedInOdds += lockInAmount; // Uppdatera locked in odds
+            lockedInOdds += lockInAmount;
             isSuccess = true;
             errorMessage = null;
             shouldLockIn = false;
 
-            // Här säkerställer vi att vi bara omdirigerar efter att annonsen har visats klart
             if (adWatched)
             {
                 GoBack();
@@ -167,13 +197,6 @@
         errorMessage = null;
     }
 
-    public void Dispose()
-    {
-        timer?.Dispose();
-        CrossMauiMTAdmob.Current.OnRewardedLoaded -= OnRewardedAdLoaded;
-        CrossMauiMTAdmob.Current.OnUserEarnedReward -= OnUserEarnedReward;
-    }
-
     private void ShowAd()
     {
         if (adReadyToWatch)
@@ -181,39 +204,95 @@
             CrossMauiMTAdmob.Current.ShowRewarded();
         }
     }
+
+    // Funktioner för att visa popup och dra vinnare
+    private void ViewWinner()
+    {
+        showPopup = true;
+    }
+
+    private void DrawWinner()
+    {
+        ProductService.DrawWinner(productNumber);
+        winner = ProductService.GetWinner(productNumber);
+    }
 }
 
 <div class="product-details">
-    <button @onclick="GoBack" class="icon-button">
-        <i class="fas fa-arrow-left"></i> <!-- Tillbaka ikon -->
-    </button>
-    <h3>Price: $@price</h3>
-    <div class="stats-container">
-        <div class="stat-item">
-            <p class="stat-value">@winningChance.ToString("0.0")%</p>
-        </div>
-        <div class="stat-item">
-            <p class="stat-value">@totalOdds.ToString("0.0")x</p>
-        </div>
-        <div class="stat-item">
-            <p class="stat-value">@lockedInOdds.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
-        </div>
-    </div>
-    <input type="range" min="0.0" max="9.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
-    <p>Selected Amount: @lockInAmount</p>
-    <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
-    @if (!string.IsNullOrEmpty(errorMessage))
+    @if (!productExists)
     {
-        <p class="error-message">@errorMessage</p>
+        <p>The product you are trying to view no longer exists.</p>
+        <button @onclick="GoBack">Back to Products</button>
     }
-    <div class="countdown-timer">
-        <h4>Fri 20:00</h4>
-        <p>@timeRemaining</p>
-    </div>
+    else
+    {
+        <button @onclick="GoBack" class="icon-button">
+            <i class="fas fa-arrow-left"></i> <!-- Tillbaka ikon -->
+        </button>
+        <h3>$@price</h3>
+        <div class="stats-container">
+            <div class="stat-item">
+                <p class="stat-value">@winningChance.ToString("0.0")%</p>
+            </div>
+            <div class="stat-item">
+                <p class="stat-value">@totalOdds.ToString("0.0")x</p>
+            </div>
+            <div class="stat-item">
+                <p class="stat-value">@lockedInOdds.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
+            </div>
+        </div>
+        <input type="range" min="0.0" max="9.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
+        <p>Selected Amount: @lockInAmount</p>
+        <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <p class="error-message">@errorMessage</p>
+        }
+
+        @if (remainingTime.TotalSeconds <= 0)
+        {
+            @if (winner == null)
+            {
+                <button @onclick="ViewWinner">View Winner</button>
+            }
+            else
+            {
+                <p><strong>Winner: @winner</strong></p>
+            }
+        }
+
+        @if (showPopup)
+        {
+            <div class="popup">
+                <h4>Draw a Winner for Product @productNumber</h4>
+                <button @onclick="DrawWinner">Draw</button>
+                @if (winner != null)
+                {
+                    <p><strong>Winner: @winner</strong></p>
+                }
+                <button @onclick="() => showPopup = false">Close</button>
+            </div>
+        }
+
+        <div class="countdown-timer">
+            <h4>@selectedDay 20:00</h4>
+            <p>@timeRemaining</p>
+        </div>
+    }
 </div>
 
 <style>
-    /* CSS styles för komponenten */
+    .popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+    }
+
     .product-details {
         text-align: center;
         margin: 100px 20px 0px 20px;

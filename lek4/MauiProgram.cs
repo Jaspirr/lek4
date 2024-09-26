@@ -48,6 +48,9 @@ namespace lek4
             builder.Services.AddSingleton<GoogleFitService>();
             builder.Services.AddSingleton<AdService>();
             builder.Services.AddSingleton<UserService>();
+            builder.Services.AddSingleton<ProductDayCounterService>();
+            builder.Services.AddSingleton<ProductService>();
+            builder.Services.AddScoped<DrawService>();
             builder.Services.AddSingleton<Components.Service.NumberService>();
 
             // Konfigurera Firebase Authentication med din API-nyckel

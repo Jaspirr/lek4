@@ -3,6 +3,7 @@
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
+@inject lek4.Components.Service.ProductService ProductService
 
 @code {
     [Parameter]
@@ -21,7 +22,9 @@
 
         NumberService.CurrentNumber = number.Value;
         remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0); // Limit to 100
-        productNumbers = Enumerable.Range(1, NumberService.MaxProductNumber).ToList(); // Use MaxProductNumber to display products
+
+        // Hämta den aktuella produktlistan från ProductService istället för att hårdkoda
+        productNumbers = ProductService.GetProductNumbers();
     }
 
     private async Task GoToProduct(int productNumber)
@@ -52,7 +55,7 @@
 <h3 class="center-title">Products</h3>
 <p class="remaining-odds">Odds: @remainingOdds.ToString("0.0")x</p> <!-- Display remaining odds -->
 
-<div class="product-grid">
+<div class="product-grid @(productNumbers.Count == 1 ? "single-product" : (productNumbers.Count == 2 ? "two-products" : (productNumbers.Count == 3 ? "three-products" : (productNumbers.Count == 4 ? "four-products" : "many-products"))))">
     @foreach (var productNumber in productNumbers)
     {
         <div class="@GetProductClass(productNumber) product-@(productNumber) @(unlockingProduct == productNumber ? "unlocking" : "")">
@@ -71,6 +74,7 @@
         </div>
     }
 </div>
+
 
 <style>
     /* Lägg till relevant CSS för sidan här */

@@ -229,36 +229,6 @@ h1:focus {
     padding: 10px 20px;
 }
 
-.product-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 5px;
-    justify-items: center;
-    margin: 120px;
-    max-width: 300px; /* Justera bredden så att den passar layouten */
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.product {
-    border: none; /* Ingen kantfärg */
-    border-radius: 10px; /* Lägg till border-radius */
-    padding: 2px;
-    text-align: center;
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transform: rotate(45deg);
-    position: relative;
-    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, background-color 0.5s;
-}
-
-    .product:hover {
-        transform: scale(1.05) rotate(45deg);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-    }
 
 .locked {
     background-color: silver; /* Silvrig färg när låst */
@@ -424,6 +394,90 @@ h1:focus {
 .product:nth-child(9) {
     grid-column: 3; /* Position ninth product in third column */
 }
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* 5 kolumner */
+    grid-template-rows: auto; /* Automatisk höjd för rader */
+    gap: 5px; /* Minska mellanrummet */
+    justify-items: center;
+    margin: 120px auto;
+    max-width: 100%; /* Full bredd så att alla produkter passar på skärmen */
+}
+
+.product {
+    border: none;
+    border-radius: 10px;
+    padding: 2px;
+    text-align: center;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(45deg);
+    position: relative;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, background-color 0.5s;
+}
+
+    .product:hover {
+        transform: scale(1.05) rotate(45deg);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Större storlek för produkt 1 */
+    .product:nth-child(1) {
+        grid-column: 3; /* Center the first product */
+        grid-row: 1;
+        width: 130px; /* Första produkten är större */
+        height: 130px;
+    }
+
+    /* Placering av produkt 2 och 3 */
+    .product:nth-child(2) {
+        grid-column: 2;
+        grid-row: 2;
+    }
+
+    .product:nth-child(3) {
+        grid-column: 4;
+        grid-row: 2;
+    }
+
+    /* Placera produkt 4 på rad 3 */
+    .product:nth-child(4) {
+        grid-column: 3; /* Under produkt 1 */
+        grid-row: 3; /* Ny rad för produkt 4 */
+    }
+
+    /* Placera produkt 5 under produkt 2 */
+    .product:nth-child(5) {
+        grid-column: 2;
+        grid-row: 4; /* Ny rad för produkt 5 */
+    }
+
+    /* Placera produkt 6 under produkt 3 */
+    .product:nth-child(6) {
+        grid-column: 4;
+        grid-row: 4; /* Ny rad för produkt 6 */
+    }
+
+    /* Placera produkt 7 under produkt 4 */
+    .product:nth-child(7) {
+        grid-column: 3;
+        grid-row: 5; /* Ny rad för produkt 7 under produkt 4 */
+    }
+
+    /* Placera produkt 8 under produkt 5 */
+    .product:nth-child(8) {
+        grid-column: 2;
+        grid-row: 6; /* Ny rad för produkt 8 under produkt 5 */
+    }
+
+    /* Placera produkt 9 under produkt 6 */
+    .product:nth-child(9) {
+        grid-column: 4;
+        grid-row: 6; /* Ny rad för produkt 9 under produkt 6 */
+    }
 
 .center-title {
     text-align: center;

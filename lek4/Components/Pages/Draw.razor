@@ -1,0 +1,54 @@
+﻿@page "/draw"
+@using lek4.Components.Service
+
+@inject DrawService DrawService
+@inject ProductService ProductService
+
+<h3>Draw Page</h3>
+
+<div class="product-draw">
+    @foreach (var productNumber in ProductService.GetProductNumbers())
+    {
+        <div class="product-info">
+            <h4>Product @productNumber</h4>
+            <p>Draw Day: @ProductService.GetDay(productNumber)</p>
+
+            @if (ProductService.GetTimeRemaining(productNumber).TotalSeconds <= 0)
+            {
+                <p><strong>Winner: @ProductService.GetWinner(productNumber) ?? "No winner yet"</strong></p>
+            }
+            else
+            {
+                <button @onclick="() => ProductService.DrawWinner(productNumber)">Draw Winner</button>
+                @if (ProductService.GetWinner(productNumber) != null)
+                {
+                    <p><strong>Winner: @ProductService.GetWinner(productNumber)</strong></p>
+                }
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .product-draw {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); /* 3 kolumner */
+        gap: 20px;
+        padding: 20px;
+    }
+
+    .product-info {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+    }
+
+        .product-info h4 {
+            margin-bottom: 10px;
+        }
+
+        .product-info p {
+            margin-bottom: 5px;
+        }
+</style>

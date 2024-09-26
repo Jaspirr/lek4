@@ -20,6 +20,7 @@ namespace lek4.Components.Service
             }
         }
 
+
         public void LockInProduct(int productNumber, double amount)
         {
             if (!LockedInProducts.Contains(productNumber))

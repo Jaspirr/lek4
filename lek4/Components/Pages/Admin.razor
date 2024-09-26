@@ -8,31 +8,34 @@
     <h3>Welcome to the Admin Panel</h3>
     <p>You have admin access. Here you can manage your application settings, users, and more.</p>
 
-    <!-- Exempel på adminfunktioner -->
+    <!-- Admin functionality buttons -->
     <div class="admin-actions">
-        <button class="action-button" @onclick="ManageUsers">Manage Users</button>
-        <button class="action-button" @onclick="ViewReports">View Reports</button>
-        <button class="action-button" @onclick="Settings">Settings</button>
+        <button class="action-button" @onclick="DrawPage">Draw</button>
+        <button class="action-button" @onclick="ChangeProducts">Change Products</button>
+        <button class="action-button" @onclick="BreakAndTime">Break and Time</button>
+        <button class="action-button" @onclick="Notifications">Notifications</button>
     </div>
 </div>
 
 @code {
-    private void ManageUsers()
+    private void DrawPage()
     {
-        // Hantera navigering eller logik för att hantera användare
-        NavigationManager.NavigateTo("/manage-users");
+        NavigationManager.NavigateTo("/draw");
     }
 
-    private void ViewReports()
+    private void ChangeProducts()
     {
-        // Hantera navigering eller logik för att visa rapporter
-        NavigationManager.NavigateTo("/view-reports");
+        NavigationManager.NavigateTo("/change-products");
     }
 
-    private void Settings()
+    private void BreakAndTime()
     {
-        // Hantera navigering eller logik för inställningar
-        NavigationManager.NavigateTo("/settings");
+        NavigationManager.NavigateTo("/break-and-time");
+    }
+
+    private void Notifications()
+    {
+        NavigationManager.NavigateTo("/notifications");
     }
 }
 
@@ -58,7 +61,7 @@
         cursor: pointer;
     }
 
-    .action-button:hover {
-        background-color: #45a049;
-    }
+        .action-button:hover {
+            background-color: #45a049;
+        }
 </style>
