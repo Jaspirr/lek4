@@ -19,11 +19,16 @@
             }
             else
             {
-                <button @onclick="() => ProductService.DrawWinner(productNumber)">Draw Winner</button>
-                @if (ProductService.GetWinner(productNumber) != null)
-                {
-                    <p><strong>Winner: @ProductService.GetWinner(productNumber)</strong></p>
-                }
+                <button @onclick="() => DrawWinnerAndRefresh(productNumber)">Draw Winner</button>
+
+            @code {
+            private void DrawWinnerAndRefresh(int productNumber)
+            {
+                ProductService.DrawWinner(productNumber);
+                StateHasChanged(); // Forces UI to refresh after drawing winner
+            }
+            }
+
             }
         </div>
     }

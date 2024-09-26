@@ -3,8 +3,10 @@
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
 @inject lek4.Components.Service.ProductService ProductService
+@inject FirebaseAuthClient FirebaseAuthClient
 @inject IJSRuntime JSRuntime
 
+@using Firebase.Auth
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
 
@@ -30,15 +32,28 @@
     private TimeSpan remainingTime;
     private string winner;
     private bool showPopup = false;
+    private string userId;
 
     protected override void OnInitialized()
     {
-        // Kontrollera om produkten finns
+        // Retrieve the current authenticated user from the Firebase client
+        var user = FirebaseAuthClient.User; // This should access the current authenticated user directly
+        if (user != null)
+        {
+            userId = user.Uid; // Get the Firebase user ID
+        }
+        else
+        {
+            // If the user is not authenticated, redirect to the login page
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        // Proceed with your existing logic
         productExists = ProductService.GetProductNumbers().Contains(productNumber);
 
         if (!productExists)
         {
-            // Om produkten inte finns, navigera tillbaka till Change Products
             NavigationManager.NavigateTo("/change-products");
             return;
         }
@@ -46,7 +61,6 @@
         timer = new Timer(UpdateTimer, null, 0, 1000);
         InitializeAds();
 
-        // Hämta återstående tid och vinnare
         remainingTime = ProductService.GetTimeRemaining(productNumber);
         if (remainingTime.TotalSeconds <= 0)
         {
@@ -105,6 +119,13 @@
         {
             nextDay = GetNextSelectedDayAt20();
             timeSpan = nextDay - now;
+
+            // Add logic to check for winner again if time is up
+            winner = ProductService.GetWinner(productNumber);
+            if (winner != null)
+            {
+                showPopup = false; // Close popup if winner is drawn
+            }
         }
 
         timeRemaining = $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
