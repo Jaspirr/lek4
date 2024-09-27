@@ -20,24 +20,23 @@
             else
             {
                 <button @onclick="() => DrawWinnerAndRefresh(productNumber)">Draw Winner</button>
-
-            @code {
-            private void DrawWinnerAndRefresh(int productNumber)
-            {
-                ProductService.DrawWinner(productNumber);
-                StateHasChanged(); // Forces UI to refresh after drawing winner
-            }
-            }
-
             }
         </div>
     }
 </div>
 
+@code {
+    private void DrawWinnerAndRefresh(int productNumber)
+    {
+        ProductService.DrawWinner(productNumber);
+        StateHasChanged(); // Forces UI to refresh after drawing winner
+    }
+}
+
 <style>
     .product-draw {
         display: grid;
-        grid-template-columns: repeat(3, 1fr); /* 3 kolumner */
+        grid-template-columns: repeat(3, 1fr); /* 3 columns */
         gap: 20px;
         padding: 20px;
     }

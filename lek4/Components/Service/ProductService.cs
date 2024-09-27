@@ -96,17 +96,17 @@ namespace lek4.Components.Service
         }
 
         // Lägg till en användare som har låst in på en produkt
-        public void LockInUser(int productNumber, string userId)
+        public void LockInUser(int productNumber, string userEmail)
         {
             if (!lockedInUsers.ContainsKey(productNumber))
             {
                 lockedInUsers[productNumber] = new List<string>();
             }
 
-            // Ensure that only unique users are added to the list for a product
-            if (!lockedInUsers[productNumber].Contains(userId))
+            // Ensure the same user isn't locked in multiple times for the same product
+            if (!lockedInUsers[productNumber].Contains(userEmail))
             {
-                lockedInUsers[productNumber].Add(userId);
+                lockedInUsers[productNumber].Add(userEmail);
             }
         }
 
@@ -138,9 +138,6 @@ namespace lek4.Components.Service
             {
                 var random = new Random();
                 var winner = users[random.Next(users.Count)];
-                productWinners[productNumber] = winner;
-
-                // Log or display a message to confirm draw is working
                 Console.WriteLine($"Winner for product {productNumber} is: {winner}");
             }
             else

@@ -5,8 +5,11 @@
 @inject lek4.Components.Service.ProductService ProductService
 @inject FirebaseAuthClient FirebaseAuthClient
 @inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
+@using System.Security.Claims
 @using Firebase.Auth
+@using Microsoft.AspNetCore.Components.Authorization
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
 
@@ -32,35 +35,41 @@
     private TimeSpan remainingTime;
     private string winner;
     private bool showPopup = false;
-    private string userId;
+    private string userEmail;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        // Retrieve the current authenticated user from the Firebase client
-        var user = FirebaseAuthClient.User; // This should access the current authenticated user directly
-        if (user != null)
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // Only redirect to login if the user is not authenticated
+        if (user.Identity.IsAuthenticated)
         {
-            userId = user.Uid; // Get the Firebase user ID
+            // Get the user's email from the claims
+            userEmail = user.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
         }
         else
         {
-            // If the user is not authenticated, redirect to the login page
-            NavigationManager.NavigateTo("/login");
-            return;
+            // User not logged in, continue without forcing login but don't retrieve email
+            userEmail = null;
         }
 
-        // Proceed with your existing logic
+        // Proceed with checking if the product exists
         productExists = ProductService.GetProductNumbers().Contains(productNumber);
 
         if (!productExists)
         {
-            NavigationManager.NavigateTo("/change-products");
+            // If the product doesn't exist, redirect to products page
+            NavigationManager.NavigateTo("/products");
+            errorMessage = "This Product is not active";
             return;
         }
 
+        // Initialize the timer and ads
         timer = new Timer(UpdateTimer, null, 0, 1000);
         InitializeAds();
 
+        // Fetch remaining time and winner for the product
         remainingTime = ProductService.GetTimeRemaining(productNumber);
         if (remainingTime.TotalSeconds <= 0)
         {
@@ -72,19 +81,19 @@
     {
         CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
         CrossMauiMTAdmob.Current.OnUserEarnedReward += OnUserEarnedReward;
-        CrossMauiMTAdmob.Current.LoadRewarded("ca-app-pub-3940256099942544/5224354917"); // Ersätt med ditt faktiska annons-ID
+        CrossMauiMTAdmob.Current.LoadRewarded("ca-app-pub-3940256099942544/5224354917"); // Replace with your actual ad ID
     }
 
     private void OnRewardedAdLoaded(object sender, EventArgs e)
     {
         adReadyToWatch = true;
-        StateHasChanged(); // Uppdatera UI
+        StateHasChanged(); // Update UI
     }
 
     private void OnUserEarnedReward(object sender, MTEventArgs e)
     {
         adWatched = true;
-        CompleteLockInPrice(); // När användaren har sett klart annonsen, slutför "lock in"
+        CompleteLockInPrice(); // Once the user watches the ad, complete the "lock-in"
     }
 
     protected override void OnParametersSet()
@@ -148,7 +157,7 @@
 
     private void GoBack()
     {
-        NavigationManager.NavigateTo("/change-products");
+        NavigationManager.NavigateTo("/products");
     }
 
     private void LockInPrice()
@@ -167,7 +176,28 @@
                 }
                 else if (adWatched)
                 {
-                    CompleteLockInPrice();
+                    // Ensure you call LockInProduct with three arguments: productNumber, userEmail, lockInAmount
+                    if (!string.IsNullOrEmpty(userEmail))
+                    {
+                        NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
+                        ProductService.LockInUser(productNumber, userEmail);  // Track locked-in user
+                    }
+                    else
+                    {
+                        // In case of anonymous, you can pass a fallback identifier (e.g., "Anonymous")
+                        NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
+                        ProductService.LockInUser(productNumber, "Anonymous");  // Track locked-in user
+                    }
+
+                    lockedInOdds += lockInAmount;
+                    isSuccess = true;
+                    errorMessage = null;
+                    shouldLockIn = false;
+
+                    if (adWatched)
+                    {
+                        GoBack();
+                    }
                 }
                 else
                 {
@@ -187,11 +217,22 @@
         }
     }
 
+
     private void CompleteLockInPrice()
     {
         if (shouldLockIn)
         {
-            NumberService.LockInProduct(productNumber, lockInAmount);
+            // Pass userEmail as the second argument along with productNumber and lockInAmount
+            if (!string.IsNullOrEmpty(userEmail))
+            {
+                NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
+            }
+            else
+            {
+                // If the user is not logged in, use "Anonymous" or another fallback identifier
+                NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
+            }
+
             lockedInOdds += lockInAmount;
             isSuccess = true;
             errorMessage = null;
@@ -239,6 +280,7 @@
     }
 }
 
+
 <div class="product-details">
     @if (!productExists)
     {
@@ -248,7 +290,7 @@
     else
     {
         <button @onclick="GoBack" class="icon-button">
-            <i class="fas fa-arrow-left"></i> <!-- Tillbaka ikon -->
+            <i class="fas fa-arrow-left"></i> <!-- Back icon -->
         </button>
         <h3>$@price</h3>
         <div class="stats-container">

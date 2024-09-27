@@ -11,6 +11,7 @@ namespace lek4.Components.Service
 
         // A dictionary to keep track of how many people have locked in each product and the amounts
         public Dictionary<int, List<double>> ProductLockAmounts { get; private set; } = new Dictionary<int, List<double>>();
+        public Dictionary<int, Dictionary<string, double>> ProductUserLocks { get; private set; } = new Dictionary<int, Dictionary<string, double>>();
 
         public void UnlockProduct(int productNumber)
         {
@@ -20,27 +21,33 @@ namespace lek4.Components.Service
             }
         }
 
-
-        public void LockInProduct(int productNumber, double amount)
+        public void LockInProduct(int productNumber, string userEmail, double amount)
         {
             if (!LockedInProducts.Contains(productNumber))
             {
                 LockedInProducts.Add(productNumber);
             }
 
-            if (ProductLockAmounts.ContainsKey(productNumber))
+            if (!ProductLockAmounts.ContainsKey(productNumber))
             {
-                ProductLockAmounts[productNumber].Add(amount);
+                ProductLockAmounts[productNumber] = new List<double>();
             }
-            else
-            {
-                ProductLockAmounts[productNumber] = new List<double> { amount };
-            }
+            ProductLockAmounts[productNumber].Add(amount);
 
-            // Deduct the locked in amount from the current number
+            // Deduct the locked-in amount from the current number
             CurrentNumber -= amount;
-        }
 
+            // Track user lock-in by userEmail
+            if (!ProductUserLocks.ContainsKey(productNumber))
+            {
+                ProductUserLocks[productNumber] = new Dictionary<string, double>();
+            }
+
+            // Add or update the user's locked-in amount
+            ProductUserLocks[productNumber][userEmail] = amount;
+
+            Console.WriteLine($"{userEmail} locked in {amount} on product {productNumber}");
+        }
         public bool IsProductUnlocked(int productNumber)
         {
             return UnlockedProducts.Contains(productNumber);
