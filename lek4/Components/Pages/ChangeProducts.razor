@@ -1,18 +1,30 @@
 ﻿@page "/change-products"
 
+@using static lek4.Components.Service.ProductService
+
 @inject NavigationManager NavigationManager
+@inject IJSRuntime js
 @inject lek4.Components.Service.ProductService ProductService
 
 <h3>Change Products</h3>
 
 <div class="product-list">
-    @foreach (var productNumber in productNumbers)
+    @if (products != null && products.Count > 0)
     {
-        <div class="product-item">
-            <p>Product @productNumber</p>
-            <button @onclick="() => EditProduct(productNumber)">Edit Product</button>
-            <button @onclick="() => RemoveProduct(productNumber)" class="remove-button">Remove</button>
-        </div>
+        @foreach (var product in products)
+        {
+            <div class="product-item">
+                <p>Product @product.ProductNumber</p>
+                <p>Price: @product.Price</p>
+                <p>Lock-in Amount: @product.LockInAmount</p>
+                <button @onclick="() => EditProduct(product.ProductNumber)">Edit Product</button>
+                <button @onclick="() => RemoveProduct(product.ProductNumber)" class="remove-button">Remove</button>
+            </div>
+        }
+    }
+    else
+    {
+        <p>No products available.</p>
     }
 </div>
 
@@ -21,45 +33,62 @@
     <label for="newProductNumber">Product Number</label>
     <input type="number" id="newProductNumber" min="1" @bind="newProductNumber" />
 
+    <label for="newProductPrice">Product Price</label>
+    <input type="number" id="newProductPrice" min="0" step="0.01" @bind="newProductPrice" />
+
     <button @onclick="AddProduct">Add Product</button>
 </div>
 
 @code {
-    private List<int> productNumbers;
+    private List<ProductData> products = new List<ProductData>();
     private int newProductNumber;
+    private double newProductPrice;
+    private string userEmail = "user@example.com"; // Placeholder, replace with actual user email if available
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        productNumbers = ProductService.GetProductNumbers(); // Hämta produktlistan från ProductService
+        // Fetch all products from Firebase
+        products = await ProductService.FetchAllProductsFromFirebaseAsync();
+        StateHasChanged(); // Refresh the UI after fetching data
     }
 
-    private void AddProduct()
+    private async Task FetchProductsFromFirebase()
     {
-        if (newProductNumber > 0)
+        products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Get products from Firebase
+        StateHasChanged(); // Refresh the UI after fetching data
+    }
+
+    private async Task AddProduct()
+    {
+        if (newProductNumber > 0 && newProductPrice > 0)
         {
-            ProductService.AddProduct(newProductNumber);
-            productNumbers = ProductService.GetProductNumbers(); // Uppdatera produktlistan efter tillägg
-            newProductNumber = 0; // Nollställ inputfältet
+            // Add new product with number and price to Firebase
+            await ProductService.AddProductToFirebase(newProductNumber, newProductPrice, userEmail);
+
+            // Refresh product list after adding
+            products = await ProductService.FetchAllProductsFromFirebaseAsync();
+
+            // Reset fields
+            newProductNumber = 0;
+            newProductPrice = 0;
         }
     }
 
-    private void RemoveProduct(int productNumber)
+    private async Task RemoveProduct(int productNumber)
     {
-        ProductService.RemoveProduct(productNumber);
-        productNumbers = ProductService.GetProductNumbers(); // Uppdatera produktlistan efter borttagning
-        StateHasChanged(); // Uppdatera UI
+        await ProductService.RemoveProductFromFirebase(productNumber); // Remove product from Firebase
+        products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Refresh product list
+        StateHasChanged(); // Update UI
     }
 
     private void EditProduct(int productNumber)
     {
-        // Kontrollera om produkten fortfarande existerar innan navigation
-        if (productNumbers.Contains(productNumber))
+        if (products.Any(p => p.ProductNumber == productNumber))
         {
             NavigationManager.NavigateTo($"/edit-product/{productNumber}");
         }
         else
         {
-            // Om produkten har tagits bort kan vi visa ett felmeddelande eller navigera tillbaka
             NavigationManager.NavigateTo("/change-products");
         }
     }
@@ -76,8 +105,8 @@
         border: 1px solid #ccc;
         border-radius: 5px;
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        flex-direction: column;
+        align-items: start;
     }
 
     .remove-button {
@@ -89,9 +118,9 @@
         cursor: pointer;
     }
 
-        .remove-button:hover {
-            background-color: darkred;
-        }
+    .remove-button:hover {
+        background-color: darkred;
+    }
 
     .add-product-form {
         margin-top: 30px;
@@ -112,7 +141,7 @@
         cursor: pointer;
     }
 
-        button:hover {
-            background-color: #45a049;
-        }
+    button:hover {
+        background-color: #45a049;
+    }
 </style>

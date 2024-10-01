@@ -13,19 +13,24 @@ public class DrawService
 
     public string GetWinner(int productNumber)
     {
-        // Placeholder för logik som hämtar vinnaren för en specifik produkt
-        return "Winner:" + productNumber;
+        // Placeholder logic to fetch or select a winner
+        var users = _productService.GetLockedInUsers(productNumber);
+        if (users.Count > 0)
+        {
+            var random = new Random();
+            var winner = users[random.Next(users.Count)];
+            return $"Winner: {winner}";
+        }
+        return "No winner selected.";
     }
-
+    public void DrawWinner(int productNumber)
+    {
+        // Call ProductService's DrawWinner method
+        _productService.DrawWinner(productNumber);
+    }
     public TimeSpan GetRemainingTime(int productNumber)
     {
-        // Använder den nya metoden i ProductService för att hämta återstående tid
+        // Use ProductService to get the remaining time
         return _productService.GetTimeRemaining(productNumber);
-    }
-
-    public DayOfWeek GetDrawDay(int productNumber)
-    {
-        // Använder ProductService för att hämta dagen för dragningen
-        return _productService.GetDay(productNumber);
     }
 }

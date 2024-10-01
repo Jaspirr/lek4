@@ -32,15 +32,14 @@ namespace lek4.Components.Commands
             _onException = onException;
         }
 
-        public bool CanExecute(object parameter)
+        public bool CanExecute(object? parameter)  // Markera parameter som nullable
         {
             return !IsExecuting;
         }
 
-        public async void Execute(object parameter)
+        public async void Execute(object? parameter)  // Markera parameter som nullable
         {
             IsExecuting = true;
-
             try
             {
                 await ExecuteAsync(parameter);
@@ -49,9 +48,9 @@ namespace lek4.Components.Commands
             {
                 _onException?.Invoke(ex);
             }
-
             IsExecuting = false;
         }
+
 
         protected abstract Task ExecuteAsync(object parameter);
 

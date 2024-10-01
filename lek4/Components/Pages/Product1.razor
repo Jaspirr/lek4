@@ -6,12 +6,14 @@
 @inject FirebaseAuthClient FirebaseAuthClient
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject DrawService DrawService
 
 @using System.Security.Claims
 @using Firebase.Auth
 @using Microsoft.AspNetCore.Components.Authorization
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
+@using lek4.Components.Service
 
 @code {
     [Parameter]
@@ -20,7 +22,7 @@
     private double price;
     private double winningChance;
     private double lockInAmount;
-    private double totalOdds;
+    private double totalOdds = 1.0;
     private double lockedInOdds;
     private string errorMessage;
     private bool isSuccess;
@@ -30,50 +32,55 @@
     private bool shouldLockIn = false;
     private bool adReadyToWatch = false;
     private bool adWatched = false;
-    private DayOfWeek selectedDay;
+    private DayOfWeek selectedDay = DayOfWeek.Monday;
     private bool productExists = true;
     private TimeSpan remainingTime;
     private string winner;
     private bool showPopup = false;
     private string userEmail;
+    private ProductService.ProductData productData;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        // Only redirect to login if the user is not authenticated
+        // Check if the user is authenticated
         if (user.Identity.IsAuthenticated)
         {
-            // Get the user's email from the claims
             userEmail = user.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
         }
         else
         {
-            // User not logged in, continue without forcing login but don't retrieve email
             userEmail = null;
         }
 
-        // Proceed with checking if the product exists
-        productExists = ProductService.GetProductNumbers().Contains(productNumber);
+        // Fetch product data from Firebase
+        productData = await ProductService.GetProductFromFirebaseAsync(productNumber);
 
-        if (!productExists)
+        if (productData != null)
         {
-            // If the product doesn't exist, redirect to products page
-            NavigationManager.NavigateTo("/products");
+            productExists = true;
+            price = productData.Price;
+            lockInAmount = productData.LockInAmount;
+            // You can also fetch and set other product-related data here
+        }
+        else
+        {
+            productExists = false;
             errorMessage = "This Product is not active";
+            NavigationManager.NavigateTo("/products");
             return;
         }
 
-        // Initialize the timer and ads
-        timer = new Timer(UpdateTimer, null, 0, 1000);
+        // Initialize ads and timer
         InitializeAds();
+        timer = new Timer(UpdateTimer, null, 0, 1000);
 
-        // Fetch remaining time and winner for the product
-        remainingTime = ProductService.GetTimeRemaining(productNumber);
+        remainingTime = DrawService.GetRemainingTime(productNumber);
         if (remainingTime.TotalSeconds <= 0)
         {
-            winner = ProductService.GetWinner(productNumber);
+            winner = DrawService.GetWinner(productNumber);
         }
     }
 
@@ -87,33 +94,93 @@
     private void OnRewardedAdLoaded(object sender, EventArgs e)
     {
         adReadyToWatch = true;
-        StateHasChanged(); // Update UI
+        StateHasChanged();
     }
 
     private void OnUserEarnedReward(object sender, MTEventArgs e)
     {
         adWatched = true;
-        CompleteLockInPrice(); // Once the user watches the ad, complete the "lock-in"
+        CompleteLockInPrice();
     }
 
-    protected override void OnParametersSet()
+    private async Task LockInPrice()
     {
         if (!productExists) return;
 
-        ResetState();
-        price = ProductService.GetPrice(productNumber);
-        selectedDay = ProductService.GetDay(productNumber);
-
-        NumberService.UnlockProduct(productNumber);
-        winningChance = NumberService.GetWinningChance(productNumber);
-        if (winningChance > 100.0)
+        if (lockInAmount > 0 && lockInAmount <= 9.0)
         {
-            winningChance = 100.0;
+            if (NumberService.HasEnoughOdds(lockInAmount))
+            {
+                shouldLockIn = true;
+
+                if (adReadyToWatch && !adWatched)
+                {
+                    ShowAd();
+                }
+                else if (adWatched)
+                {
+                    await SaveProductData();
+                }
+                else
+                {
+                    errorMessage = "Ad is not ready yet.";
+                }
+            }
+            else
+            {
+                isSuccess = false;
+                errorMessage = "You don't have enough odds.";
+            }
         }
-        totalOdds = Math.Max(NumberService.GetRemainingOdds(), 0.0);
-        lockedInOdds = NumberService.ProductLockAmounts.ContainsKey(productNumber)
-            ? NumberService.ProductLockAmounts[productNumber].Sum()
-            : 0;
+        else
+        {
+            isSuccess = false;
+            errorMessage = "Please enter a value between 0.0 and 9.0.";
+        }
+    }
+
+    private async Task SaveProductData()
+    {
+        if (!string.IsNullOrEmpty(userEmail))
+        {
+            await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
+            NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
+            ProductService.LockInUser(productNumber, userEmail);
+        }
+        else
+        {
+            await ProductService.SaveProductData(productNumber, "Anonymous", lockInAmount, price);
+            NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
+            ProductService.LockInUser(productNumber, "Anonymous");
+        }
+
+        lockedInOdds += lockInAmount;
+        isSuccess = true;
+        errorMessage = null;
+        shouldLockIn = false;
+
+        GoBack();
+    }
+
+    private void CompleteLockInPrice()
+    {
+        if (shouldLockIn)
+        {
+            SaveProductData();
+        }
+    }
+
+    private void ShowAd()
+    {
+        if (adReadyToWatch)
+        {
+            CrossMauiMTAdmob.Current.ShowRewarded();
+        }
+        else
+        {
+            errorMessage = "Ad is not ready yet.";
+            StateHasChanged();
+        }
     }
 
     private void UpdateTimer(object state)
@@ -129,11 +196,10 @@
             nextDay = GetNextSelectedDayAt20();
             timeSpan = nextDay - now;
 
-            // Add logic to check for winner again if time is up
-            winner = ProductService.GetWinner(productNumber);
+            winner = DrawService.GetWinner(productNumber);
             if (winner != null)
             {
-                showPopup = false; // Close popup if winner is drawn
+                showPopup = false;
             }
         }
 
@@ -160,126 +226,27 @@
         NavigationManager.NavigateTo("/products");
     }
 
-    private void LockInPrice()
-    {
-        if (!productExists) return;
-
-        if (lockInAmount > 0 && lockInAmount <= 9.0)
-        {
-            if (NumberService.HasEnoughOdds(lockInAmount))
-            {
-                shouldLockIn = true;
-
-                if (adReadyToWatch && !adWatched)
-                {
-                    ShowAd();
-                }
-                else if (adWatched)
-                {
-                    // Ensure you call LockInProduct with three arguments: productNumber, userEmail, lockInAmount
-                    if (!string.IsNullOrEmpty(userEmail))
-                    {
-                        NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
-                        ProductService.LockInUser(productNumber, userEmail);  // Track locked-in user
-                    }
-                    else
-                    {
-                        // In case of anonymous, you can pass a fallback identifier (e.g., "Anonymous")
-                        NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
-                        ProductService.LockInUser(productNumber, "Anonymous");  // Track locked-in user
-                    }
-
-                    lockedInOdds += lockInAmount;
-                    isSuccess = true;
-                    errorMessage = null;
-                    shouldLockIn = false;
-
-                    if (adWatched)
-                    {
-                        GoBack();
-                    }
-                }
-                else
-                {
-                    errorMessage = "Ad is not ready yet.";
-                }
-            }
-            else
-            {
-                isSuccess = false;
-                errorMessage = "You don't have enough odds.";
-            }
-        }
-        else
-        {
-            isSuccess = false;
-            errorMessage = "Please enter a value between 0.0 and 9.0.";
-        }
-    }
-
-
-    private void CompleteLockInPrice()
-    {
-        if (shouldLockIn)
-        {
-            // Pass userEmail as the second argument along with productNumber and lockInAmount
-            if (!string.IsNullOrEmpty(userEmail))
-            {
-                NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
-            }
-            else
-            {
-                // If the user is not logged in, use "Anonymous" or another fallback identifier
-                NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
-            }
-
-            lockedInOdds += lockInAmount;
-            isSuccess = true;
-            errorMessage = null;
-            shouldLockIn = false;
-
-            if (adWatched)
-            {
-                GoBack();
-            }
-        }
-    }
-
-    private void OnSliderChanged(ChangeEventArgs e)
-    {
-        lockInAmount = Convert.ToDouble(e.Value);
-        exceedsTotalOdds = lockInAmount > totalOdds;
-    }
-
-    private void ResetState()
-    {
-        shouldLockIn = false;
-        adWatched = false;
-        adReadyToWatch = false;
-        errorMessage = null;
-    }
-
-    private void ShowAd()
-    {
-        if (adReadyToWatch)
-        {
-            CrossMauiMTAdmob.Current.ShowRewarded();
-        }
-    }
-
-    // Funktioner för att visa popup och dra vinnare
     private void ViewWinner()
     {
         showPopup = true;
+        StateHasChanged();
     }
 
     private void DrawWinner()
     {
-        ProductService.DrawWinner(productNumber);
-        winner = ProductService.GetWinner(productNumber);
+        winner = DrawService.GetWinner(productNumber);
+        StateHasChanged();
+    }
+    private void OnSliderChanged(ChangeEventArgs e)
+{
+    if (double.TryParse(e.Value.ToString(), out double value))
+    {
+        lockInAmount = value;
+        exceedsTotalOdds = lockInAmount > totalOdds;
     }
 }
 
+}
 
 <div class="product-details">
     @if (!productExists)
@@ -290,7 +257,7 @@
     else
     {
         <button @onclick="GoBack" class="icon-button">
-            <i class="fas fa-arrow-left"></i> <!-- Back icon -->
+            <i class="fas fa-arrow-left"></i>
         </button>
         <h3>$@price</h3>
         <div class="stats-container">
@@ -343,6 +310,7 @@
         </div>
     }
 </div>
+
 
 <style>
     .popup {

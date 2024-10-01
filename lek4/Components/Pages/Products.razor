@@ -9,11 +9,11 @@
     [Parameter]
     public double? number { get; set; }
 
-    private List<int> productNumbers;
-    private int unlockingProduct = -1; // Håller reda på vilken produkt som håller på att låsas upp
+    private List<int> productNumbers = new List<int>();
+    private int unlockingProduct = -1; // Keep track of the product being unlocked
     private double remainingOdds;
 
-    protected override void OnParametersSet()
+    protected override async Task OnInitializedAsync()
     {
         if (!number.HasValue)
         {
@@ -21,19 +21,25 @@
         }
 
         NumberService.CurrentNumber = number.Value;
-        remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0); // Limit to 100
+        remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0); // Limit odds to 100
 
-        // Hämta den aktuella produktlistan från ProductService istället för att hårdkoda
-        productNumbers = ProductService.GetProductNumbers();
+        // Fetch the actual product numbers from Firebase via ProductService
+        await FetchProductNumbers();
+    }
+
+    private async Task FetchProductNumbers()
+    {
+        var products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Fetch products from Firebase
+        productNumbers = products.Select(p => p.ProductNumber).ToList(); // Get the product numbers
     }
 
     private async Task GoToProduct(int productNumber)
     {
         unlockingProduct = productNumber;
-        StateHasChanged(); // Uppdatera komponenten för att starta animationen
-        await Task.Delay(1000); // Vänta tills animationen är klar (1 sekund)
+        StateHasChanged(); // Update the component to start the animation
+        await Task.Delay(1000); // Wait for the animation to complete (1 second)
         NumberService.UnlockProduct(productNumber);
-        NavigationManager.NavigateTo($"/product/{productNumber}"); // Navigera till produktsidan utan att visa en annons
+        NavigationManager.NavigateTo($"/product/{productNumber}"); // Navigate to the product page
     }
 
     private string GetIconClass(int productNumber)
@@ -63,11 +69,11 @@
                 <div class="icon-wrapper">
                     @if (!IsProductLockedIn(productNumber))
                     {
-                        <i class="@GetIconClass(productNumber)"></i> <!-- Hänglåsikon -->
+                        <i class="@GetIconClass(productNumber)"></i> <!-- Lock icon -->
                     }
                     @if (IsProductLockedIn(productNumber))
                     {
-                        <i class="fas fa-check checkmark"></i> <!-- Bock ikon -->
+                        <i class="fas fa-check checkmark"></i> <!-- Checkmark icon -->
                     }
                 </div>
             </a>
@@ -75,7 +81,6 @@
     }
 </div>
 
-
 <style>
-    /* Lägg till relevant CSS för sidan här */
+    /* Add relevant CSS for the page here */
 </style>

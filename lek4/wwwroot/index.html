@@ -16,7 +16,12 @@
     <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-analytics.js"></script>
     <script src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-firestore.js"></script>
+
     <script src="NewFolder/ads.js"></script> <!-- Ensure this line is present -->
+
 </head>
 
 <body>
@@ -29,5 +34,66 @@
     </div>
 
     <script src="_framework/blazor.webview.js" autostart="false"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA",
+            authDomain: "stega-426008.firebaseapp.com",
+            projectId: "stega-426008",
+            storageBucket: "stega-426008.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "1:870131863077:android:d2b763cf0e1ccde97a79cc"
+        };
+
+        // Initiera Firebase
+        firebase.initializeApp(firebaseConfig);
+
+        // Initiera Firestore
+        const db = firebase.firestore();
+    </script>
+    <script>
+        async function addProductToFirestore(productId, name, endTime) {
+            try {
+                await db.collection("products").doc(productId).set({
+                    name: name,
+                    endTime: endTime,
+                    lockedInUsers: [],
+                    winner: null
+                });
+                console.log("Product added successfully!");
+            } catch (error) {
+                console.error("Error adding product: ", error);
+            }
+        }
+    </script>
+    <script>
+        async function lockInUserForProduct(productId, userEmail) {
+            const productRef = db.collection("products").doc(productId);
+            const productDoc = await productRef.get();
+
+            if (productDoc.exists) {
+                let lockedInUsers = productDoc.data().lockedInUsers || [];
+                if (!lockedInUsers.includes(userEmail)) {
+                    lockedInUsers.push(userEmail);
+                    await productRef.update({ lockedInUsers: lockedInUsers });
+                    console.log(`${userEmail} locked in for product ${productId}`);
+                }
+            }
+        }
+    </script>
+    <script>
+        async function drawWinnerForProduct(productId) {
+            const productRef = db.collection("products").doc(productId);
+            const productDoc = await productRef.get();
+
+            if (productDoc.exists) {
+                const lockedInUsers = productDoc.data().lockedInUsers || [];
+                if (lockedInUsers.length > 0) {
+                    const winner = lockedInUsers[Math.floor(Math.random() * lockedInUsers.length)];
+                    await productRef.update({ winner: winner });
+                    console.log(`Winner for product ${productId} is: ${winner}`);
+                }
+            }
+        }
+    </script>
 </body>
 </html>

@@ -1,4 +1,5 @@
 ﻿@page "/edit-product/{productNumber:int}"
+@using lek4.Components.Service
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.ProductService ProductService
@@ -9,13 +10,11 @@
     <label for="price">Price</label>
     <input type="number" id="price" min="0" step="0.1" @bind="price" />
 
-    <label for="day">Select Day</label>
-    <select id="day" @bind="selectedDay">
-        @foreach (DayOfWeek day in Enum.GetValues(typeof(DayOfWeek)))
-        {
-            <option value="@day">@day</option>
-        }
-    </select>
+    <label for="lockInAmount">Lock-in Amount</label>
+    <input type="number" id="lockInAmount" min="0" step="0.1" @bind="lockInAmount" />
+
+    <label for="userEmail">User Email</label>
+    <input type="email" id="userEmail" @bind="userEmail" />
 
     <button @onclick="SaveChanges">Save Changes</button>
 </div>
@@ -25,20 +24,44 @@
     public int productNumber { get; set; }
 
     private double price;
-    private DayOfWeek selectedDay;
+    private double lockInAmount;
+    private string userEmail;
+    private ProductService.ProductData productData; // Holds the product data
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        // Hämta aktuellt pris och vald dag från ProductService
-        price = ProductService.GetPrice(productNumber);
-        selectedDay = ProductService.GetDay(productNumber);
+        // Fetch the product data from Firebase
+        productData = await ProductService.GetProductFromFirebaseAsync(productNumber);
+
+        if (productData != null)
+        {
+            // Set local values for price, lockInAmount, and userEmail based on the fetched data
+            price = productData.Price;
+            lockInAmount = productData.LockInAmount;
+            userEmail = productData.UserEmail;
+        }
+        else
+        {
+            // Handle if the product does not exist
+            Console.WriteLine("Product not found.");
+            NavigationManager.NavigateTo("/change-products"); // Redirect back
+        }
     }
 
-    private void SaveChanges()
+    private async Task SaveChanges()
     {
-        // Spara pris och vald dag i ProductService
-        ProductService.SetPrice(productNumber, price);
-        ProductService.SetDay(productNumber, selectedDay);
-        NavigationManager.NavigateTo("/change-products"); // Navigera tillbaka efter sparande
+        // Update the product data with new values
+        if (productData != null)
+        {
+            productData.Price = price;
+            productData.LockInAmount = lockInAmount;
+            productData.UserEmail = userEmail;
+
+            // Save the updated product data to Firebase
+            await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
+
+            // After saving, navigate back to the products list
+            NavigationManager.NavigateTo("/change-products");
+        }
     }
 }

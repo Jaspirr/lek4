@@ -11,11 +11,10 @@
     {
         <div class="product-info">
             <h4>Product @productNumber</h4>
-            <p>Draw Day: @ProductService.GetDay(productNumber)</p>
 
             @if (ProductService.GetTimeRemaining(productNumber).TotalSeconds <= 0)
             {
-                <p><strong>Winner: @ProductService.GetWinner(productNumber) ?? "No winner yet"</strong></p>
+                <p><strong>Winner: @DrawService.GetWinner(productNumber) ?? "No winner yet"</strong></p>
             }
             else
             {
@@ -28,7 +27,7 @@
 @code {
     private void DrawWinnerAndRefresh(int productNumber)
     {
-        ProductService.DrawWinner(productNumber);
+        DrawService.DrawWinner(productNumber);
         StateHasChanged(); // Forces UI to refresh after drawing winner
     }
 }
