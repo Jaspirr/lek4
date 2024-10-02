@@ -1,6 +1,5 @@
 ﻿using lek4.Components.Commands;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Net.Http;
 using System.Text;
@@ -21,6 +20,7 @@ namespace lek4.Features.SignUp
 
         protected override async Task ExecuteAsync(object parameter)
         {
+            // Kontrollera att lösenord matchar
             if (_viewModel.Password != _viewModel.ConfirmPassword)
             {
                 await Application.Current.MainPage.DisplayAlert("Error", "Password and Confirm password do not match!", "Ok");
@@ -29,9 +29,11 @@ namespace lek4.Features.SignUp
 
             try
             {
+                // Firebase API-nyckel
                 var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
                 var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={apiKey}";
 
+                // Skapa JSON-payload för registreringsanrop
                 var payload = new
                 {
                     email = _viewModel.Email,
@@ -39,24 +41,30 @@ namespace lek4.Features.SignUp
                     returnSecureToken = true
                 };
 
-                var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
+                // Serialisera payload till JSON
+                var jsonPayload = JsonConvert.SerializeObject(payload);
+                var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                // Skicka POST-förfrågan till Firebase för att skapa användare
                 var response = await httpClient.PostAsync(requestUri, content);
-                response.EnsureSuccessStatusCode();
+                response.EnsureSuccessStatusCode(); // Kontrollera om anropet lyckades
 
                 var responseBody = await response.Content.ReadAsStringAsync();
-                var responseJson = JObject.Parse(responseBody);
-                var idToken = responseJson["idToken"].ToString();
-                var localId = responseJson["localId"].ToString(); // Firebase UID för användaren
+                Console.WriteLine($"Response from Firebase: {responseBody}");
 
-                // Skicka email-verifiering
+                // Läs in Firebase-svaret som JSON
+                var responseJson = JsonConvert.DeserializeObject<dynamic>(responseBody);
+                var idToken = responseJson.idToken.ToString();
+                var localId = responseJson.localId.ToString(); // Firebase UID för användaren
+
+                // Skicka e-postverifiering
                 await SendEmailVerificationAsync(idToken);
 
-                // Kontrollera om användaren är admin
-                bool isAdmin = IsAdminEmail(_viewModel.Email);
 
-                // Spara användarprofilen
-                await SaveUserProfileToStorage(localId, _viewModel.FirstName, _viewModel.LastName, isAdmin);
+                // Spara användarprofil i Firebase Storage
+                await SaveUserProfileToStorage(localId, _viewModel.FirstName, _viewModel.LastName);
 
+                // Visa framgångsmeddelande
                 await Application.Current.MainPage.DisplayAlert("Success", "Successfully signed up! Please verify your email address.", "Ok");
             }
             catch (Exception ex)
@@ -65,6 +73,7 @@ namespace lek4.Features.SignUp
             }
         }
 
+        // Metod för att skicka e-postverifiering
         private async Task SendEmailVerificationAsync(string idToken)
         {
             var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
@@ -76,35 +85,42 @@ namespace lek4.Features.SignUp
                 idToken = idToken
             };
 
-            var content = new StringContent(JObject.FromObject(payload).ToString(), Encoding.UTF8, "application/json");
+            // Serialisera payload för e-postverifiering
+            var jsonPayload = JsonConvert.SerializeObject(payload);
+            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+            // Skicka POST-förfrågan till Firebase för att skicka verifieringsmejl
             var response = await httpClient.PostAsync(requestUri, content);
-            response.EnsureSuccessStatusCode();
+            var responseBody = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Response from email verification: {responseBody}");
+            response.EnsureSuccessStatusCode(); // Kontrollera om anropet lyckades
         }
 
-        private bool IsAdminEmail(string email)
-        {
-            // Check if the user is admin based on their email address
-            var adminEmails = new List<string> { "jesper.erlandsson@hotmail.com" }; // Add more if necessary
-            return adminEmails.Contains(email.ToLower());
-        }
+        // Metod för att kontrollera om användaren är admin
+       
 
-        private async Task SaveUserProfileToStorage(string userId, string firstName, string lastName, bool isAdmin)
+        // Metod för att spara användarens profil i Firebase Storage
+        private async Task SaveUserProfileToStorage(string userId, string firstName, string lastName)
         {
             var profileData = new
             {
                 Email = _viewModel.Email,
-                FirstName = firstName, // Ta emot förnamnet
-                LastName = lastName,   // Ta emot efternamnet
-                isAdmin = isAdmin
+                FirstName = firstName,
+                LastName = lastName,
             };
 
-            var json = JsonConvert.SerializeObject(profileData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userId}.json", content); // Replace with your Firebase Storage URL
+            // Serialisera användarens profil till JSON
+            var jsonPayload = JsonConvert.SerializeObject(profileData);
+            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
+            // Skicka PUT-förfrågan till Firebase Storage för att spara användarprofilen
+            var response = await httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userId}.json", content);
+            var responseBody = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Response from saving user profile: {responseBody}");
+
+            // Kontrollera om anropet lyckades
             if (!response.IsSuccessStatusCode)
             {
-                var responseBody = await response.Content.ReadAsStringAsync();
                 throw new Exception($"Failed to save user profile: {responseBody}");
             }
         }

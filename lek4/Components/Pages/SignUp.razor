@@ -6,7 +6,6 @@
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
 
-
 <div class="login-container">
     <div class="login-form">
         <h3 class="login-title">Sign Up</h3>
@@ -37,7 +36,7 @@
                     <select @bind="selectedDay">
                         @foreach (var day in days)
                         {
-                            <option value="@day">@day</option>
+                            <option value="@day"></option>
                         }
                     </select>
                 </div>
@@ -83,7 +82,6 @@
     private int selectedYear;
     private int selectedMonth;
     private int selectedDay;
-
     private List<int> years = new List<int>();
     private Dictionary<string, int> months = new Dictionary<string, int>
     {
@@ -101,7 +99,6 @@
         {"December", 12}
     };
     private List<int> days = Enumerable.Range(1, 31).ToList();
-
     private List<string> cities = new List<string>
     {
         "Stockholm", "Göteborg", "Malmö", "Uppsala", "Västerås", "Örebro", "Linköping", "Helsingborg",
@@ -125,46 +122,51 @@
     private async Task RegisterUser()
     {
         signupModel.BirthDate = new DateTime(selectedYear, selectedMonth, selectedDay);
+
+        // Kontrollera om användaren är minst 18 år
         if (CalculateAge(signupModel.BirthDate) < 18)
         {
             await Application.Current.MainPage.DisplayAlert("Error", "You must be at least 18 years old to sign up.", "Ok");
             return;
         }
 
+        // Kontrollera om lösenorden matchar
         if (signupModel.Password != signupModel.ConfirmPassword)
         {
             await Application.Current.MainPage.DisplayAlert("Error", "Passwords do not match.", "Ok");
-            return;
+            return; // Lägg till en return här för att avsluta metoden om lösenorden inte stämmer
         }
 
         try
         {
+            // Skapa användaren i Firebase Authentication
             var userCredential = await AuthClient.CreateUserWithEmailAndPasswordAsync(signupModel.Email, signupModel.Password);
+            Console.WriteLine($"User created with UID: {userCredential.User.Uid}");
+
+            // Skicka e-postverifiering till användaren
             await SendEmailVerificationAsync(userCredential.User);
+            Console.WriteLine("Email verification sent.");
+
+            // Spara användarprofilen i Firebase Storage
             await SaveUserProfileToStorage(userCredential.User);
+            Console.WriteLine("User profile saved to storage.");
+
+            // Bekräfta registrering
             await Application.Current.MainPage.DisplayAlert("Success", "Registration successful! Please verify your email before logging in.", "Ok");
             NavigationManager.NavigateTo("/login");
         }
         catch (Exception ex)
         {
+            // Fånga eventuella fel och visa ett felmeddelande
+            Console.WriteLine($"Full Exception: {ex.ToString()}");
             var errorMessage = GetErrorMessage(ex.Message);
             await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
         }
     }
 
-    private async Task<bool> IsAdminEmail(string email)
-    {
-        var adminEmails = new List<string> { "admin@example.com" };
-        return adminEmails.Contains(email.ToLower());
-    }
+    // Metod för att spara användarprofil i Firebase Storage
     private async Task SaveUserProfileToStorage(User user)
     {
-        string email = user.Info.Email;
-        bool isAdmin = await IsAdminEmail(email);
-
-        // Generate a unique key for the user
-        var uniqueKey = Guid.NewGuid().ToString(); // Generate unique key
-
         var profileData = new
         {
             FirstName = signupModel.FirstName,
@@ -172,28 +174,48 @@
             BirthDate = signupModel.BirthDate.ToString("yyyy-MM-dd"),
             City = signupModel.City,
             Gender = signupModel.Gender,
-            Email = email,
-            isAdmin = isAdmin,
-            UserKey = uniqueKey // Save the user's unique key
+            Email = signupModel.Email
         };
 
         var json = JsonSerializer.Serialize(profileData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         var client = new HttpClient();
-        var response = await client.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content);
+
+        // Skicka förfrågan till Firebase
+        var response = await client.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content);
+
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Console.WriteLine($"Firebase response: {responseBody}");
+
+        // Kontrollera om responsen är JSON
+        if (!responseBody.StartsWith("{"))
+        {
+            Console.WriteLine("Non-JSON response received.");
+            throw new Exception($"Failed to save user profile: {responseBody}");
+        }
+
+        // Försök att deserialisera JSON om det är giltigt
+        try
+        {
+            var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
+            // Hantera JSON-svaret här
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Failed to parse JSON: {ex.Message}");
+            throw new Exception($"Failed to parse Firebase response: {ex.Message}");
+        }
 
         if (!response.IsSuccessStatusCode)
         {
-            var responseBody = await response.Content.ReadAsStringAsync();
             throw new Exception($"Failed to save user profile: {responseBody}");
         }
     }
 
-
     private async Task SendEmailVerificationAsync(User user)
     {
         var idToken = await user.GetIdTokenAsync();
-        var apiKey = "YOUR_FIREBASE_API_KEY"; // Replace with your Firebase API key
+        var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
         var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={apiKey}";
         var payload = new
         {
@@ -251,10 +273,8 @@
         public string Email { get; set; }
         public string Password { get; set; }
         public string ConfirmPassword { get; set; }
-        public bool IsAdmin { get; set; }
     }
 }
-
 
 <style>
     .login-container {

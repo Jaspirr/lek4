@@ -224,11 +224,12 @@ namespace lek4.Components.Service
         }
 
 
-        public async Task LockInUser(int productNumber, string userId, string providedKey)
+        public async Task LockInUser(int productNumber, string userEmail, string providedKey)
         {
-            // Kontrollera att användaren har rätt nyckel
-            var userProfile = await GetUserProfileFromFirebase(userId);
+            // Hämta användarprofil från Firebase
+            var userProfile = await GetUserProfileFromFirebase(userEmail);
 
+            // Kontrollera att användaren har rätt nyckel
             if (userProfile != null && userProfile.UserKey == providedKey)
             {
                 if (!lockedInUsers.ContainsKey(productNumber))
@@ -236,12 +237,14 @@ namespace lek4.Components.Service
                     lockedInUsers[productNumber] = new List<string>();
                 }
 
-                if (!lockedInUsers[productNumber].Contains(userId))
+                if (!lockedInUsers[productNumber].Contains(userEmail))
                 {
-                    lockedInUsers[productNumber].Add(userId);
+                    lockedInUsers[productNumber].Add(userEmail); // Spara korrekt e-postadress istället för "Anonymous"
+
+                    // Uppdatera Firebase med användarens inlåsningsinformation
                     await SaveLockedInUsersToFirebase(productNumber, lockedInUsers[productNumber]);
 
-                    Console.WriteLine($"User {userId} locked in for product {productNumber}.");
+                    Console.WriteLine($"User {userEmail} locked in for product {productNumber}.");
                 }
             }
             else
@@ -250,21 +253,19 @@ namespace lek4.Components.Service
             }
         }
 
-
         public async Task<UserProfile> GetUserProfileFromFirebase(string userEmail)
         {
-            // Construct the Firebase URL for the specific user profile
+            // Firebase URL baserad på e-postadressen
             var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userEmail}.json?alt=media";
 
-            // Send an HTTP GET request to Firebase
+            // Skicka en HTTP GET-förfrågan till Firebase
             var response = await _httpClient.GetAsync(url);
 
             if (response.IsSuccessStatusCode)
             {
-                // Read and deserialize the response into a UserProfile object
+                // Läs och deserialisera svaret till ett UserProfile-objekt
                 var jsonResponse = await response.Content.ReadAsStringAsync();
                 var userProfile = JsonSerializer.Deserialize<UserProfile>(jsonResponse);
-
                 return userProfile;
             }
             else
@@ -273,7 +274,6 @@ namespace lek4.Components.Service
                 return null;
             }
         }
-
 
         private async Task SaveLockedInUsersToFirebase(int productNumber, List<string> lockedInUsers)
         {

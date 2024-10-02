@@ -18,6 +18,7 @@ public class CustomAuthenticationStateProvider : AuthenticationStateProvider
             new Claim(ClaimTypes.Name, email),
             new Claim(ClaimTypes.Role, isAdmin ? "Admin" : "User")
         }, "apiauth_type");
+        Console.WriteLine($"Authenticating user with email: {email}");
 
         var user = new ClaimsPrincipal(identity);
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));

@@ -22,38 +22,42 @@ public class UserService
         if (response.IsSuccessStatusCode)
         {
             var responseBody = await response.Content.ReadAsStringAsync();
-            var userProfile = JsonSerializer.Deserialize<UserProfile>(responseBody);
+            Console.WriteLine($"Response Body: {responseBody}");
 
-            // Kontrollera att userProfile inte är null
-            if (userProfile != null)
+            try
             {
-                // Uppdatera IsAdmin till true
-                userProfile.IsAdmin = true;
+                var userProfile = JsonSerializer.Deserialize<UserProfile>(responseBody);
 
-                // Serialisera tillbaka till JSON
-                var updatedJson = JsonSerializer.Serialize(userProfile);
-
-                // Ladda upp den uppdaterade JSON-filen tillbaka till Firebase Storage
-                var content = new StringContent(updatedJson, Encoding.UTF8, "application/json");
-                var putResponse = await _httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{email}.json", content);
-
-                if (putResponse.IsSuccessStatusCode)
+                if (userProfile != null)
                 {
-                    Console.WriteLine("User profile updated successfully.");
+                    // Uppdatera IsAdmin till true
+                    userProfile.IsAdmin = true;
+
+                    // Serialisera tillbaka till JSON
+                    var updatedJson = JsonSerializer.Serialize(userProfile);
+
+                    // Ladda upp den uppdaterade JSON-filen tillbaka till Firebase Storage
+                    var content = new StringContent(updatedJson, Encoding.UTF8, "application/json");
+                    var putResponse = await _httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{email}.json", content);
+
+                    if (putResponse.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine("User profile updated successfully.");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Failed to update user profile. Status code: {putResponse.StatusCode}");
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("Failed to update user profile.");
+                    Console.WriteLine("Failed to deserialize user profile.");
                 }
             }
-            else
+            catch (JsonException ex)
             {
-                Console.WriteLine("Failed to deserialize user profile.");
+                Console.WriteLine($"JSON deserialization error: {ex.Message}");
             }
-        }
-        else
-        {
-            Console.WriteLine("User profile not found.");
         }
     }
 
