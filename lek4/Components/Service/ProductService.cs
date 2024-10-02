@@ -11,6 +11,7 @@ namespace lek4.Components.Service
 {
     public class ProductService
     {
+
         private Dictionary<int, double> productPrices = new Dictionary<int, double>();
         private Dictionary<int, DayOfWeek> productDays = new Dictionary<int, DayOfWeek>();
         private Dictionary<int, DateTime> productEndTimes = new Dictionary<int, DateTime>();
@@ -177,6 +178,29 @@ namespace lek4.Components.Service
             }
         }
 
+        public async Task<List<int>> GetProductNumbersFromFirebaseAsync(int maxProducts = 100)
+        {
+            var productNumbers = new List<int>();
+
+            // Iterate over a range of possible product numbers and fetch each product
+            for (int productNumber = 1; productNumber <= maxProducts; productNumber++)
+            {
+                var product = await GetProductFromFirebaseAsync(productNumber);
+
+                if (product != null)
+                {
+                    productNumbers.Add(product.ProductNumber); // Add the product number to the list
+                }
+                else
+                {
+                    // If a product is not found, we stop fetching further products.
+                    // You can adjust this logic if needed.
+                    break;
+                }
+            }
+
+            return productNumbers;
+        }
 
 
         public double GetPrice(int productNumber)
@@ -199,20 +223,130 @@ namespace lek4.Components.Service
             return TimeSpan.Zero;
         }
 
-        public void LockInUser(int productNumber, string userEmail)
-        {
-            if (!lockedInUsers.ContainsKey(productNumber))
-            {
-                lockedInUsers[productNumber] = new List<string>();
-            }
 
-            if (!lockedInUsers[productNumber].Contains(userEmail))
+        public async Task LockInUser(int productNumber, string userId, string providedKey)
+        {
+            // Kontrollera att användaren har rätt nyckel
+            var userProfile = await GetUserProfileFromFirebase(userId);
+
+            if (userProfile != null && userProfile.UserKey == providedKey)
             {
-                lockedInUsers[productNumber].Add(userEmail);
-                Console.WriteLine($"User {userEmail} locked in for product {productNumber}.");
+                if (!lockedInUsers.ContainsKey(productNumber))
+                {
+                    lockedInUsers[productNumber] = new List<string>();
+                }
+
+                if (!lockedInUsers[productNumber].Contains(userId))
+                {
+                    lockedInUsers[productNumber].Add(userId);
+                    await SaveLockedInUsersToFirebase(productNumber, lockedInUsers[productNumber]);
+
+                    Console.WriteLine($"User {userId} locked in for product {productNumber}.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Invalid key. Lock-in failed.");
             }
         }
 
+
+        public async Task<UserProfile> GetUserProfileFromFirebase(string userEmail)
+        {
+            // Construct the Firebase URL for the specific user profile
+            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userEmail}.json?alt=media";
+
+            // Send an HTTP GET request to Firebase
+            var response = await _httpClient.GetAsync(url);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Read and deserialize the response into a UserProfile object
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var userProfile = JsonSerializer.Deserialize<UserProfile>(jsonResponse);
+
+                return userProfile;
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch user profile for {userEmail}. Status code: {response.StatusCode}");
+                return null;
+            }
+        }
+
+
+        private async Task SaveLockedInUsersToFirebase(int productNumber, List<string> lockedInUsers)
+        {
+            var lockedInUsersData = new
+            {
+                LockedInUsers = lockedInUsers
+            };
+
+            var json = JsonSerializer.Serialize(lockedInUsersData);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2FlockedInUsers.json", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to save locked-in users for product {productNumber}. Error: {response.StatusCode}");
+            }
+        }
+        public List<(string UserEmail, double LockInAmount)> GetLockedInUsersWithLockInAmount(int productNumber)
+        {
+            // This is a placeholder. You should update it to actually retrieve LockInAmount and UserEmail
+            if (lockedInUsers.ContainsKey(productNumber))
+            {
+                return lockedInUsers[productNumber].Select(email =>
+                    (email, products.First(p => p.ProductNumber == productNumber).LockInAmount)).ToList();
+            }
+            return new List<(string UserEmail, double LockInAmount)>();
+        }
+        public async Task SaveWinnerToFirebase(int productNumber, string winnerEmail)
+        {
+            // Construct the data to be saved
+            var winnerData = new { Winner = winnerEmail };
+
+            var winnerJson = JsonSerializer.Serialize(winnerData);
+            var content = new StringContent(winnerJson, Encoding.UTF8, "application/json");
+
+            // Firebase path for saving winner data
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json";
+
+            // Use PUT to upload the winner data
+            var response = await _httpClient.PutAsync(path, content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Winner for product {productNumber} saved successfully.");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to save winner for product {productNumber}. Error: {response.StatusCode}");
+            }
+        }
+        public async Task<string> GetWinnerFromFirebase(int productNumber)
+        {
+            // Firebase path for fetching winner data
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json?alt=media";
+
+            // Send an HTTP GET request to Firebase
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var winnerData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonResponse);
+
+                // Return the winner's email
+                return winnerData.ContainsKey("Winner") ? winnerData["Winner"] : null;
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch winner for product {productNumber}. Status code: {response.StatusCode}");
+                return null;
+            }
+        }
         public List<string> GetLockedInUsers(int productNumber)
         {
             return lockedInUsers.ContainsKey(productNumber) ? lockedInUsers[productNumber] : new List<string>();
@@ -224,6 +358,14 @@ namespace lek4.Components.Service
             public string UserEmail { get; set; }
             public double Price { get; set; }
             public double LockInAmount { get; set; }
+        }
+        public class UserProfile
+        {
+            public string UserKey { get; set; }
+            public string FirstName { get; set; }
+            public string LastName { get; set; }
+            public string Email { get; set; }
+            // Add other user properties as needed
         }
     }
 }

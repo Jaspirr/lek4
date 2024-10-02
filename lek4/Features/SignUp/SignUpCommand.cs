@@ -5,6 +5,7 @@ using System;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace lek4.Features.SignUp
 {
@@ -47,14 +48,14 @@ namespace lek4.Features.SignUp
                 var idToken = responseJson["idToken"].ToString();
                 var localId = responseJson["localId"].ToString(); // Firebase UID för användaren
 
-                // Send email verification
+                // Skicka email-verifiering
                 await SendEmailVerificationAsync(idToken);
 
-                // Bestäm om användaren är admin
+                // Kontrollera om användaren är admin
                 bool isAdmin = IsAdminEmail(_viewModel.Email);
 
-                // Spara användarprofilen med adminstatus
-                await SaveUserProfileToStorage(localId, isAdmin);
+                // Spara användarprofilen
+                await SaveUserProfileToStorage(localId, _viewModel.FirstName, _viewModel.LastName, isAdmin);
 
                 await Application.Current.MainPage.DisplayAlert("Success", "Successfully signed up! Please verify your email address.", "Ok");
             }
@@ -82,18 +83,18 @@ namespace lek4.Features.SignUp
 
         private bool IsAdminEmail(string email)
         {
-            // Kontrollera om användaren är admin baserat på e-postadress
-            var adminEmails = new List<string> { "jesper.erlandsson@hotmail.com" }; // Lägg till fler om nödvändigt
+            // Check if the user is admin based on their email address
+            var adminEmails = new List<string> { "jesper.erlandsson@hotmail.com" }; // Add more if necessary
             return adminEmails.Contains(email.ToLower());
         }
 
-        private async Task SaveUserProfileToStorage(string userId, bool isAdmin)
+        private async Task SaveUserProfileToStorage(string userId, string firstName, string lastName, bool isAdmin)
         {
             var profileData = new
             {
                 Email = _viewModel.Email,
-                FirstName = _viewModel.FirstName,
-                LastName = _viewModel.LastName,
+                FirstName = firstName, // Ta emot förnamnet
+                LastName = lastName,   // Ta emot efternamnet
                 isAdmin = isAdmin
             };
 

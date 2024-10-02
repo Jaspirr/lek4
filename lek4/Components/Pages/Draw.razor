@@ -7,28 +7,60 @@
 <h3>Draw Page</h3>
 
 <div class="product-draw">
-    @foreach (var productNumber in ProductService.GetProductNumbers())
+    @if (productNumbers != null)
     {
-        <div class="product-info">
-            <h4>Product @productNumber</h4>
+        @foreach (var productNumber in productNumbers)
+        {
+            <div class="product-info">
+                <h4>Product @productNumber</h4>
 
-            @if (ProductService.GetTimeRemaining(productNumber).TotalSeconds <= 0)
-            {
-                <p><strong>Winner: @DrawService.GetWinner(productNumber) ?? "No winner yet"</strong></p>
-            }
-            else
-            {
-                <button @onclick="() => DrawWinnerAndRefresh(productNumber)">Draw Winner</button>
-            }
-        </div>
+                @if (GetTimeRemaining(productNumber).TotalSeconds <= 0)
+                {
+                    <p><strong>Winner: @(winners.ContainsKey(productNumber) ? winners[productNumber] : "No winner yet")</strong></p>
+                }
+                else
+                {
+                    <button @onclick="() => DrawWinnerAndRefresh(productNumber)">Draw Winner</button>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <p>Loading products...</p>
     }
 </div>
 
 @code {
-    private void DrawWinnerAndRefresh(int productNumber)
+    private List<int> productNumbers;
+    private Dictionary<int, string> winners = new Dictionary<int, string>();
+
+    protected override async Task OnInitializedAsync()
     {
-        DrawService.DrawWinner(productNumber);
-        StateHasChanged(); // Forces UI to refresh after drawing winner
+        // Fetch the product numbers when the page initializes
+        productNumbers = await ProductService.GetProductNumbersFromFirebaseAsync();
+
+        // Preload any winners if necessary
+        foreach (var productNumber in productNumbers)
+        {
+            winners[productNumber] = await DrawService.DrawWinnerAsync(productNumber) ?? "No winner yet";
+        }
+    }
+
+    private TimeSpan GetTimeRemaining(int productNumber)
+    {
+        // Use ProductService to get remaining time for each product
+        return ProductService.GetTimeRemaining(productNumber);
+    }
+
+    private async Task DrawWinnerAndRefresh(int productNumber)
+    {
+        // Draw the winner for the specific product
+        await DrawService.DrawWinnerAsync(productNumber);
+
+        // Update the UI with the new winner
+        winners[productNumber] = await DrawService.DrawWinnerAsync(productNumber);
+        StateHasChanged(); // Trigger UI refresh
     }
 }
 

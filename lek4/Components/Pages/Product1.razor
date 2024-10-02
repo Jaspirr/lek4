@@ -39,6 +39,7 @@
     private bool showPopup = false;
     private string userEmail;
     private ProductService.ProductData productData;
+    private string providedKey = "some-key"; // Replace with actual key logic
 
     protected override async Task OnInitializedAsync()
     {
@@ -77,10 +78,10 @@
         InitializeAds();
         timer = new Timer(UpdateTimer, null, 0, 1000);
 
-        remainingTime = DrawService.GetRemainingTime(productNumber);
+        var remainingTime = ProductService.GetTimeRemaining(productNumber);
         if (remainingTime.TotalSeconds <= 0)
         {
-            winner = DrawService.GetWinner(productNumber);
+            winner = await DrawService.GetWinnerAsync(productNumber); // Fetch winner using DrawService
         }
     }
 
@@ -145,13 +146,13 @@
         {
             await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
             NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
-            ProductService.LockInUser(productNumber, userEmail);
+            await ProductService.LockInUser(productNumber, userEmail, providedKey); // Pass the providedKey here
         }
         else
         {
             await ProductService.SaveProductData(productNumber, "Anonymous", lockInAmount, price);
             NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
-            ProductService.LockInUser(productNumber, "Anonymous");
+            await ProductService.LockInUser(productNumber, "Anonymous", providedKey); // Pass the providedKey here
         }
 
         lockedInOdds += lockInAmount;
@@ -166,7 +167,7 @@
     {
         if (shouldLockIn)
         {
-            SaveProductData();
+            SaveProductData().Wait();
         }
     }
 
@@ -196,11 +197,16 @@
             nextDay = GetNextSelectedDayAt20();
             timeSpan = nextDay - now;
 
-            winner = DrawService.GetWinner(productNumber);
-            if (winner != null)
+            // Call async method in a fire-and-forget manner using Task.Run
+            Task.Run(async () =>
             {
-                showPopup = false;
-            }
+                winner = await DrawService.GetWinnerAsync(productNumber); // Asynchronous call to GetWinnerAsync
+                if (winner != null)
+                {
+                    showPopup = false;
+                    InvokeAsync(StateHasChanged); // Update UI after the async task completes
+                }
+            });
         }
 
         timeRemaining = $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
@@ -232,20 +238,20 @@
         StateHasChanged();
     }
 
-    private void DrawWinner()
+    private async Task DrawWinner()
     {
-        winner = DrawService.GetWinner(productNumber);
-        StateHasChanged();
+        winner = await DrawService.GetWinnerAsync(productNumber); // Call the asynchronous method
+        StateHasChanged(); // Refresh the UI after the winner is drawn
     }
-    private void OnSliderChanged(ChangeEventArgs e)
-{
-    if (double.TryParse(e.Value.ToString(), out double value))
-    {
-        lockInAmount = value;
-        exceedsTotalOdds = lockInAmount > totalOdds;
-    }
-}
 
+    private void OnSliderChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value.ToString(), out double value))
+        {
+            lockInAmount = value;
+            exceedsTotalOdds = lockInAmount > totalOdds;
+        }
+    }
 }
 
 <div class="product-details">

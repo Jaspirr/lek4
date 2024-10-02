@@ -6,6 +6,7 @@
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
 
+
 <div class="login-container">
     <div class="login-form">
         <h3 class="login-title">Sign Up</h3>
@@ -103,36 +104,10 @@
 
     private List<string> cities = new List<string>
     {
-        "Stockholm",
-        "Göteborg",
-        "Malmö",
-        "Uppsala",
-        "Västerås",
-        "Örebro",
-        "Linköping",
-        "Helsingborg",
-        "Jönköping",
-        "Norrköping",
-        "Lund",
-        "Umeå",
-        "Gävle",
-        "Borås",
-        "Eskilstuna",
-        "Södertälje",
-        "Karlstad",
-        "Täby",
-        "Växjö",
-        "Halmstad",
-        "Sundsvall",
-        "Luleå",
-        "Trollhättan",
-        "Östersund",
-        "Borlänge",
-        "Tumba",
-        "Kalmar",
-        "Skövde",
-        "Karlskrona",
-        "Kristianstad"
+        "Stockholm", "Göteborg", "Malmö", "Uppsala", "Västerås", "Örebro", "Linköping", "Helsingborg",
+        "Jönköping", "Norrköping", "Lund", "Umeå", "Gävle", "Borås", "Eskilstuna", "Södertälje", "Karlstad",
+        "Täby", "Växjö", "Halmstad", "Sundsvall", "Luleå", "Trollhättan", "Östersund", "Borlänge", "Tumba",
+        "Kalmar", "Skövde", "Karlskrona", "Kristianstad"
     };
 
     protected override void OnInitialized()
@@ -176,20 +151,19 @@
             await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
         }
     }
+
     private async Task<bool> IsAdminEmail(string email)
     {
-        // Här kontrollerar vi mot en lista av admin-e-postadresser
-        var adminEmails = new List<string> { "jesper.erlandsson@hotmail.com", "otheradmin@example.com" };
+        var adminEmails = new List<string> { "admin@example.com" };
         return adminEmails.Contains(email.ToLower());
     }
-
     private async Task SaveUserProfileToStorage(User user)
     {
-        // Hämta användarens e-postadress från user.UserInfo
         string email = user.Info.Email;
-
-        // Kontrollera om användarens e-post finns i Firebase Security Rules
         bool isAdmin = await IsAdminEmail(email);
+
+        // Generate a unique key for the user
+        var uniqueKey = Guid.NewGuid().ToString(); // Generate unique key
 
         var profileData = new
         {
@@ -198,8 +172,9 @@
             BirthDate = signupModel.BirthDate.ToString("yyyy-MM-dd"),
             City = signupModel.City,
             Gender = signupModel.Gender,
-            Email = email, // Använd den hämtade e-postadressen
-            isAdmin = isAdmin // Tilldela adminstatus
+            Email = email,
+            isAdmin = isAdmin,
+            UserKey = uniqueKey // Save the user's unique key
         };
 
         var json = JsonSerializer.Serialize(profileData);
@@ -218,7 +193,7 @@
     private async Task SendEmailVerificationAsync(User user)
     {
         var idToken = await user.GetIdTokenAsync();
-        var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
+        var apiKey = "YOUR_FIREBASE_API_KEY"; // Replace with your Firebase API key
         var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={apiKey}";
         var payload = new
         {
@@ -276,9 +251,10 @@
         public string Email { get; set; }
         public string Password { get; set; }
         public string ConfirmPassword { get; set; }
-        public bool IsAdmin { get; set; } // Lägg till denna rad för adminstatus
+        public bool IsAdmin { get; set; }
     }
 }
+
 
 <style>
     .login-container {
