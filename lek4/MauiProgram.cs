@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Net.Http;
 using System;
+using Blazored.LocalStorage;
 
 namespace lek4
 {
@@ -43,6 +44,8 @@ namespace lek4
             builder.Services.AddAuthorizationCore();
             // Registrera Authorization som en scoped tjänst
             builder.Services.AddScoped<Authorization>();
+
+            builder.Services.AddBlazoredLocalStorage();
 
             // Registrera andra tjänster
             builder.Services.AddSingleton<GoogleFitService>();

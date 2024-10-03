@@ -7,6 +7,7 @@
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject DrawService DrawService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
 
 @using System.Security.Claims
 @using Firebase.Auth
@@ -142,17 +143,20 @@
 
     private async Task SaveProductData()
     {
+        // Retrieve email from local storage
+        var userEmail = await localStorage.GetItemAsync<string>("userEmail");
+
         if (!string.IsNullOrEmpty(userEmail))
         {
             await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
             NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
-            await ProductService.LockInUser(productNumber, userEmail, providedKey); // Pass the providedKey here
+            await ProductService.LockInUser(productNumber, userEmail); // No more providedKey needed
         }
         else
         {
             await ProductService.SaveProductData(productNumber, "Anonymous", lockInAmount, price);
             NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
-            await ProductService.LockInUser(productNumber, "Anonymous", providedKey); // Pass the providedKey here
+            await ProductService.LockInUser(productNumber, "Anonymous"); // No more providedKey needed
         }
 
         lockedInOdds += lockInAmount;
@@ -162,6 +166,7 @@
 
         GoBack();
     }
+
 
     private void CompleteLockInPrice()
     {

@@ -4,6 +4,7 @@
 @using System.Text
 @using System.Net.Http
 @inject FirebaseAuthClient AuthClient
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
 @inject NavigationManager NavigationManager
 
 <div class="settings-container">
@@ -94,12 +95,14 @@
         NavigationManager.NavigateTo("/account-settings");
     }
 
-    private void Logout()
+    private async Task Logout()
     {
-        AuthClient.SignOut();
-        NavigationManager.NavigateTo("/login");
-    }
+        // Clear the email from localStorage
+        await localStorage.RemoveItemAsync("userEmail");
 
+        await Application.Current.MainPage.DisplayAlert("Success", "Successfully logged out!", "Ok");
+        NavigationManager.NavigateTo("/login"); // Redirect to login page
+    }
     public class ProfileModel
     {
         public string FirstName { get; set; }

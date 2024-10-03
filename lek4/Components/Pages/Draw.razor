@@ -20,6 +20,7 @@
                 }
                 else
                 {
+                    <p>Time remaining: @GetTimeRemaining(productNumber).Days day(s), @GetTimeRemaining(productNumber).Hours hour(s), @GetTimeRemaining(productNumber).Minutes minute(s)</p>
                     <button @onclick="() => DrawWinnerAndRefresh(productNumber)">Draw Winner</button>
                 }
             </div>
@@ -40,10 +41,11 @@
         // Fetch the product numbers when the page initializes
         productNumbers = await ProductService.GetProductNumbersFromFirebaseAsync();
 
-        // Preload any winners if necessary
+        // Preload any winners if they exist
         foreach (var productNumber in productNumbers)
         {
-            winners[productNumber] = await DrawService.DrawWinnerAsync(productNumber) ?? "No winner yet";
+            // Check if a winner exists for this product
+            winners[productNumber] = await DrawService.GetWinnerAsync(productNumber) ?? "No winner yet";
         }
     }
 
@@ -55,11 +57,10 @@
 
     private async Task DrawWinnerAndRefresh(int productNumber)
     {
-        // Draw the winner for the specific product
-        await DrawService.DrawWinnerAsync(productNumber);
+        // Draw the winner for the specific product and update the winner's display
+        var winner = await DrawService.DrawWinnerAsync(productNumber);
+        winners[productNumber] = winner ?? "No winner yet";
 
-        // Update the UI with the new winner
-        winners[productNumber] = await DrawService.DrawWinnerAsync(productNumber);
         StateHasChanged(); // Trigger UI refresh
     }
 }
@@ -86,4 +87,17 @@
         .product-info p {
             margin-bottom: 5px;
         }
+
+        .product-info button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+            .product-info button:hover {
+                background-color: #45a049;
+            }
 </style>

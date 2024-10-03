@@ -24,8 +24,8 @@ public class DrawService
     {
         try
         {
-            // Updated Firebase URL for the winner file under /users/winner.json
-            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner.json?alt=media";
+            // Uppdaterad Firebase-URL för att hämta vinnare för en specifik produkt
+            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json?alt=media";
             var response = await _httpClient.GetAsync(url);
 
             if (response.IsSuccessStatusCode)
@@ -33,7 +33,6 @@ public class DrawService
                 var jsonResponse = await response.Content.ReadAsStringAsync();
                 var winnerData = JsonSerializer.Deserialize<WinnerData>(jsonResponse);
 
-                // Return the winner’s information
                 return $"{winnerData.FirstName} {winnerData.LastName}";
             }
             else if (response.StatusCode == HttpStatusCode.NotFound)
@@ -54,6 +53,7 @@ public class DrawService
         }
     }
 
+
     // New DrawWinnerAsync method for drawing the winner
     public async Task<string> DrawWinnerAsync(int productNumber)
     {
@@ -61,24 +61,34 @@ public class DrawService
 
         if (lockedInUsersWithAmounts.Count > 0)
         {
-            // Calculate the odds based on LockInAmount
+            // Steg 1: Räkna ut den totala LockInAmount
             var totalLockInAmount = lockedInUsersWithAmounts.Sum(x => x.LockInAmount);
+
+            // Steg 2: Generera ett slumpmässigt värde mellan 0 och totalLockInAmount
             var randomValue = new Random().NextDouble() * totalLockInAmount;
 
             double cumulativeOdds = 0.0;
+
+            // Steg 3: Iterera över användarna och hitta den som vinner
             foreach (var user in lockedInUsersWithAmounts)
             {
                 cumulativeOdds += user.LockInAmount;
+
+                // När cumulativeOdds överskrider randomValue, välj den användaren
                 if (randomValue <= cumulativeOdds)
                 {
                     var winnerUserEmail = user.UserEmail;
 
-                    // Save the winner to Firebase
+                    // Steg 4: Spara vinnaren i Firebase
                     await SaveWinnerToFirebase(productNumber, winnerUserEmail);
 
-                    // Fetch user profile to display the name instead of email
+                    // Hämta användarens profil för att visa namn istället för e-post
                     var userProfile = await _productService.GetUserProfileFromFirebase(winnerUserEmail);
-                    return $"{userProfile.FirstName} {userProfile.LastName}";
+
+                    // Om profilen hittas, returnera namn, annars returnera e-post
+                    return userProfile != null
+                        ? $"{userProfile.FirstName} {userProfile.LastName}"
+                        : winnerUserEmail;
                 }
             }
         }
@@ -86,7 +96,7 @@ public class DrawService
         return "No winner";
     }
 
-    // Method to save the winner to Firebase
+
     public async Task SaveWinnerToFirebase(int productNumber, string winnerUserEmail)
     {
         var winnerData = new
@@ -98,15 +108,16 @@ public class DrawService
         var json = JsonSerializer.Serialize(winnerData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        // Updated path to save the winner under /users/winner.json
-        var response = await _httpClient.PutAsync(
-            $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner.json", content);
+        // Uppdaterad path för att spara vinnaren under produktspecifik väg
+        var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json";
+        var response = await _httpClient.PutAsync(path, content);
 
         if (!response.IsSuccessStatusCode)
         {
             Console.WriteLine($"Failed to save winner for product {productNumber}. Status code: {response.StatusCode}");
         }
     }
+
 
 }
 
@@ -117,3 +128,4 @@ public class WinnerData
     public string LastName { get; set; }
     public string WinnerEmail { get; set; }
 }
+

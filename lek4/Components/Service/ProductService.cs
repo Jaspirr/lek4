@@ -6,6 +6,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Net;
 using System;
+using Blazored.LocalStorage;
 
 namespace lek4.Components.Service
 {
@@ -18,12 +19,17 @@ namespace lek4.Components.Service
         private Dictionary<int, List<string>> lockedInUsers = new Dictionary<int, List<string>>(); // Keep track of users locked into products
         private Dictionary<int, string> productWinners = new Dictionary<int, string>(); // Keep track of product winners
         private List<ProductData> products = new List<ProductData>();
+        private readonly UserService _userService;
+        private readonly ILocalStorageService _localStorage;
 
         private readonly HttpClient _httpClient;
 
-        public ProductService(HttpClient httpClient)
+
+        public ProductService(HttpClient httpClient,UserService userService, ILocalStorageService localStorage)
         {
             _httpClient = httpClient;
+            _userService = userService;
+            _localStorage = localStorage;
             // Example: Pre-define some product numbers
             productEndTimes[1] = DateTime.Now.AddDays(2); // Product 1 ends in 2 days
             productEndTimes[2] = DateTime.Now.AddHours(10); // Product 2 ends in 10 hours
@@ -49,6 +55,8 @@ namespace lek4.Components.Service
             // Call SaveProductData on the current instance
             await SaveProductData(productNumber, userEmail, lockInAmount, price);
         }
+
+
         public void DrawWinner(int productNumber)
         {
             if (lockedInUsers.ContainsKey(productNumber) && lockedInUsers[productNumber].Count > 0)
@@ -128,6 +136,7 @@ namespace lek4.Components.Service
                 Console.WriteLine($"Failed to save product data for {productNumber}. Error: {response.StatusCode}");
             }
         }
+
 
 
         public async Task<List<ProductData>> FetchAllProductsFromFirebaseAsync(int maxProducts = 100)
@@ -224,13 +233,17 @@ namespace lek4.Components.Service
         }
 
 
-        public async Task LockInUser(int productNumber, string userEmail, string providedKey)
+        public async Task LockInUser(int productNumber, string userEmail)
         {
-            // Hämta användarprofil från Firebase
+            if (string.IsNullOrEmpty(userEmail) || userEmail == "Anonymous")
+            {
+                Console.WriteLine("Invalid email. Cannot lock in as Anonymous.");
+                return;
+            }
+
             var userProfile = await GetUserProfileFromFirebase(userEmail);
 
-            // Kontrollera att användaren har rätt nyckel
-            if (userProfile != null && userProfile.UserKey == providedKey)
+            if (userProfile != null)
             {
                 if (!lockedInUsers.ContainsKey(productNumber))
                 {
@@ -239,17 +252,20 @@ namespace lek4.Components.Service
 
                 if (!lockedInUsers[productNumber].Contains(userEmail))
                 {
-                    lockedInUsers[productNumber].Add(userEmail); // Spara korrekt e-postadress istället för "Anonymous"
+                    lockedInUsers[productNumber].Add(userEmail); // Use the correct email
 
-                    // Uppdatera Firebase med användarens inlåsningsinformation
+                    // Save the locked-in user to Firebase
                     await SaveLockedInUsersToFirebase(productNumber, lockedInUsers[productNumber]);
-
                     Console.WriteLine($"User {userEmail} locked in for product {productNumber}.");
+                }
+                else
+                {
+                    Console.WriteLine($"User {userEmail} has already locked in for product {productNumber}.");
                 }
             }
             else
             {
-                Console.WriteLine("Invalid key. Lock-in failed.");
+                Console.WriteLine("User profile not found. Lock-in failed.");
             }
         }
 

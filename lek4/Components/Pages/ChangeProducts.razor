@@ -43,7 +43,7 @@
     private List<ProductData> products = new List<ProductData>();
     private int newProductNumber;
     private double newProductPrice;
-    private string userEmail = "user@example.com"; // Placeholder, replace with actual user email if available
+    private string userEmail = "user@example.com"; // Replace with actual user email if available
 
     protected override async Task OnInitializedAsync()
     {
@@ -62,8 +62,8 @@
     {
         if (newProductNumber > 0 && newProductPrice > 0)
         {
-            // Add new product with number and price to Firebase
-            await ProductService.AddProductToFirebase(newProductNumber, newProductPrice, userEmail);
+            // Add new product with number, price, and user email to Firebase
+            await ProductService.AddProductToFirebase(newProductNumber, newProductPrice, userEmail); // Pass userEmail
 
             // Refresh product list after adding
             products = await ProductService.FetchAllProductsFromFirebaseAsync();

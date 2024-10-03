@@ -3,6 +3,9 @@
 @using System.Text.Json
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
+@inject UserService userService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
 
 <div class="login-container">
     <div class="login-form">
@@ -35,8 +38,15 @@
         try
         {
             var userCredential = await AuthClient.SignInWithEmailAndPasswordAsync(loginModel.Email, loginModel.Password);
-            await Application.Current.MainPage.DisplayAlert("Success", "Successfully logged in!", "Ok");
-            NavigationManager.NavigateTo("/"); // Replace with your actual home page route
+            var firebaseUser = userCredential.User;
+
+            if (firebaseUser != null)
+            {
+                var userEmail = firebaseUser.Info.Email; // Use .Info.Email to get the email of the authenticated user
+                await localStorage.SetItemAsync("userEmail", userEmail); // Store email locally
+                await Application.Current.MainPage.DisplayAlert("Success", "Successfully logged in!", "Ok");
+                NavigationManager.NavigateTo("/"); // Redirect after successful login
+            }
         }
         catch (Exception ex)
         {
@@ -44,6 +54,7 @@
             await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
         }
     }
+
 
     private string GetErrorMessage(string responseBody)
     {
