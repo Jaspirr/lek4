@@ -304,32 +304,11 @@ namespace lek4.Components.Service
             return new List<(string UserEmail, double LockInAmount)>();
         }
 
-        public async Task SaveWinnerToFirebase(int productNumber, string winnerEmail)
-        {
-            var winnerData = new { Winner = winnerEmail };
-
-            var winnerJson = JsonSerializer.Serialize(winnerData);
-            var content = new StringContent(winnerJson, Encoding.UTF8, "application/json");
-
-            // Firebase path for saving winner data
-            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json";
-
-            // Use PUT to save the winner data
-            var response = await _httpClient.PutAsync(path, content);
-            if (response.IsSuccessStatusCode)
-            {
-                Console.WriteLine($"Winner for product {productNumber} saved successfully.");
-            }
-            else
-            {
-                Console.WriteLine($"Failed to save winner for product {productNumber}. Error: {response.StatusCode}");
-            }
-        }
 
         public async Task<string> GetWinnerFromFirebase(int productNumber)
         {
             // Firebase path for fetching winner data
-            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json?alt=media";
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users/winner/{productNumber}/winner.json?alt=media";
 
             // Send GET request to Firebase
             var response = await _httpClient.GetAsync(path);
@@ -345,6 +324,31 @@ namespace lek4.Components.Service
                 return null;
             }
         }
+
+
+
+        // Step 3: Method to fetch detailed winner profile from Firebase using email
+        public async Task<string> GetWinnerProfileFromFirebase(string winnerEmail)
+        {
+            // Firebase path for fetching the winner's profile
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{winnerEmail}%2Fwinner.json?alt=media";
+
+            // Send GET request to Firebase
+            var response = await _httpClient.GetAsync(path);
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var winnerProfile = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonResponse);
+
+                return winnerProfile.ContainsKey("Winner") ? winnerProfile["Winner"] : null;
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch winner profile for {winnerEmail}. Status code: {response.StatusCode}");
+                return null;
+            }
+        }
+
 
         public List<string> GetLockedInUsers(int productNumber)
         {

@@ -19,51 +19,20 @@ public class DrawService
         _httpClient = httpClient; // Store HttpClient instance
     }
 
-    // The existing GetWinnerAsync method
-    public async Task<string> GetWinnerAsync(int productNumber)
-    {
-        try
-        {
-            // Uppdaterad Firebase-URL för att hämta vinnare för en specifik produkt
-            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json?alt=media";
-            var response = await _httpClient.GetAsync(url);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                var winnerData = JsonSerializer.Deserialize<WinnerData>(jsonResponse);
-
-                return $"{winnerData.FirstName} {winnerData.LastName}";
-            }
-            else if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                Console.WriteLine($"No winner found for product {productNumber}. Winner has not been drawn yet.");
-                return "No winner yet";
-            }
-            else
-            {
-                Console.WriteLine($"Failed to fetch winner for product {productNumber}. Status code: {response.StatusCode}");
-                return null;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error fetching winner for product {productNumber}: {ex.Message}");
-            return null;
-        }
-    }
-
-
-    // New DrawWinnerAsync method for drawing the winner
+    // Method to draw the winner
     public async Task<string> DrawWinnerAsync(int productNumber)
     {
+        // Fetch emails and lock-in amounts for the given product
         var lockedInUsersWithAmounts = _productService.GetLockedInUsersWithLockInAmount(productNumber);
+
         if (lockedInUsersWithAmounts.Count > 0)
         {
+            // Sum of all lock-in amounts
             var totalLockInAmount = lockedInUsersWithAmounts.Sum(x => x.LockInAmount);
             var randomValue = new Random().NextDouble() * totalLockInAmount;
             double cumulativeOdds = 0.0;
 
+            // Select the winner based on lock-in amounts
             foreach (var user in lockedInUsersWithAmounts)
             {
                 cumulativeOdds += user.LockInAmount;
@@ -71,40 +40,50 @@ public class DrawService
                 {
                     var winnerUserEmail = user.UserEmail;
 
-                    // Step 3: Save winner to Firebase
+                    // Save the winner to Firebase
                     await SaveWinnerToFirebase(productNumber, winnerUserEmail);
 
-                    // Fetch user profile for display
-                    var userProfile = await _productService.GetUserProfileFromFirebase(winnerUserEmail);
-                    return userProfile != null ? $"{userProfile.FirstName} {userProfile.LastName}" : winnerUserEmail;
+                    // Return winner's email or display name for confirmation
+                    return winnerUserEmail;
                 }
             }
         }
+
         return "No winner";
     }
 
 
+    // Method to fetch the winner from Firebase using ProductService
+    public async Task<string> GetWinnerAsync(int productNumber)
+    {
+        // Delegate the call to ProductService to fetch the winner from Firebase
+        return await _productService.GetWinnerFromFirebase(productNumber);
+    }
+
+    // Method to save the winner to Firebase
     public async Task SaveWinnerToFirebase(int productNumber, string winnerEmail)
     {
         var winnerData = new { Winner = winnerEmail };
-
         var winnerJson = JsonSerializer.Serialize(winnerData);
         var content = new StringContent(winnerJson, Encoding.UTF8, "application/json");
 
-        // Firebase path for saving the winner
-        var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json";
+        // Correct Firebase path to store winner under "users/winner/{productNumber}/winner.json"
+        // Ensure proper URL formatting without extra encoding
+        var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users/winner/{productNumber}/winner.json?alt=media";
 
-        // Send PUT request to save winner data
+        // Use PUT request to save winner data
         var response = await _httpClient.PutAsync(path, content);
+
         if (response.IsSuccessStatusCode)
         {
             Console.WriteLine($"Winner for product {productNumber} saved successfully.");
         }
         else
         {
-            Console.WriteLine($"Failed to save winner for product {productNumber}. Error: {response.StatusCode}");
+            Console.WriteLine($"Failed to save winner for product {productNumber}. Status code: {response.StatusCode}");
         }
     }
+
 
 
 }

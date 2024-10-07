@@ -14,24 +14,14 @@
             <div class="product-info">
                 <h4>Product @productNumber</h4>
 
+                <!-- Display winner if available, otherwise "No winner yet" -->
                 <p><strong>Winner: @(winners.ContainsKey(productNumber) ? winners[productNumber] : "No winner yet")</strong></p>
 
-                <!-- Timer expired logic -->
-                @if (GetTimeRemaining(productNumber).TotalSeconds <= 0)
-                {
-                    <p>Time expired. You can draw a winner.</p>
-                    @if (winners.ContainsKey(productNumber) && winners[productNumber] == "No winner yet")
-                    {
-                        <button @onclick="() => DrawWinnerAutomatically(productNumber)">Auto Draw Winner</button>
-                    }
-                }
-                else
-                {
-                    <p>Time remaining: @GetTimeRemaining(productNumber).Days day(s), @GetTimeRemaining(productNumber).Hours hour(s), @GetTimeRemaining(productNumber).Minutes minute(s)</p>
-                }
+                <!-- Button to draw a winner -->
+                <button @onclick="() => DrawWinnerAndSaveToFirebase(productNumber)" class="draw-winner-button">Draw Winner</button>
 
-                <!-- Manual Draw -->
-                <button @onclick="() => DrawWinnerManually(productNumber)">Draw Winner Manually</button>
+                <!-- Button to fetch and display the winner -->
+                <button @onclick="() => FetchWinnerFromFirebase(productNumber)" class="fetch-winner-button">Fetch Winner</button>
             </div>
         }
     }
@@ -50,38 +40,67 @@
         // Fetch the product numbers when the page initializes
         productNumbers = await ProductService.GetProductNumbersFromFirebaseAsync();
 
-        // Preload any winners if they exist
+        // Preload only product numbers, not winners
         foreach (var productNumber in productNumbers)
         {
-            // Check if a winner exists for this product
-            winners[productNumber] = await DrawService.GetWinnerAsync(productNumber) ?? "No winner yet";
+            winners[productNumber] = "No winner yet"; // Winner should not be fetched automatically
         }
     }
 
-    private TimeSpan GetTimeRemaining(int productNumber)
+    // Fetch emails, lock-in amounts, draw winner, and save to Firebase
+    private async Task DrawWinnerAndSaveToFirebase(int productNumber)
     {
-        // Use ProductService to get remaining time for each product
-        return ProductService.GetTimeRemaining(productNumber);
-    }
-
-    // Draw winner manually (user clicks)
-    private async Task DrawWinnerManually(int productNumber)
-    {
-        var winner = await DrawService.DrawWinnerAsync(productNumber);
-        winners[productNumber] = winner ?? "No winner yet";
-
-        StateHasChanged(); // Trigger UI refresh to display the winner
-    }
-
-    // Draw winner automatically (timer expires)
-    private async Task DrawWinnerAutomatically(int productNumber)
-    {
-        if (winners[productNumber] == "No winner yet")
+        try
         {
+            // Attempt to draw the winner
             var winner = await DrawService.DrawWinnerAsync(productNumber);
+
+            if (!string.IsNullOrEmpty(winner)) // Ensure a valid winner is picked
+            {
+                winners[productNumber] = winner; // Update the UI with the drawn winner
+
+                // Now save the winner to Firebase
+                await DrawService.SaveWinnerToFirebase(productNumber, winner);
+
+                Console.WriteLine($"Winner {winner} for product {productNumber} drawn and saved successfully.");
+
+                StateHasChanged(); // Trigger UI refresh to display the winner
+            }
+            else
+            {
+                Console.WriteLine($"No winner was drawn for product {productNumber}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error while drawing winner for product {productNumber}: {ex.Message}");
+        }
+    }
+
+
+    // Fetch the winner from Firebase using ProductService
+    private async Task FetchWinnerFromFirebase(int productNumber)
+    {
+        try
+        {
+            // Fetch winner from Firebase using ProductService instead of DrawService
+            var winner = await ProductService.GetWinnerFromFirebase(productNumber);
             winners[productNumber] = winner ?? "No winner yet";
 
+            if (winner != null)
+            {
+                Console.WriteLine($"Fetched winner for product {productNumber}: {winner}");
+            }
+            else
+            {
+                Console.WriteLine($"No winner found for product {productNumber}");
+            }
+
             StateHasChanged(); // Trigger UI refresh to display the winner
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error while fetching winner for product {productNumber}: {ex.Message}");
         }
     }
 }
@@ -99,26 +118,51 @@
         border-radius: 10px;
         padding: 20px;
         text-align: center;
+        background-color: #f9f9f9;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
     }
 
         .product-info h4 {
             margin-bottom: 10px;
+            font-size: 1.2em;
+            color: #333;
         }
 
         .product-info p {
             margin-bottom: 5px;
+            font-size: 1em;
+            color: #555;
         }
 
         .product-info button {
-            padding: 10px 20px;
+            margin-top: 10px;
+            padding: 5px 10px; /* Make buttons smaller */
             background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-size: 0.9em; /* Smaller text */
+            transition: background-color 0.3s ease;
         }
 
             .product-info button:hover {
                 background-color: #45a049;
             }
+
+    .draw-winner-button {
+        background-color: #f44336; /* Red button for drawing a winner */
+    }
+
+        .draw-winner-button:hover {
+            background-color: #d32f2f;
+        }
+
+    .fetch-winner-button {
+        background-color: #4CAF50; /* Green button for fetching the winner */
+    }
+
+        .fetch-winner-button:hover {
+            background-color: #388E3C;
+        }
 </style>

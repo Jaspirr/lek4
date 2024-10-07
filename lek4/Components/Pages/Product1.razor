@@ -65,7 +65,6 @@
             productExists = true;
             price = productData.Price;
             lockInAmount = productData.LockInAmount;
-            // You can also fetch and set other product-related data here
         }
         else
         {
@@ -79,10 +78,17 @@
         InitializeAds();
         timer = new Timer(UpdateTimer, null, 0, 1000);
 
-        var remainingTime = ProductService.GetTimeRemaining(productNumber);
+        // Get remaining time for the product
+        remainingTime = ProductService.GetTimeRemaining(productNumber);
+
+        // Check if the time has expired and fetch the winner
         if (remainingTime.TotalSeconds <= 0)
         {
             winner = await DrawService.GetWinnerAsync(productNumber); // Fetch winner using DrawService
+            if (!string.IsNullOrEmpty(winner))
+            {
+                StateHasChanged(); // Trigger UI refresh to display the winner
+            }
         }
     }
 
@@ -167,8 +173,6 @@
         GoBack();
     }
 
-
-
     private void CompleteLockInPrice()
     {
         if (shouldLockIn)
@@ -203,10 +207,9 @@
             nextDay = GetNextSelectedDayAt20();
             timeSpan = nextDay - now;
 
-            // Call async method in a fire-and-forget manner using Task.Run
             Task.Run(async () =>
             {
-                winner = await DrawService.GetWinnerAsync(productNumber); // Asynchronous call to GetWinnerAsync
+                winner = await DrawService.GetWinnerAsync(productNumber); // Fetch the winner
                 if (winner != null)
                 {
                     showPopup = false;
@@ -243,7 +246,6 @@
         showPopup = true;
         StateHasChanged();
     }
-
 
     private void OnSliderChanged(ChangeEventArgs e)
     {
@@ -295,7 +297,6 @@
             <p><strong>Winner: @winner</strong></p>
         }
 
-
         @if (showPopup)
         {
             <div class="popup">
@@ -314,6 +315,7 @@
         </div>
     }
 </div>
+
 
 
 <style>
