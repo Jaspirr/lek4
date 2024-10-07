@@ -56,22 +56,7 @@ namespace lek4.Components.Service
             await SaveProductData(productNumber, userEmail, lockInAmount, price);
         }
 
-
-        public void DrawWinner(int productNumber)
-        {
-            if (lockedInUsers.ContainsKey(productNumber) && lockedInUsers[productNumber].Count > 0)
-            {
-                var users = lockedInUsers[productNumber];
-                var random = new Random();
-                var winner = users[random.Next(users.Count)];
-                productWinners[productNumber] = winner; // Store the winner in the productWinners dictionary
-                Console.WriteLine($"Winner for product {productNumber} is {winner}");
-            }
-            else
-            {
-                Console.WriteLine($"No users locked in for product {productNumber}. No winner drawn.");
-            }
-        }
+       
         public void RemoveProductLocally(int productNumber)
         {
             var product = products.FirstOrDefault(p => p.ProductNumber == productNumber);
@@ -233,7 +218,7 @@ namespace lek4.Components.Service
         }
 
 
-        public async Task LockInUser(int productNumber, string userEmail)
+        public async Task LockInUser(int productNumber, string userEmail, double lockInAmount)
         {
             if (string.IsNullOrEmpty(userEmail) || userEmail == "Anonymous")
             {
@@ -241,33 +226,30 @@ namespace lek4.Components.Service
                 return;
             }
 
-            var userProfile = await GetUserProfileFromFirebase(userEmail);
-
-            if (userProfile != null)
+            // Add user email to the locked-in users list without fetching profile
+            if (!lockedInUsers.ContainsKey(productNumber))
             {
-                if (!lockedInUsers.ContainsKey(productNumber))
-                {
-                    lockedInUsers[productNumber] = new List<string>();
-                }
+                lockedInUsers[productNumber] = new List<string>();
+            }
 
-                if (!lockedInUsers[productNumber].Contains(userEmail))
-                {
-                    lockedInUsers[productNumber].Add(userEmail); // Use the correct email
+            if (!lockedInUsers[productNumber].Contains(userEmail))
+            {
+                lockedInUsers[productNumber].Add(userEmail);
 
-                    // Save the locked-in user to Firebase
-                    await SaveLockedInUsersToFirebase(productNumber, lockedInUsers[productNumber]);
-                    Console.WriteLine($"User {userEmail} locked in for product {productNumber}.");
-                }
-                else
-                {
-                    Console.WriteLine($"User {userEmail} has already locked in for product {productNumber}.");
-                }
+                // Save the locked-in users to Firebase
+                await SaveLockedInUsersToFirebase(productNumber, lockedInUsers[productNumber]);
+
+                // Save product data including lock-in amount
+                await SaveProductData(productNumber, userEmail, lockInAmount, GetPrice(productNumber)); // Adjust to include price or other values as needed
+
+                Console.WriteLine($"User {userEmail} locked in for product {productNumber}.");
             }
             else
             {
-                Console.WriteLine("User profile not found. Lock-in failed.");
+                Console.WriteLine($"User {userEmail} has already locked in for product {productNumber}.");
             }
         }
+
 
         public async Task<UserProfile> GetUserProfileFromFirebase(string userEmail)
         {
@@ -309,17 +291,21 @@ namespace lek4.Components.Service
         }
         public List<(string UserEmail, double LockInAmount)> GetLockedInUsersWithLockInAmount(int productNumber)
         {
-            // This is a placeholder. You should update it to actually retrieve LockInAmount and UserEmail
             if (lockedInUsers.ContainsKey(productNumber))
             {
-                return lockedInUsers[productNumber].Select(email =>
-                    (email, products.First(p => p.ProductNumber == productNumber).LockInAmount)).ToList();
+                var product = products.FirstOrDefault(p => p.ProductNumber == productNumber);
+                if (product != null)
+                {
+                    // Return list of (UserEmail, LockInAmount)
+                    return lockedInUsers[productNumber].Select(email =>
+                        (email, product.LockInAmount)).ToList();
+                }
             }
             return new List<(string UserEmail, double LockInAmount)>();
         }
+
         public async Task SaveWinnerToFirebase(int productNumber, string winnerEmail)
         {
-            // Construct the data to be saved
             var winnerData = new { Winner = winnerEmail };
 
             var winnerJson = JsonSerializer.Serialize(winnerData);
@@ -328,10 +314,8 @@ namespace lek4.Components.Service
             // Firebase path for saving winner data
             var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json";
 
-            // Use PUT to upload the winner data
+            // Use PUT to save the winner data
             var response = await _httpClient.PutAsync(path, content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-
             if (response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"Winner for product {productNumber} saved successfully.");
@@ -341,20 +325,18 @@ namespace lek4.Components.Service
                 Console.WriteLine($"Failed to save winner for product {productNumber}. Error: {response.StatusCode}");
             }
         }
+
         public async Task<string> GetWinnerFromFirebase(int productNumber)
         {
             // Firebase path for fetching winner data
             var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json?alt=media";
 
-            // Send an HTTP GET request to Firebase
+            // Send GET request to Firebase
             var response = await _httpClient.GetAsync(path);
-
             if (response.IsSuccessStatusCode)
             {
                 var jsonResponse = await response.Content.ReadAsStringAsync();
                 var winnerData = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonResponse);
-
-                // Return the winner's email
                 return winnerData.ContainsKey("Winner") ? winnerData["Winner"] : null;
             }
             else
@@ -363,6 +345,7 @@ namespace lek4.Components.Service
                 return null;
             }
         }
+
         public List<string> GetLockedInUsers(int productNumber)
         {
             return lockedInUsers.ContainsKey(productNumber) ? lockedInUsers[productNumber] : new List<string>();

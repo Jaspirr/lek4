@@ -150,13 +150,13 @@
         {
             await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
             NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
-            await ProductService.LockInUser(productNumber, userEmail); // No more providedKey needed
+            await ProductService.LockInUser(productNumber, userEmail, lockInAmount); // Pass lockInAmount
         }
         else
         {
             await ProductService.SaveProductData(productNumber, "Anonymous", lockInAmount, price);
             NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
-            await ProductService.LockInUser(productNumber, "Anonymous"); // No more providedKey needed
+            await ProductService.LockInUser(productNumber, "Anonymous", lockInAmount); // Pass lockInAmount
         }
 
         lockedInOdds += lockInAmount;
@@ -166,6 +166,7 @@
 
         GoBack();
     }
+
 
 
     private void CompleteLockInPrice()
@@ -243,11 +244,6 @@
         StateHasChanged();
     }
 
-    private async Task DrawWinner()
-    {
-        winner = await DrawService.GetWinnerAsync(productNumber); // Call the asynchronous method
-        StateHasChanged(); // Refresh the UI after the winner is drawn
-    }
 
     private void OnSliderChanged(ChangeEventArgs e)
     {
@@ -290,23 +286,20 @@
             <p class="error-message">@errorMessage</p>
         }
 
-        @if (remainingTime.TotalSeconds <= 0)
+        @if (remainingTime.TotalSeconds <= 0 && winner == null)
         {
-            @if (winner == null)
-            {
-                <button @onclick="ViewWinner">View Winner</button>
-            }
-            else
-            {
-                <p><strong>Winner: @winner</strong></p>
-            }
+            <button @onclick="ViewWinner">View Winner</button>
         }
+        else if (winner != null)
+        {
+            <p><strong>Winner: @winner</strong></p>
+        }
+
 
         @if (showPopup)
         {
             <div class="popup">
-                <h4>Draw a Winner for Product @productNumber</h4>
-                <button @onclick="DrawWinner">Draw</button>
+                <h4>Winner for Product @productNumber</h4>
                 @if (winner != null)
                 {
                     <p><strong>Winner: @winner</strong></p>

@@ -14,15 +14,24 @@
             <div class="product-info">
                 <h4>Product @productNumber</h4>
 
+                <p><strong>Winner: @(winners.ContainsKey(productNumber) ? winners[productNumber] : "No winner yet")</strong></p>
+
+                <!-- Timer expired logic -->
                 @if (GetTimeRemaining(productNumber).TotalSeconds <= 0)
                 {
-                    <p><strong>Winner: @(winners.ContainsKey(productNumber) ? winners[productNumber] : "No winner yet")</strong></p>
+                    <p>Time expired. You can draw a winner.</p>
+                    @if (winners.ContainsKey(productNumber) && winners[productNumber] == "No winner yet")
+                    {
+                        <button @onclick="() => DrawWinnerAutomatically(productNumber)">Auto Draw Winner</button>
+                    }
                 }
                 else
                 {
                     <p>Time remaining: @GetTimeRemaining(productNumber).Days day(s), @GetTimeRemaining(productNumber).Hours hour(s), @GetTimeRemaining(productNumber).Minutes minute(s)</p>
-                    <button @onclick="() => DrawWinnerAndRefresh(productNumber)">Draw Winner</button>
                 }
+
+                <!-- Manual Draw -->
+                <button @onclick="() => DrawWinnerManually(productNumber)">Draw Winner Manually</button>
             </div>
         }
     }
@@ -55,13 +64,25 @@
         return ProductService.GetTimeRemaining(productNumber);
     }
 
-    private async Task DrawWinnerAndRefresh(int productNumber)
+    // Draw winner manually (user clicks)
+    private async Task DrawWinnerManually(int productNumber)
     {
-        // Draw the winner for the specific product and update the winner's display
         var winner = await DrawService.DrawWinnerAsync(productNumber);
         winners[productNumber] = winner ?? "No winner yet";
 
-        StateHasChanged(); // Trigger UI refresh
+        StateHasChanged(); // Trigger UI refresh to display the winner
+    }
+
+    // Draw winner automatically (timer expires)
+    private async Task DrawWinnerAutomatically(int productNumber)
+    {
+        if (winners[productNumber] == "No winner yet")
+        {
+            var winner = await DrawService.DrawWinnerAsync(productNumber);
+            winners[productNumber] = winner ?? "No winner yet";
+
+            StateHasChanged(); // Trigger UI refresh to display the winner
+        }
     }
 }
 

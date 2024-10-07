@@ -58,63 +58,51 @@ public class DrawService
     public async Task<string> DrawWinnerAsync(int productNumber)
     {
         var lockedInUsersWithAmounts = _productService.GetLockedInUsersWithLockInAmount(productNumber);
-
         if (lockedInUsersWithAmounts.Count > 0)
         {
-            // Steg 1: Räkna ut den totala LockInAmount
             var totalLockInAmount = lockedInUsersWithAmounts.Sum(x => x.LockInAmount);
-
-            // Steg 2: Generera ett slumpmässigt värde mellan 0 och totalLockInAmount
             var randomValue = new Random().NextDouble() * totalLockInAmount;
-
             double cumulativeOdds = 0.0;
 
-            // Steg 3: Iterera över användarna och hitta den som vinner
             foreach (var user in lockedInUsersWithAmounts)
             {
                 cumulativeOdds += user.LockInAmount;
-
-                // När cumulativeOdds överskrider randomValue, välj den användaren
                 if (randomValue <= cumulativeOdds)
                 {
                     var winnerUserEmail = user.UserEmail;
 
-                    // Steg 4: Spara vinnaren i Firebase
+                    // Step 3: Save winner to Firebase
                     await SaveWinnerToFirebase(productNumber, winnerUserEmail);
 
-                    // Hämta användarens profil för att visa namn istället för e-post
+                    // Fetch user profile for display
                     var userProfile = await _productService.GetUserProfileFromFirebase(winnerUserEmail);
-
-                    // Om profilen hittas, returnera namn, annars returnera e-post
-                    return userProfile != null
-                        ? $"{userProfile.FirstName} {userProfile.LastName}"
-                        : winnerUserEmail;
+                    return userProfile != null ? $"{userProfile.FirstName} {userProfile.LastName}" : winnerUserEmail;
                 }
             }
         }
-
         return "No winner";
     }
 
 
-    public async Task SaveWinnerToFirebase(int productNumber, string winnerUserEmail)
+    public async Task SaveWinnerToFirebase(int productNumber, string winnerEmail)
     {
-        var winnerData = new
-        {
-            WinnerEmail = winnerUserEmail,
-            TimeOfDraw = DateTime.UtcNow
-        };
+        var winnerData = new { Winner = winnerEmail };
 
-        var json = JsonSerializer.Serialize(winnerData);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var winnerJson = JsonSerializer.Serialize(winnerData);
+        var content = new StringContent(winnerJson, Encoding.UTF8, "application/json");
 
-        // Uppdaterad path för att spara vinnaren under produktspecifik väg
+        // Firebase path for saving the winner
         var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2Fwinner.json";
-        var response = await _httpClient.PutAsync(path, content);
 
-        if (!response.IsSuccessStatusCode)
+        // Send PUT request to save winner data
+        var response = await _httpClient.PutAsync(path, content);
+        if (response.IsSuccessStatusCode)
         {
-            Console.WriteLine($"Failed to save winner for product {productNumber}. Status code: {response.StatusCode}");
+            Console.WriteLine($"Winner for product {productNumber} saved successfully.");
+        }
+        else
+        {
+            Console.WriteLine($"Failed to save winner for product {productNumber}. Error: {response.StatusCode}");
         }
     }
 
