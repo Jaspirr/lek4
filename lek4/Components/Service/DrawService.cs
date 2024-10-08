@@ -23,7 +23,7 @@ public class DrawService
     public async Task<string> DrawWinnerAsync(int productNumber)
     {
         // Fetch emails and lock-in amounts for the given product
-        var lockedInUsersWithAmounts = _productService.GetLockedInUsersWithLockInAmount(productNumber);
+        var lockedInUsersWithAmounts = await _productService.GetLockedInUsersWithLockInAmountAsync(productNumber);
 
         if (lockedInUsersWithAmounts.Count > 0)
         {
@@ -53,6 +53,8 @@ public class DrawService
     }
 
 
+
+
     // Method to fetch the winner from Firebase using ProductService
     public async Task<string> GetWinnerAsync(int productNumber)
     {
@@ -63,13 +65,22 @@ public class DrawService
     // Method to save the winner to Firebase
     public async Task SaveWinnerToFirebase(int productNumber, string winnerEmail)
     {
+        if (string.IsNullOrEmpty(winnerEmail))
+        {
+            Console.WriteLine("Error: Cannot save invalid winner.");
+            return;
+        }
+
         var winnerData = new { Winner = winnerEmail };
         var winnerJson = JsonSerializer.Serialize(winnerData);
         var content = new StringContent(winnerJson, Encoding.UTF8, "application/json");
 
-        // Correct Firebase path to store winner under "users/winner/{productNumber}/winner.json"
-        // Ensure proper URL formatting without extra encoding
-        var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users/winner/{productNumber}/winner.json?alt=media";
+        // Firebase path without ?alt=media
+        var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner%2F{productNumber}%2Fwinner.json";
+
+        // Log the URL and data for debugging
+        Console.WriteLine($"URL: {path}");
+        Console.WriteLine($"Data being sent: {winnerJson}");
 
         // Use PUT request to save winner data
         var response = await _httpClient.PutAsync(path, content);
@@ -83,7 +94,6 @@ public class DrawService
             Console.WriteLine($"Failed to save winner for product {productNumber}. Status code: {response.StatusCode}");
         }
     }
-
 
 
 }

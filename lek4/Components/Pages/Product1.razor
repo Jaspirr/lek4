@@ -154,17 +154,24 @@
 
         if (!string.IsNullOrEmpty(userEmail))
         {
+            // Save product data to Firebase and lock in the user
             await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
+            await ProductService.LockInUser(productNumber, userEmail, lockInAmount); // Ensure user and amount are saved correctly
+
+            // Update the local service with locked-in details
             NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
-            await ProductService.LockInUser(productNumber, userEmail, lockInAmount); // Pass lockInAmount
         }
         else
         {
+            // If no user email, save as "Anonymous"
             await ProductService.SaveProductData(productNumber, "Anonymous", lockInAmount, price);
+            await ProductService.LockInUser(productNumber, "Anonymous", lockInAmount);
+
+            // Update the local service with anonymous user details
             NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
-            await ProductService.LockInUser(productNumber, "Anonymous", lockInAmount); // Pass lockInAmount
         }
 
+        // Adjust lock-in odds and other properties
         lockedInOdds += lockInAmount;
         isSuccess = true;
         errorMessage = null;

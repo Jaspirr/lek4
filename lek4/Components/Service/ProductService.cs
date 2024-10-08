@@ -226,27 +226,65 @@ namespace lek4.Components.Service
                 return;
             }
 
-            // Add user email to the locked-in users list without fetching profile
-            if (!lockedInUsers.ContainsKey(productNumber))
+            // Fetch the existing list of users from Firebase
+            var existingUsers = await GetLockedInUsersFromFirebase(productNumber);
+
+            // Check if the user is already locked in
+            var existingUser = existingUsers.FirstOrDefault(u => u.UserEmail == userEmail);
+
+            if (existingUser != null)
             {
-                lockedInUsers[productNumber] = new List<string>();
-            }
-
-            if (!lockedInUsers[productNumber].Contains(userEmail))
-            {
-                lockedInUsers[productNumber].Add(userEmail);
-
-                // Save the locked-in users to Firebase
-                await SaveLockedInUsersToFirebase(productNumber, lockedInUsers[productNumber]);
-
-                // Save product data including lock-in amount
-                await SaveProductData(productNumber, userEmail, lockInAmount, GetPrice(productNumber)); // Adjust to include price or other values as needed
-
-                Console.WriteLine($"User {userEmail} locked in for product {productNumber}.");
+                // Update the lock-in amount for the existing user
+                existingUser.LockInAmount += lockInAmount;
+                Console.WriteLine($"Updated lock-in amount for {userEmail} on product {productNumber}");
             }
             else
             {
-                Console.WriteLine($"User {userEmail} has already locked in for product {productNumber}.");
+                // Create a new user entry
+                var newUser = new ProductData
+                {
+                    ProductNumber = productNumber,
+                    UserEmail = userEmail,
+                    LockInAmount = lockInAmount
+                };
+                existingUsers.Add(newUser);
+            }
+
+            // Save the updated list of users back to Firebase
+            await SaveLockedInUsersToFirebase(productNumber, existingUsers);
+        }
+
+
+        private async Task<List<ProductData>> GetLockedInUsersFromFirebase(int productNumber)
+        {
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2F{productNumber}.json?alt=media";
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                try
+                {
+                    // Try to deserialize as a list of ProductData
+                    var lockedInUsers = JsonSerializer.Deserialize<List<ProductData>>(jsonResponse);
+                    return lockedInUsers ?? new List<ProductData>(); // Return empty list if null
+                }
+                catch (JsonException)
+                {
+                    Console.WriteLine("Failed to deserialize JSON into List<ProductData>. Make sure the JSON is an array.");
+                    return new List<ProductData>(); // Return an empty list on failure
+                }
+            }
+            else if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                // No users found, return an empty list
+                return new List<ProductData>();
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch users for product {productNumber}. Status code: {response.StatusCode}");
+                return new List<ProductData>();
             }
         }
 
@@ -272,37 +310,32 @@ namespace lek4.Components.Service
                 return null;
             }
         }
-
-        private async Task SaveLockedInUsersToFirebase(int productNumber, List<string> lockedInUsers)
+        private async Task SaveLockedInUsersToFirebase(int productNumber, List<ProductData> users)
         {
-            var lockedInUsersData = new
-            {
-                LockedInUsers = lockedInUsers
-            };
+            // Serialize the list of users
+            var lockedInUsersData = JsonSerializer.Serialize(users);
+            var content = new StringContent(lockedInUsersData, Encoding.UTF8, "application/json");
 
-            var json = JsonSerializer.Serialize(lockedInUsersData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products%2F{productNumber}%2FlockedInUsers.json", content);
+            // Save the updated list of locked-in users to Firebase
+            var response = await _httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2F{productNumber}.json", content);
 
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"Failed to save locked-in users for product {productNumber}. Error: {response.StatusCode}");
             }
         }
-        public List<(string UserEmail, double LockInAmount)> GetLockedInUsersWithLockInAmount(int productNumber)
+
+
+
+        public async Task<List<(string UserEmail, double LockInAmount)>> GetLockedInUsersWithLockInAmountAsync(int productNumber)
         {
-            if (lockedInUsers.ContainsKey(productNumber))
-            {
-                var product = products.FirstOrDefault(p => p.ProductNumber == productNumber);
-                if (product != null)
-                {
-                    // Return list of (UserEmail, LockInAmount)
-                    return lockedInUsers[productNumber].Select(email =>
-                        (email, product.LockInAmount)).ToList();
-                }
-            }
-            return new List<(string UserEmail, double LockInAmount)>();
+            // Fetch the existing locked-in users from Firebase
+            var lockedInUsers = await GetLockedInUsersFromFirebase(productNumber);  // Must be fetched from Firebase
+
+            // Create and return a list of (UserEmail, LockInAmount)
+            return lockedInUsers.Select(user => (user.UserEmail, user.LockInAmount)).ToList();
         }
+
 
 
         public async Task<string> GetWinnerFromFirebase(int productNumber)
