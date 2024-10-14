@@ -32,18 +32,21 @@
 </div>
 
 @code {
-    private List<int> productNumbers;
+    private List<int> productNumbers = new List<int>();
     private Dictionary<int, string> winners = new Dictionary<int, string>();
 
     protected override async Task OnInitializedAsync()
     {
-        // Fetch the product numbers when the page initializes
-        productNumbers = await ProductService.GetProductNumbersFromFirebaseAsync();
+        // Fetch all products, then extract the product numbers
+        var products = await ProductService.FetchAllProductsFromFirebaseAsync();
 
-        // Preload only product numbers, not winners
+        // Extract product numbers from the fetched product data
+        productNumbers = products.Select(p => p.ProductNumber).ToList();
+
+        // Initialize winners dictionary for each product number
         foreach (var productNumber in productNumbers)
         {
-            winners[productNumber] = "No winner yet"; // Winner should not be fetched automatically
+            winners[productNumber] = "No winner yet"; // Initialize with no winner
         }
     }
 
@@ -52,14 +55,14 @@
     {
         try
         {
-            // Attempt to draw the winner
+            // Attempt to draw the winner using DrawService
             var winner = await DrawService.DrawWinnerAsync(productNumber);
 
             if (!string.IsNullOrEmpty(winner)) // Ensure a valid winner is picked
             {
                 winners[productNumber] = winner; // Update the UI with the drawn winner
 
-                // Now save the winner to Firebase
+                // Now save the winner to Firebase under winner.json
                 await DrawService.SaveWinnerToFirebase(productNumber, winner);
 
                 Console.WriteLine($"Winner {winner} for product {productNumber} drawn and saved successfully.");
@@ -77,13 +80,12 @@
         }
     }
 
-
-    // Fetch the winner from Firebase using ProductService
+    // Fetch the winner from Firebase using DrawService
     private async Task FetchWinnerFromFirebase(int productNumber)
     {
         try
         {
-            // Fetch winner from Firebase using ProductService instead of DrawService
+            // Fetch winner from Firebase using ProductService
             var winner = await ProductService.GetWinnerFromFirebase(productNumber);
             winners[productNumber] = winner ?? "No winner yet";
 
@@ -104,6 +106,7 @@
         }
     }
 }
+
 
 <style>
     .product-draw {

@@ -1,5 +1,6 @@
 ﻿@page "/products"
 @page "/products/{number:double}"
+@using lek4.Components.Service
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
@@ -9,7 +10,7 @@
     [Parameter]
     public double? number { get; set; }
 
-    private List<int> productNumbers = new List<int>();
+    private List<ProductService.ProductData> products = new List<ProductService.ProductData>(); // List to hold product data
     private int unlockingProduct = -1; // Keep track of the product being unlocked
     private double remainingOdds;
 
@@ -23,14 +24,14 @@
         NumberService.CurrentNumber = number.Value;
         remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0); // Limit odds to 100
 
-        // Fetch the actual product numbers from Firebase via ProductService
-        await FetchProductNumbers();
+        // Fetch the actual products from Firebase
+        await FetchProductsFromFirebase();
     }
 
-    private async Task FetchProductNumbers()
+    private async Task FetchProductsFromFirebase()
     {
-        var products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Fetch products from Firebase
-        productNumbers = products.Select(p => p.ProductNumber).ToList(); // Get the product numbers
+        // Fetch the product data from Firebase
+        products = await ProductService.FetchAllProductsFromFirebaseAsync();
     }
 
     private async Task GoToProduct(int productNumber)
@@ -38,22 +39,29 @@
         unlockingProduct = productNumber;
         StateHasChanged(); // Update the component to start the animation
         await Task.Delay(1000); // Wait for the animation to complete (1 second)
+
+        // Unlock the product in NumberService
         NumberService.UnlockProduct(productNumber);
-        NavigationManager.NavigateTo($"/product/{productNumber}"); // Navigate to the product page
+
+        // Navigate to the specific product page
+        NavigationManager.NavigateTo($"/product/{productNumber}");
     }
 
     private string GetIconClass(int productNumber)
     {
+        // Return the correct icon class based on whether the product is unlocked
         return NumberService.IsProductUnlocked(productNumber) ? "fas fa-unlock" : "fas fa-lock";
     }
 
     private bool IsProductLockedIn(int productNumber)
     {
+        // Check if the product is locked in via NumberService
         return NumberService.IsProductLockedIn(productNumber);
     }
 
     private string GetProductClass(int productNumber)
     {
+        // Return the correct CSS class based on the product's lock-in status
         return NumberService.IsProductLockedIn(productNumber) ? "product locked-in" : "product locked";
     }
 }
@@ -61,17 +69,17 @@
 <h3 class="center-title">Products</h3>
 <p class="remaining-odds">Odds: @remainingOdds.ToString("0.0")x</p> <!-- Display remaining odds -->
 
-<div class="product-grid @(productNumbers.Count == 1 ? "single-product" : (productNumbers.Count == 2 ? "two-products" : (productNumbers.Count == 3 ? "three-products" : (productNumbers.Count == 4 ? "four-products" : "many-products"))))">
-    @foreach (var productNumber in productNumbers)
+<div class="product-grid @(products.Count == 1 ? "single-product" : (products.Count == 2 ? "two-products" : (products.Count == 3 ? "three-products" : (products.Count == 4 ? "four-products" : "many-products"))))">
+    @foreach (var product in products)
     {
-        <div class="@GetProductClass(productNumber) product-@(productNumber) @(unlockingProduct == productNumber ? "unlocking" : "")">
-            <a @onclick="async () => await GoToProduct(productNumber)">
+        <div class="@GetProductClass(product.ProductNumber) product-@(product.ProductNumber) @(unlockingProduct == product.ProductNumber ? "unlocking" : "")">
+            <a @onclick="async () => await GoToProduct(product.ProductNumber)">
                 <div class="icon-wrapper">
-                    @if (!IsProductLockedIn(productNumber))
+                    @if (!IsProductLockedIn(product.ProductNumber))
                     {
-                        <i class="@GetIconClass(productNumber)"></i> <!-- Lock icon -->
+                        <i class="@GetIconClass(product.ProductNumber)"></i> <!-- Lock icon -->
                     }
-                    @if (IsProductLockedIn(productNumber))
+                    @if (IsProductLockedIn(product.ProductNumber))
                     {
                         <i class="fas fa-check checkmark"></i> <!-- Checkmark icon -->
                     }

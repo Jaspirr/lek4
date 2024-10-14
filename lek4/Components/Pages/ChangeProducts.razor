@@ -16,7 +16,19 @@
             <div class="product-item">
                 <p>Product @product.ProductNumber</p>
                 <p>Price: @product.Price</p>
-                <p>Lock-in Amount: @product.LockInAmount</p>
+
+                <!-- Display locked-in users for the product -->
+                <p>Users:</p>
+                <ul>
+                    @if (lockedInUsers.ContainsKey(product.ProductNumber))
+                    {
+                        @foreach (var user in lockedInUsers[product.ProductNumber])
+                        {
+                            <li>@user.UserEmail - Locked in amount: @user.LockInAmount</li>
+                        }
+                    }
+                </ul>
+
                 <button @onclick="() => EditProduct(product.ProductNumber)">Edit Product</button>
                 <button @onclick="() => RemoveProduct(product.ProductNumber)" class="remove-button">Remove</button>
             </div>
@@ -38,35 +50,45 @@
 
     <button @onclick="AddProduct">Add Product</button>
 </div>
-
 @code {
     private List<ProductData> products = new List<ProductData>();
     private int newProductNumber;
     private double newProductPrice;
     private string userEmail = "user@example.com"; // Placeholder, replace with actual user email if available
+    private Dictionary<int, List<ProductData>> lockedInUsers = new Dictionary<int, List<ProductData>>();
 
     protected override async Task OnInitializedAsync()
     {
-        // Fetch all products from Firebase
+        // Fetch all products with their details from Firebase
         products = await ProductService.FetchAllProductsFromFirebaseAsync();
+        await LoadLockedInUsersForAllProducts(); // Load the locked-in users for all products
         StateHasChanged(); // Refresh the UI after fetching data
     }
 
-    private async Task FetchProductsFromFirebase()
+    private async Task LoadLockedInUsersForAllProducts()
     {
-        products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Get products from Firebase
-        StateHasChanged(); // Refresh the UI after fetching data
+        foreach (var product in products) // products now contains full ProductData objects
+        {
+            // Fetch locked-in users for each product
+            var users = await ProductService.GetUsersForProduct(product.ProductNumber);
+            lockedInUsers[product.ProductNumber] = users;
+        }
     }
+
 
     private async Task AddProduct()
     {
         if (newProductNumber > 0 && newProductPrice > 0)
         {
-            // Add new product with number and price to Firebase
-            await ProductService.AddProductToFirebase(newProductNumber, newProductPrice, userEmail);
+            // Define lockInAmount (since it's 0 initially)
+            double lockInAmount = 0.0;
+
+            // Save the new product info with required parameters
+            await ProductService.SaveProductData(newProductNumber, userEmail, lockInAmount, newProductPrice);
 
             // Refresh product list after adding
-            products = await ProductService.FetchAllProductsFromFirebaseAsync();
+            products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Fetch all products again
+            await LoadLockedInUsersForAllProducts(); // Load users for all products again
 
             // Reset fields
             newProductNumber = 0;
@@ -78,8 +100,10 @@
     {
         await ProductService.RemoveProductFromFirebase(productNumber); // Remove product from Firebase
         products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Refresh product list
+        await LoadLockedInUsersForAllProducts(); // Load users for all products again
         StateHasChanged(); // Update UI
     }
+
 
     private void EditProduct(int productNumber)
     {
@@ -93,6 +117,7 @@
         }
     }
 }
+
 
 <style>
     .product-list {
@@ -118,9 +143,9 @@
         cursor: pointer;
     }
 
-    .remove-button:hover {
-        background-color: darkred;
-    }
+        .remove-button:hover {
+            background-color: darkred;
+        }
 
     .add-product-form {
         margin-top: 30px;
@@ -141,7 +166,7 @@
         cursor: pointer;
     }
 
-    button:hover {
-        background-color: #45a049;
-    }
+        button:hover {
+            background-color: #45a049;
+        }
 </style>

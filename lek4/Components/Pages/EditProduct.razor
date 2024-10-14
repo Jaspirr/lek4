@@ -47,18 +47,24 @@
             NavigationManager.NavigateTo("/change-products"); // Redirect back
         }
     }
-
     private async Task SaveChanges()
     {
         // Update the product data with new values
         if (productData != null)
         {
+            // Update productData object with the new values from the form
             productData.Price = price;
             productData.LockInAmount = lockInAmount;
             productData.UserEmail = userEmail;
 
-            // Save the updated product data to Firebase
+            // Assuming you need to define a userId, you can either generate it or provide a value
+            int userId = 1; // You can set this to any unique value for the user
+
+            // Use the existing SaveProductData method to save the updated product info
             await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
+
+            // Save the user data with a unique userId
+            await ProductService.SaveUserToProduct(productNumber, userId, productData);
 
             // After saving, navigate back to the products list
             NavigationManager.NavigateTo("/change-products");

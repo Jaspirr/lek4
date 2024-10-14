@@ -15,7 +15,6 @@
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
 @using lek4.Components.Service
-
 @code {
     [Parameter]
     public int productNumber { get; set; }
@@ -40,7 +39,7 @@
     private bool showPopup = false;
     private string userEmail;
     private ProductService.ProductData productData;
-    private string providedKey = "some-key"; // Replace with actual key logic
+   
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,14 +56,13 @@
             userEmail = null;
         }
 
-        // Fetch product data from Firebase
+        // Fetch product information (productInfo.json) from Firebase
         productData = await ProductService.GetProductFromFirebaseAsync(productNumber);
 
         if (productData != null)
         {
             productExists = true;
             price = productData.Price;
-            lockInAmount = productData.LockInAmount;
         }
         else
         {
@@ -84,13 +82,14 @@
         // Check if the time has expired and fetch the winner
         if (remainingTime.TotalSeconds <= 0)
         {
-            winner = await DrawService.GetWinnerAsync(productNumber); // Fetch winner using DrawService
+            winner = await ProductService.GetWinnerFromFirebase(productNumber); // Fetch winner using DrawService
             if (!string.IsNullOrEmpty(winner))
             {
                 StateHasChanged(); // Trigger UI refresh to display the winner
             }
         }
     }
+
 
     private void InitializeAds()
     {
@@ -154,8 +153,7 @@
 
         if (!string.IsNullOrEmpty(userEmail))
         {
-            // Save product data to Firebase and lock in the user
-            await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
+            // Lock in the user, and save lock-in amount in a separate file under the product folder
             await ProductService.LockInUser(productNumber, userEmail, lockInAmount); // Ensure user and amount are saved correctly
 
             // Update the local service with locked-in details
@@ -164,7 +162,6 @@
         else
         {
             // If no user email, save as "Anonymous"
-            await ProductService.SaveProductData(productNumber, "Anonymous", lockInAmount, price);
             await ProductService.LockInUser(productNumber, "Anonymous", lockInAmount);
 
             // Update the local service with anonymous user details
@@ -179,6 +176,7 @@
 
         GoBack();
     }
+
 
     private void CompleteLockInPrice()
     {
@@ -216,7 +214,7 @@
 
             Task.Run(async () =>
             {
-                winner = await DrawService.GetWinnerAsync(productNumber); // Fetch the winner
+                winner = await ProductService.GetWinnerFromFirebase(productNumber); // Fetch the winner
                 if (winner != null)
                 {
                     showPopup = false;
@@ -263,6 +261,7 @@
         }
     }
 }
+
 
 <div class="product-details">
     @if (!productExists)
