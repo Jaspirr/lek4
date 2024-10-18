@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -25,27 +26,30 @@ namespace lek4.Components.Service
         }
 
         // Hämta alla användares lock-in-data från Firebase för en specifik produkt
-        public async Task<List<UserLockInData>> GetAllUserLockInData(int productNumber)
+        // Fetches all users' lock-in data from Firebase for a specific product
+        public async Task<Dictionary<string, double>> GetAllUserLockInData(int productNumber)
         {
-            var userLockInDataList = new List<UserLockInData>();
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2Ftotalusers.json?alt=media";
+            var response = await _httpClient.GetAsync(path);
 
-            // Hämta användarfilerna från Firebase
-            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2F?alt=media";
-
-            // Mocka för närvarande att vi hämtar filnamnen för alla användare under produktens mapp
-            var userFiles = new List<string> { "user1.json", "user2.json", "user3.json" }; // Du kan använda din metod för att hämta filnamnen
-
-            foreach (var userFile in userFiles)
+            if (response.IsSuccessStatusCode)
             {
-                var userLockInData = await GetUserLockInData(productNumber, userFile);
-                if (userLockInData != null)
-                {
-                    userLockInDataList.Add(userLockInData);
-                }
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                // Deserialize to Dictionary<string, double>
+                return JsonSerializer.Deserialize<Dictionary<string, double>>(jsonResponse);
             }
-
-            return userLockInDataList;
+            else if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return new Dictionary<string, double>();  // Return an empty dictionary if file doesn't exist
+            }
+            else
+            {
+                Console.WriteLine($"Error fetching total users for product {productNumber}: {response.StatusCode}");
+                return new Dictionary<string, double>();  // Return an empty dictionary on error
+            }
         }
+
+
 
         // Hämta lock-in-data för en specifik användare
         private async Task<UserLockInData> GetUserLockInData(int productNumber, string userFileName)
@@ -67,24 +71,25 @@ namespace lek4.Components.Service
         }
 
         // Utför en slumpmässig dragning baserat på lock-in-belopp
-        public string DrawWinner(List<UserLockInData> users)
+        // Perform a random draw based on lock-in amounts
+        public string DrawWinner(Dictionary<string, double> users)
         {
-            // Skapa en lista där varje användare läggs in så många gånger som deras LockInAmount
             var weightedList = new List<string>();
 
+            // Iterate over each user and add their email multiple times to the list based on lockInAmount
             foreach (var user in users)
             {
-                int weight = (int)Math.Ceiling(user.LockInAmount);  // Skapa en vikt baserad på lock-in amount
+                int weight = (int)Math.Ceiling(user.Value);  // Calculate the weight based on lock-in amount
                 for (int i = 0; i < weight; i++)
                 {
-                    weightedList.Add(user.UserEmail);  // Lägg till användaren i listan
+                    weightedList.Add(user.Key);  // Add the user's email to the weighted list
                 }
             }
 
-            // Skapa en slumpmässig dragning baserat på den viktade listan
+            // Perform the random draw
             Random random = new Random();
             int index = random.Next(weightedList.Count);
-            return weightedList[index];
+            return weightedList[index];  // Return the winner's email
         }
 
 
