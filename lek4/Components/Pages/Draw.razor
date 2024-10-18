@@ -18,7 +18,7 @@
                 <p><strong>Winner: @(winners.ContainsKey(productNumber) ? winners[productNumber] : "No winner yet")</strong></p>
 
                 <!-- Button to draw a winner -->
-                <button @onclick="() => DrawWinnerAndSaveToFirebase(productNumber)" class="draw-winner-button">Draw Winner</button>
+               @*  <button @onclick="() => DrawWinnerFromTotalUsers(productNumber)" class="draw-winner-button">Draw Winner</button> *@
 
                 <!-- Button to fetch and display the winner -->
                 <button @onclick="() => FetchWinnerFromFirebase(productNumber)" class="fetch-winner-button">Fetch Winner</button>
@@ -50,35 +50,37 @@
         }
     }
 
+
     // Fetch emails, lock-in amounts, draw winner, and save to Firebase
-    private async Task DrawWinnerAndSaveToFirebase(int productNumber)
-    {
-        try
-        {
-            // Attempt to draw the winner using DrawService
-            var winner = await DrawService.DrawWinnerAsync(productNumber);
+    // public async Task<string> DrawWinnerFromTotalUsers(int productNumber)
+    // {
+    //     // Hämta totalusers-filen från Firebase
+    //     var totalUsers = await ProductService.GetTotalUsersFromFirebase(productNumber);
 
-            if (!string.IsNullOrEmpty(winner)) // Ensure a valid winner is picked
-            {
-                winners[productNumber] = winner; // Update the UI with the drawn winner
+    //     if (totalUsers.Users.Count == 0)
+    //     {
+    //         return null; // Inga användare tillgängliga för dragningen
+    //     }
 
-                // Now save the winner to Firebase under winner.json
-                await DrawService.SaveWinnerToFirebase(productNumber, winner);
+    //     // Skapa en viktad lista för att utföra dragningen
+    //     var weightedList = new List<string>();
+    //     foreach (var user in totalUsers.Users)
+    //     {
+    //         int weight = (int)Math.Ceiling(user.Value); // Ju större lock-in belopp, desto fler gånger är användaren i listan
+    //         for (int i = 0; i < weight; i++)
+    //         {
+    //             weightedList.Add(user.Key);  // Lägg till användarens e-post i listan
+    //         }
+    //     }
 
-                Console.WriteLine($"Winner {winner} for product {productNumber} drawn and saved successfully.");
+    //     // Gör den faktiska dragningen
+    //     Random random = new Random();
+    //     int index = random.Next(weightedList.Count);
+    //     return weightedList[index]; // Returnera vinnaren
+    // }
 
-                StateHasChanged(); // Trigger UI refresh to display the winner
-            }
-            else
-            {
-                Console.WriteLine($"No winner was drawn for product {productNumber}.");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error while drawing winner for product {productNumber}: {ex.Message}");
-        }
-    }
+
+
 
     // Fetch the winner from Firebase using DrawService
     private async Task FetchWinnerFromFirebase(int productNumber)
