@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using static lek4.Components.Service.ProductService;
 
 namespace lek4.Components.Service
 {
@@ -18,14 +18,44 @@ namespace lek4.Components.Service
             _httpClient = httpClient;
         }
 
-        // Klass för att representera en användares lock-in-data
+        // Class to represent user lock-in data
         public class UserLockInData
         {
             public string UserEmail { get; set; }
             public double LockInAmount { get; set; }
         }
+        public async Task<string> GetWinnerFromFirebase(int productNumber)
+        {
+            // Firebase URL to fetch winner data for a product
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner%2Fproduct{productNumber}%2Fwinner.json?alt=media";
 
-        // Hämta alla användares lock-in-data från Firebase för en specifik produkt
+            // Send a GET request to Firebase
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Deserialize the response content
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var winnerData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonResponse);
+
+                // Extract and return the winner email
+                if (winnerData.ContainsKey("Winner"))
+                {
+                    return winnerData["Winner"].ToString();
+                }
+                else
+                {
+                    Console.WriteLine($"No winner data found for product {productNumber}");
+                    return null;
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch winner for product {productNumber}. Status code: {response.StatusCode}");
+                return null;
+            }
+        }
+
         // Fetches all users' lock-in data from Firebase for a specific product
         public async Task<Dictionary<string, double>> GetAllUserLockInData(int productNumber)
         {
@@ -49,9 +79,7 @@ namespace lek4.Components.Service
             }
         }
 
-
-
-        // Hämta lock-in-data för en specifik användare
+        // Fetch lock-in data for a specific user
         private async Task<UserLockInData> GetUserLockInData(int productNumber, string userFileName)
         {
             var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2F{userFileName}?alt=media";
@@ -70,7 +98,6 @@ namespace lek4.Components.Service
             }
         }
 
-        // Utför en slumpmässig dragning baserat på lock-in-belopp
         // Perform a random draw based on lock-in amounts
         public string DrawWinner(Dictionary<string, double> users)
         {
@@ -92,14 +119,14 @@ namespace lek4.Components.Service
             return weightedList[index];  // Return the winner's email
         }
 
-
-        // Spara vinnaren i Firebase i en separat winner.json-fil
-        public async Task SaveWinnerToFirebase(int productNumber, string winnerEmail)
+        // Save the winner to Firebase in a separate winner.json file
+        public async Task SaveWinnerToFirebase(int productNumber, string winnerEmail, double price)
         {
             var winnerData = new
             {
                 Winner = winnerEmail,
-                Timestamp = DateTime.UtcNow
+                Timestamp = DateTime.UtcNow,
+                Price = price,
             };
 
             var winnerJson = JsonSerializer.Serialize(winnerData);

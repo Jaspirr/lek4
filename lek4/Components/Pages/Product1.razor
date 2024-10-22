@@ -1,4 +1,5 @@
-﻿@page "/product/{productNumber:int}"
+﻿﻿
+@page "/product/{productNumber:int}"
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
@@ -262,6 +263,12 @@
             exceedsTotalOdds = lockInAmount > totalOdds;
         }
     }
+    private void NavigateToViewWinner()
+    {
+        // Navigera till ViewWinner-sidan och skicka med productNumber
+        NavigationManager.NavigateTo($"/winner/{productNumber}");
+    }
+
 }
 
 
@@ -273,38 +280,50 @@
     }
     else
     {
+        <!-- Always show the "Go Back" button -->
         <button @onclick="GoBack" class="icon-button">
             <i class="fas fa-arrow-left"></i>
         </button>
-        <h3>$@price</h3>
-        <div class="stats-container">
-            <div class="stat-item">
-                <p class="stat-value">@winningChance.ToString("0.0")%</p>
-            </div>
-            <div class="stat-item">
-                <p class="stat-value">@totalOdds.ToString("0.0")x</p>
-            </div>
-            <div class="stat-item">
-                <p class="stat-value">@lockedInOdds.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
-            </div>
-        </div>
-        <input type="range" min="0.0" max="9.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
-        <p>Selected Amount: @lockInAmount</p>
-        <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
-        @if (!string.IsNullOrEmpty(errorMessage))
+
+        @if (winner == null)
         {
-            <p class="error-message">@errorMessage</p>
+            <!-- Show the product details if no winner is set -->
+            <h3>$@price</h3>
+            <div class="stats-container">
+                <div class="stat-item">
+                    <p class="stat-value">@winningChance.ToString("0.0")%</p>
+                </div>
+                <div class="stat-item">
+                    <p class="stat-value">@totalOdds.ToString("0.0")x</p>
+                </div>
+                <div class="stat-item">
+                    <p class="stat-value">@lockedInOdds.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
+                </div>
+            </div>
+            <input type="range" min="0.0" max="9.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
+            <p>Selected Amount: @lockInAmount</p>
+            <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <p class="error-message">@errorMessage</p>
+            }
+
+            <!-- Countdown Timer, shown only if there is no winner -->
+            <div class="countdown-timer">
+                <h4>@selectedDay 20:00</h4>
+                <p>@timeRemaining</p>
+            </div>
+        }
+        else
+        {
+            <!-- Show only the View Winner button if there is a winner -->
+            <div class="centered-container">
+                <button @onclick="NavigateToViewWinner" class="view-winner-button">View Winner</button>
+            </div>
         }
 
-        @if (remainingTime.TotalSeconds <= 0 && winner == null)
-        {
-            <button @onclick="ViewWinner">View Winner</button>
-        }
-        else if (winner != null)
-        {
-            <p><strong>Winner: @winner</strong></p>
-        }
-
+        <!-- Popup to show the winner -->
         @if (showPopup)
         {
             <div class="popup">
@@ -316,15 +335,8 @@
                 <button @onclick="() => showPopup = false">Close</button>
             </div>
         }
-
-        <div class="countdown-timer">
-            <h4>@selectedDay 20:00</h4>
-            <p>@timeRemaining</p>
-        </div>
     }
 </div>
-
-
 
 <style>
     .popup {
@@ -493,7 +505,12 @@
         color: white;
         font-size: 0.9em;
         text-align: center;
+        display: block; /* Display only when no winner */
     }
+
+        .countdown-timer.winner-present {
+            display: none; /* Hide if there is a winner */
+        }
 
         .countdown-timer h4 {
             margin: 0;
@@ -506,7 +523,33 @@
             color: white;
             font-size: 0.9em;
         }
+
+    .view-winner-button {
+        background-color: mediumpurple;
+        color: white;
+        padding: 20px 40px;
+        border: none;
+        border-radius: 10px;
+        font-size: 2em;
+        cursor: pointer;
+        margin-top: 20px;
+        text-align: center;
+    }
+
+        .view-winner-button:hover {
+            background-color: rebeccapurple;
+        }
+
+
+    /* Centering container for View Winner button */
+    .centered-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 40vh; /* Centers the button in the viewport */
+    }
 </style>
+
 
 <script>
     document.addEventListener('input', function (event) {

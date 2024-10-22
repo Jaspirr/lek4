@@ -50,6 +50,7 @@
 
     <button @onclick="AddProduct">Add Product</button>
 </div>
+
 @code {
     private List<ProductData> products = new List<ProductData>();
     private int newProductNumber;
@@ -67,14 +68,13 @@
 
     private async Task LoadLockedInUsersForAllProducts()
     {
-        foreach (var product in products) // products now contains full ProductData objects
+        foreach (var product in products)
         {
             // Fetch locked-in users for each product
             var users = await ProductService.GetUsersForProduct(product.ProductNumber);
             lockedInUsers[product.ProductNumber] = users;
         }
     }
-
 
     private async Task AddProduct()
     {
@@ -98,10 +98,25 @@
 
     private async Task RemoveProduct(int productNumber)
     {
-        await ProductService.RemoveProductFromFirebase(productNumber); // Remove product from Firebase
-        products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Refresh product list
-        await LoadLockedInUsersForAllProducts(); // Load users for all products again
-        StateHasChanged(); // Update UI
+        // Try removing the product from Firebase
+        try
+        {
+            await ProductService.RemoveProductFromFirebase(productNumber); // Remove product from Firebase
+
+            // Remove the product from the local list to avoid re-fetching all products
+            products = products.Where(p => p.ProductNumber != productNumber).ToList();
+
+            // Remove associated locked-in users for that product
+            lockedInUsers.Remove(productNumber);
+
+            // Refresh UI after the deletion
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error removing product {productNumber}: {ex.Message}");
+            // You may want to display some user-friendly error message here if needed
+        }
     }
 
 
@@ -117,7 +132,6 @@
         }
     }
 }
-
 
 <style>
     .product-list {

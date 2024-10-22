@@ -1,0 +1,234 @@
+﻿@page "/winner/{productNumber:int}"
+
+@inject NavigationManager NavigationManager
+@inject lek4.Components.Service.ProductService ProductService
+@inject lek4.Components.Service.DrawService DrawService
+@inject IJSRuntime JSRuntime
+
+@code {
+    [Parameter]
+    public int productNumber { get; set; }
+
+    private string winner;
+    private bool showWheel = true;
+    private bool showWinner = false;
+    private string selectedWinner;
+    private Dictionary<string, double> userLockInData;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Hämta alla användares odds och namn för den specifika produkten
+        userLockInData = await DrawService.GetAllUserLockInData(productNumber);
+
+        // Starta hjulanimationen
+        await JSRuntime.InvokeVoidAsync("startDynamicWheelAnimation", userLockInData);
+
+        // Vänta tills hjulet stannar innan vinnaren och konfettin visas
+        await Task.Delay(2500); // 2,5 sekunder för snurr
+
+        // Fade ut hjulet och fade in vinnaren
+        showWheel = false;
+        await Task.Delay(800); // Vänta på fade-out (0,8 sekunder)
+
+        // Hämta och visa vinnaren
+        winner = await ProductService.GetWinnerFromFirebase(productNumber);
+        selectedWinner = winner;
+        showWinner = true;
+
+        // Trigga konfettin över vinnaren
+        await JSRuntime.InvokeVoidAsync("triggerConfettiOverPopup");
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo($"/products");
+    }
+}
+
+@if (showWheel)
+{
+    <div class="wheel-container">
+        <canvas id="wheel-canvas" width="300" height="300" class="wheel-animation"></canvas>
+
+        <!-- Rundad pil som pekar mot hjulets vinnande sektion -->
+        <div class="arrow-pointer"></div>
+    </div>
+}
+else if (showWinner)
+{
+    <div class="winner-details animate__animated animate__fadeIn">
+        @if (string.IsNullOrEmpty(selectedWinner))
+        {
+            <p>No winner found for this product.</p>
+        }
+        else
+        {
+            <div class="popup animate__animated animate__fadeInUp" id="popup-container">
+                <h4>Winner for Product @productNumber</h4>
+                <p><strong>Winner: @selectedWinner</strong></p>
+                <button @onclick="GoBack">Go Back</button>
+            </div>
+        }
+    </div>
+}
+
+<!-- Detta är canvasen för konfetti -->
+<canvas id="confetti-canvas" style="position:absolute;z-index:1001;"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/confetti-js@0.0.17/dist/index.min.js"></script>
+<script>
+    window.triggerConfettiOverPopup = function () {
+        const confettiCanvas = document.getElementById('confetti-canvas');
+        const popup = document.getElementById('popup-container');
+
+        if (popup && confettiCanvas) {
+            // Positionera konfetti canvas
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+
+            const confettiSettings = {
+                target: 'confetti-canvas',
+                max: 100,  // Färre konfetti
+                size: 2,   // Liten storlek på konfettin
+                animate: true,
+                props: ["circle", "square", "triangle"], // Olika konfetti former
+                colors: [[165, 42, 42], [255, 215, 0], [138, 43, 226], [64, 224, 208]],
+                clock: 25,  // Sänkt hastighet
+                start_from_edge: false,  // Starta konfetti från mitten
+                origin: { x: 0.5, y: 0.5 },  // Starta från mitten
+            };
+
+            const confetti = new ConfettiGenerator(confettiSettings);
+            confetti.render();
+        } else {
+            setTimeout(triggerConfettiOverPopup, 100);
+        }
+    };
+
+    window.startDynamicWheelAnimation = function (userLockInData) {
+        const canvas = document.getElementById('wheel-canvas');
+        const ctx = canvas.getContext('2d');
+
+        const users = Object.keys(userLockInData);  // Användarens e-post
+        const odds = Object.values(userLockInData); // Användarens odds
+        const totalOdds = odds.reduce((sum, current) => sum + current, 0);  // Totalt antal odds
+
+        // Definiera färgerna för varannan bit: mintgrön, ljusgul och ljuslila
+        const colors = ['#98FF98', '#FFFACD', '#E6E6FA']; // Mintgrönt, ljusgul och ljuslila
+
+        let rotation = 0;
+        const totalRotationTime = 2500; // Förläng snurrtiden till 2.5 sekunder
+        const slowDownTime = 1600; // Börja sakta ner efter 1.6 sekunder
+        const animationInterval = 10;
+        let timeElapsed = 0;
+        let intervalId;
+
+        function drawWheel() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(canvas.width / 2, canvas.height / 2);
+            let startAngle = rotation;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < users.length; i++) {
+                const sliceAngle = (2 * Math.PI) * (odds[i] / totalOdds);
+                const endAngle = startAngle + sliceAngle;
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[i % colors.length]; // Alternera mellan mintgrönt, ljusgul och ljuslila
+                ctx.fill();
+
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                startAngle = endAngle;
+            }
+        }
+
+        function rotateWheel() {
+            timeElapsed += animationInterval;
+            if (timeElapsed < slowDownTime) {
+                rotation += 0.2;
+            } else {
+                rotation += Math.max(0.005, 0.2 * (1 - (timeElapsed - slowDownTime) / (totalRotationTime - slowDownTime)));
+            }
+
+            drawWheel();
+
+            if (timeElapsed >= totalRotationTime) {
+                clearInterval(intervalId);
+            }
+        }
+
+        intervalId = setInterval(rotateWheel, animationInterval);
+    };
+</script>
+
+<style>
+    .popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        border-radius: 10px;
+        width: 300px;
+        text-align: center;
+    }
+
+    .winner-details {
+        text-align: center;
+        margin-top: 100px;
+    }
+
+    .popup button {
+        padding: 10px 20px;
+        background-color: mediumpurple;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+        margin-top: 10px;
+    }
+
+        .popup button:hover {
+            background-color: rebeccapurple;
+        }
+
+    .wheel-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 80vh; /* Anpassa denna höjd för att centrera hjulet i mitten */
+    }
+
+    .wheel-animation {
+        margin: 0 auto;
+    }
+
+    /* Rundad pil */
+    .arrow-pointer {
+        width: 0;
+        height: 0;
+        border-left: 20px solid transparent;
+        border-right: 20px solid transparent;
+        border-bottom: 40px solid black;
+        margin: 10px auto;
+        transform: translateY(-20px);
+        border-radius: 10px; /* Gör pilen rundad */
+    }
+
+    #confetti-canvas {
+        position: absolute;
+        pointer-events: none;
+    }
+</style>

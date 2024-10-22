@@ -19,6 +19,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-firestore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.min.js"></script>
 
     <script src="NewFolder/ads.js"></script> <!-- Ensure this line is present -->
 
@@ -50,6 +51,16 @@
         // Initiera Firestore
         const db = firebase.firestore();
     </script>
+    <script>
+        function launchConfetti() {
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+    </script>
+
     <script>
         async function addProductToFirestore(productId, name, endTime) {
             try {
