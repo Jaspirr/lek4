@@ -14,7 +14,9 @@
         @foreach (var product in products)
         {
             <div class="product-item">
-                <p>Product @product.ProductNumber</p>
+                <img src="@product.ImageUrl" alt="@product.ProductName" width="100" height="100" />
+                <p>Product Name: @product.ProductName</p>
+                <p>Product Number: @product.ProductNumber</p>
                 <p>Price: @product.Price</p>
 
                 <!-- Display locked-in users for the product -->
@@ -32,6 +34,7 @@
                 <button @onclick="() => EditProduct(product.ProductNumber)">Edit Product</button>
                 <button @onclick="() => RemoveProduct(product.ProductNumber)" class="remove-button">Remove</button>
             </div>
+
         }
     }
     else
@@ -45,16 +48,25 @@
     <label for="newProductNumber">Product Number</label>
     <input type="number" id="newProductNumber" min="1" @bind="newProductNumber" />
 
+    <label for="newProductName">Product Name</label>
+    <input type="text" id="newProductName" @bind="newProductName" />
+
     <label for="newProductPrice">Product Price</label>
     <input type="number" id="newProductPrice" min="0" step="0.01" @bind="newProductPrice" />
+
+    <label for="newProductImageUrl">Product Image URL</label>
+    <input type="text" id="newProductImageUrl" @bind="newProductImageUrl" />
 
     <button @onclick="AddProduct">Add Product</button>
 </div>
 
+
 @code {
     private List<ProductData> products = new List<ProductData>();
     private int newProductNumber;
+    private string newProductName; // New variable for product name
     private double newProductPrice;
+    private string newProductImageUrl; // New variable for image URL
     private string userEmail = "user@example.com"; // Placeholder, replace with actual user email if available
     private Dictionary<int, List<ProductData>> lockedInUsers = new Dictionary<int, List<ProductData>>();
 
@@ -78,13 +90,13 @@
 
     private async Task AddProduct()
     {
-        if (newProductNumber > 0 && newProductPrice > 0)
+        if (newProductNumber > 0 && newProductPrice > 0 && !string.IsNullOrEmpty(newProductName))
         {
             // Define lockInAmount (since it's 0 initially)
             double lockInAmount = 0.0;
 
-            // Save the new product info with required parameters
-            await ProductService.SaveProductData(newProductNumber, userEmail, lockInAmount, newProductPrice);
+            // Save the new product info with required parameters including name and image URL
+            await ProductService.AddProductToFirebase(newProductNumber, newProductPrice, userEmail, newProductName, newProductImageUrl);
 
             // Refresh product list after adding
             products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Fetch all products again
@@ -93,6 +105,8 @@
             // Reset fields
             newProductNumber = 0;
             newProductPrice = 0;
+            newProductName = ""; // Reset product name
+            newProductImageUrl = ""; // Reset image URL
         }
     }
 
@@ -115,10 +129,8 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error removing product {productNumber}: {ex.Message}");
-            // You may want to display some user-friendly error message here if needed
         }
     }
-
 
     private void EditProduct(int productNumber)
     {

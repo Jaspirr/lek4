@@ -16,8 +16,15 @@
     <label for="userEmail">User Email</label>
     <input type="email" id="userEmail" @bind="userEmail" />
 
+    <label for="productName">Product Name</label>
+    <input type="text" id="productName" @bind="productName" /> <!-- New input for product name -->
+
+    <label for="productImageUrl">Product Image URL</label>
+    <input type="text" id="productImageUrl" @bind="productImageUrl" /> <!-- New input for product image URL -->
+
     <button @onclick="SaveChanges">Save Changes</button>
 </div>
+
 
 @code {
     [Parameter]
@@ -26,6 +33,8 @@
     private double price;
     private double lockInAmount;
     private string userEmail;
+    private string productName;      // New field for product name
+    private string productImageUrl;  // New field for product image URL
     private ProductService.ProductData productData; // Holds the product data
 
     protected override async Task OnInitializedAsync()
@@ -35,10 +44,12 @@
 
         if (productData != null)
         {
-            // Set local values for price, lockInAmount, and userEmail based on the fetched data
+            // Set local values for price, lockInAmount, userEmail, productName, and productImageUrl based on the fetched data
             price = productData.Price;
             lockInAmount = productData.LockInAmount;
             userEmail = productData.UserEmail;
+            productName = productData.ProductName;      // Set product name
+            productImageUrl = productData.ImageUrl;     // Set product image URL
         }
         else
         {
@@ -47,6 +58,7 @@
             NavigationManager.NavigateTo("/change-products"); // Redirect back
         }
     }
+
     private async Task SaveChanges()
     {
         // Update the product data with new values
@@ -56,12 +68,14 @@
             productData.Price = price;
             productData.LockInAmount = lockInAmount;
             productData.UserEmail = userEmail;
+            productData.ProductName = productName;      // Update product name
+            productData.ImageUrl = productImageUrl;     // Update product image URL
 
             // Assuming you need to define a userId, you can either generate it or provide a value
             int userId = 1; // You can set this to any unique value for the user
 
-            // Use the existing SaveProductData method to save the updated product info
-            await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price);
+            // Use the updated SaveProductData method to save the updated product info including name and image URL
+            await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price, productName, productImageUrl);
 
             // Save the user data with a unique userId
             await ProductService.SaveUserToProduct(productNumber, userId, productData);
@@ -71,3 +85,4 @@
         }
     }
 }
+

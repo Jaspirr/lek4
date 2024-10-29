@@ -4,7 +4,7 @@ namespace lek4.Components.Service
 {
     public class NumberService
     {
-        public double CurrentNumber { get; set; }
+        public double Number { get; set; }
         public int MaxProductNumber { get; set; } = 9; // Set a default max product number
         public List<int> UnlockedProducts { get; private set; } = new List<int>();
         public List<int> LockedInProducts { get; private set; } = new List<int>();
@@ -35,7 +35,7 @@ namespace lek4.Components.Service
             ProductLockAmounts[productNumber].Add(amount);
 
             // Deduct the locked-in amount from the current number
-            CurrentNumber -= amount;
+            Number -= amount;
 
             // Track user lock-in by userEmail
             if (!ProductUserLocks.ContainsKey(productNumber))
@@ -73,13 +73,13 @@ namespace lek4.Components.Service
         // Check if the user has enough odds left
         public bool HasEnoughOdds(double amount)
         {
-            return CurrentNumber >= amount;
+            return Number >= amount;
         }
 
         // Get the remaining odds
         public double GetRemainingOdds()
         {
-            return CurrentNumber;
+            return Number;
         }
 
     }

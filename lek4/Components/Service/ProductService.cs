@@ -28,15 +28,16 @@ namespace lek4.Components.Service
         }
 
         // Add a new product to Firebase with productInfo.json
-        public async Task AddProductToFirebase(int productNumber, double price, string userEmail)
+        public async Task AddProductToFirebase(int productNumber, double price, string userEmail, string productName, string imageUrl)
         {
             // Define the lock-in amount
             double lockInAmount = 0.0; // Initial lock-in amount
 
             // Call SaveProductData with all the required arguments
-            await SaveProductData(productNumber, userEmail, lockInAmount, price);
+            await SaveProductData(productNumber, userEmail, lockInAmount, price, productName, imageUrl);
         }
- 
+
+
         public async Task SaveUserToProduct(int productNumber, int userId, ProductData productData)
         {
             var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products/product{productNumber}/user{userId}.json";
@@ -57,14 +58,16 @@ namespace lek4.Components.Service
 
 
         // Save product info to Firebase
-        public async Task SaveProductData(int productNumber, string userEmail, double lockInAmount, double price)
+        public async Task SaveProductData(int productNumber, string userEmail, double lockInAmount, double price, string productName, string imageUrl)
         {
             var productData = new ProductData
             {
                 ProductNumber = productNumber,
                 UserEmail = userEmail,
                 LockInAmount = lockInAmount,
-                Price = price
+                Price = price,
+                ProductName = productName, // Save product name
+                ImageUrl = imageUrl        // Save image URL
             };
 
             var productJson = JsonSerializer.Serialize(productData);
@@ -89,6 +92,7 @@ namespace lek4.Components.Service
                 Console.WriteLine($"Failed to save product data for {productNumber}. Error: {response.StatusCode}");
             }
         }
+
         public async Task<string> GetWinnerFromFirebase(int productNumber)
         {
             // Firebase URL to fetch winner data for a product
@@ -149,15 +153,11 @@ namespace lek4.Components.Service
         {
             try
             {
-                // Construct the Firebase URL for the specific product (simplified and without the extra encoded slashes)
                 var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2FproductInfo.json?alt=media";
-
-                // Send an HTTP GET request to Firebase
                 var response = await _httpClient.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    // Read and deserialize the response into a ProductData object
                     var jsonResponse = await response.Content.ReadAsStringAsync();
                     var product = JsonSerializer.Deserialize<ProductData>(jsonResponse);
 
@@ -165,18 +165,17 @@ namespace lek4.Components.Service
                 }
                 else
                 {
-                    // Log if the product is not found or any other error
                     Console.WriteLine($"Failed to fetch product {productNumber}. Status code: {response.StatusCode}");
                     return null;
                 }
             }
             catch (Exception ex)
             {
-                // Log if there’s any other error
                 Console.WriteLine($"An error occurred while fetching product {productNumber}: {ex.Message}");
                 return null;
             }
         }
+
 
 
 
@@ -226,54 +225,54 @@ namespace lek4.Components.Service
                 return;
             }
 
-            // Fetch the user's existing lock-in data from Firebase (if it exists)
-            var existingUser = await GetUserFromUserStats(userEmail); // Fetch from new storage path
+            // Hämta användarens befintliga lock-in-data från Firebase (om det finns)
+            var existingUser = await GetUserFromFirebase(productNumber, userEmail);
             bool isNewUser = existingUser == null;
 
             if (existingUser != null)
             {
-                // If the user already has a lock-in amount, add the new amount
+                // Om användaren redan har ett lock-in belopp, addera det nya beloppet
                 existingUser.LockInAmount += lockInAmount;
-                lockInAmount = existingUser.LockInAmount;  // Update the amount to be saved
-                Console.WriteLine($"Updated lock-in amount for {userEmail}.");
+                lockInAmount = existingUser.LockInAmount;  // Uppdatera beloppet som ska sparas
+                Console.WriteLine($"Updated lock-in amount for {userEmail} on product {productNumber}");
             }
 
-            // Create or update user data
+            // Skapa eller uppdatera användardata
             var userLockInData = new
             {
                 UserEmail = userEmail,
                 LockInAmount = lockInAmount
             };
 
-            // Serialize the user data to JSON
+            // Serialisera användarens data till JSON
             var userJson = JsonSerializer.Serialize(userLockInData);
             var content = new StringContent(userJson, Encoding.UTF8, "application/json");
 
-            // Save the user data to the new location in Firebase (/users/UserStats/{userEmail}.json)
-            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{userEmail}.json";
+            // Ange Firebase-sökvägen för att spara användaren baserat på e-post
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2F{userEmail}.json";
+
+            // Använd POST för att spara data till Firebase
             var response = await _httpClient.PostAsync(path, content);
 
-            var responseContent = await response.Content.ReadAsStringAsync();  // Log the response for debugging
+            var responseContent = await response.Content.ReadAsStringAsync();  // Logga responsen för felsökning
             Console.WriteLine($"Response content: {responseContent}");
 
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Lock-in for {userEmail} saved successfully.");
+                Console.WriteLine($"Lock-in for {userEmail} saved successfully for product {productNumber}.");
 
-                // Update totalusers.json with the user's lock-in amount
+                // Uppdatera totalusers.json med användarens lock-in amount
                 await UpdateTotalUsers(productNumber, userEmail, lockInAmount);
 
-                // Update totalstats.json with the new lock-in amount
+                // Uppdatera totalstats.json med det nya beloppet
                 await _statsService.UpdateTotalStats(productNumber, userEmail, lockInAmount);
+
             }
             else
             {
-                Console.WriteLine($"Failed to save lock-in for {userEmail}. Error: {response.StatusCode}");
+                Console.WriteLine($"Failed to save lock-in for {userEmail} on product {productNumber}. Error: {response.StatusCode}");
             }
         }
-
-
-
 
         public async Task<int> GetNextUserNumber(int productNumber)
         {
@@ -474,21 +473,29 @@ namespace lek4.Components.Service
         // Hämta totalusers för en specifik produkt från Firebase
         public async Task UpdateTotalUsers(int productNumber, string userEmail, double lockInAmount)
         {
+            // Ensure the userEmail is valid
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                Console.WriteLine("User email is null or empty, cannot update total users.");
+                return;
+            }
+
+            // Fetch existing lock-in data from Firebase
             var totalUsers = await GetTotalUsersFromFirebase(productNumber);
 
+            // Check if the user's lock-in amount exists in totalUsers data
             if (totalUsers.ContainsKey(userEmail))
             {
-                // Update the existing user's lock-in amount
-                totalUsers[userEmail] += lockInAmount;
+                // Update the existing user's lock-in amount and round it
+                totalUsers[userEmail] = Math.Round(totalUsers[userEmail] + lockInAmount, 2);
             }
             else
             {
-                // Add a new user with their lock-in amount
-                totalUsers[userEmail] = lockInAmount;
+                // Add a new entry for the user if not present and round it
+                totalUsers[userEmail] = Math.Round(lockInAmount, 2);
             }
 
-            totalUsers[userEmail] = Math.Round(totalUsers[userEmail], 2); // Ensure rounding consistency
-
+            // Serialize the updated dictionary back to JSON and save it to Firebase
             var usersJson = JsonSerializer.Serialize(totalUsers);
             var content = new StringContent(usersJson, Encoding.UTF8, "application/json");
 
@@ -621,6 +628,8 @@ namespace lek4.Components.Service
             public int LockInCount { get; set; }
             public double TotalLockInAmount { get; set; }
             public DateTime Timestamp { get; set; }
+            public string ProductName { get; set; }
+            public string ImageUrl { get; set; }
         }
        
 

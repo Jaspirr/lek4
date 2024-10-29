@@ -1,4 +1,5 @@
-﻿@page "/products"
+﻿﻿
+@page "/products"
 @page "/products/{number:double}"
 @using lek4.Components.Service
 
@@ -18,10 +19,10 @@
     {
         if (!number.HasValue)
         {
-            number = NumberService.CurrentNumber;
+            number = NumberService.Number;
         }
 
-        NumberService.CurrentNumber = number.Value;
+        NumberService.Number = number.Value;
         remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0); // Limit odds to 100
 
         // Fetch the actual products from Firebase
@@ -90,5 +91,5 @@
 </div>
 
 <style>
-    /* Add relevant CSS for the page here */
+   
 </style>

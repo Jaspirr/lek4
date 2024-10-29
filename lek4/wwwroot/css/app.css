@@ -1,4 +1,4 @@
-﻿html, body {
+﻿﻿html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
@@ -168,6 +168,7 @@ h1:focus {
         opacity: 1; /* Make visible with transition */
         transform: translate(-50%, -50%) scale(1); /* Maintain the same scale */
     }
+
 .step-count {
     font-size: 1rem;
     margin-top: 10px;
@@ -394,6 +395,7 @@ h1:focus {
 .product:nth-child(9) {
     grid-column: 3; /* Position ninth product in third column */
 }
+
 .product-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr); /* 5 kolumner */

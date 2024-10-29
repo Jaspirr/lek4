@@ -47,10 +47,10 @@
 @code {
     private double number
     {
-        get => NumberService.CurrentNumber;
+        get => NumberService.Number; 
         set
         {
-            NumberService.CurrentNumber = Math.Round(value, 1); // Ensure number is rounded to 1 decimal place
+            NumberService.Number = Math.Round(value, 1); // Ensure number is rounded to 1 decimal place
             CheckAndShowAd();
         }
     }

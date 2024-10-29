@@ -9,6 +9,8 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject DrawService DrawService
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject NumberService NumberService;
+@inject StatsService StatsService;
 
 @using System.Security.Claims
 @using Firebase.Auth
@@ -16,12 +18,14 @@
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
 @using lek4.Components.Service
+
 @code {
     [Parameter]
     public int productNumber { get; set; }
-
     private double price;
-    private double winningChance;
+    private string winningChance;
+    private double totalLockedInAmount;
+    private string currentModal;
     private double lockInAmount;
     private double totalOdds = 1.0;
     private double lockedInOdds;
@@ -47,16 +51,6 @@
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        // Check if the user is authenticated
-        if (user.Identity.IsAuthenticated)
-        {
-            userEmail = user.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
-        }
-        else
-        {
-            userEmail = null;
-        }
-
         // Fetch product information (productInfo.json) from Firebase
         productData = await ProductService.GetProductFromFirebaseAsync(productNumber);
 
@@ -64,6 +58,20 @@
         {
             productExists = true;
             price = productData.Price;
+
+            // Hämta vinnaren direkt efter att produktinformationen har hämtats
+            winner = await ProductService.GetWinnerFromFirebase(productNumber);
+            if (!string.IsNullOrEmpty(winner))
+            {
+                StateHasChanged(); // Uppdatera UI om det finns en vinnare
+            }
+
+            // Fetch total locked-in amount for the user from totalusers.json
+            await FetchLockInAmount();
+
+            // Set totalOdds and lockInAmount to follow the "number" from Home page
+            totalOdds = NumberService.Number;
+            lockInAmount = NumberService.Number;
         }
         else
         {
@@ -77,20 +85,9 @@
         InitializeAds();
         timer = new Timer(UpdateTimer, null, 0, 1000);
 
-        // Get remaining time for the product
-        remainingTime = ProductService.GetTimeRemaining(productNumber);
-
-        // Check if the time has expired and fetch the winner
-        if (remainingTime.TotalSeconds <= 0)
-        {
-            winner = await ProductService.GetWinnerFromFirebase(productNumber); // Fetch winner using DrawService
-            if (!string.IsNullOrEmpty(winner))
-            {
-                StateHasChanged(); // Trigger UI refresh to display the winner
-            }
-        }
+        // Calculate initial winning chance
+        await UpdateWinningChance();
     }
-
 
     private void InitializeAds()
     {
@@ -128,6 +125,11 @@
                 else if (adWatched)
                 {
                     await SaveProductData();
+                    totalLockedInAmount += lockInAmount; // Update totalLockedInAmount with the new lock-in amount
+                    await ProductService.UpdateTotalUsers(productNumber, userEmail, totalLockedInAmount); // Save to Firebase
+                    lockInAmount = 0.0; // Reset lockInAmount after saving
+                    await UpdateWinningChance(); // Recalculate winning chance
+                    StateHasChanged(); // Refresh the UI
                 }
                 else
                 {
@@ -143,7 +145,35 @@
         else
         {
             isSuccess = false;
-            errorMessage = "Please enter a value between 0.0 and 9.0.";
+            errorMessage = "Please enter a value between 0.0 and 100.0.";
+        }
+    }
+
+    private async Task FetchLockInAmount()
+    {
+        // Retrieve the user's email from local storage
+        var storedEmail = await localStorage.GetItemAsync<string>("userEmail");
+
+        if (string.IsNullOrEmpty(storedEmail))
+        {
+            Console.WriteLine("No email found in local storage.");
+            totalLockedInAmount = 0.0;
+            return;
+        }
+
+        // Fetch lock-in data from totalusers.json
+        var totalUsers = await ProductService.GetTotalUsersFromFirebase(productNumber);
+
+        // Check if the user's lock-in amount exists in totalUsers data
+        if (totalUsers.TryGetValue(storedEmail, out double amount))
+        {
+            totalLockedInAmount = amount; // Set totalLockedInAmount to the value retrieved from Firebase
+            Console.WriteLine($"Total locked-in amount for {storedEmail} is {totalLockedInAmount}.");
+        }
+        else
+        {
+            totalLockedInAmount = 0.0; // Default to 0 if no data is found
+            Console.WriteLine($"No lock-in data found for {storedEmail}.");
         }
     }
 
@@ -254,7 +284,6 @@
         showPopup = true;
         StateHasChanged();
     }
-
     private void OnSliderChanged(ChangeEventArgs e)
     {
         if (double.TryParse(e.Value.ToString(), out double value))
@@ -263,80 +292,175 @@
             exceedsTotalOdds = lockInAmount > totalOdds;
         }
     }
+
+
     private void NavigateToViewWinner()
     {
         // Navigera till ViewWinner-sidan och skicka med productNumber
         NavigationManager.NavigateTo($"/winner/{productNumber}");
     }
+    private async Task UpdateWinningChance()
+    {
+        var totalStats = await StatsService.GetTotalStatsFromFirebase(productNumber);
+        if (totalStats != null && totalStats.TotalLockInAmount > 0)
+        {
+            var ratio = totalLockedInAmount / totalStats.TotalLockInAmount;
+
+            // Update with 5 winning chance levels
+            if (ratio >= 0.8)
+                winningChance = "V-High";
+            else if (ratio >= 0.6)
+                winningChance = "High";
+            else if (ratio >= 0.4)
+                winningChance = "Med";
+            else if (ratio >= 0.2)
+                winningChance = "Low";
+            else
+                winningChance = "V-Low";
+        }
+        else
+        {
+            winningChance = "Very Low"; // Default or fallback option if no stats
+        }
+    }
+    private string GetWinningChanceClass()
+    {
+        return winningChance switch
+        {
+            "Very Low" => "V-Low",
+            "Low" => "Low",
+            "Medium" => "Med",
+            "High" => "High",
+            "Very High" => "V-High",
+            _ => ""
+        };
+    }
+    private void IncreaseLockInAmount()
+    {
+        if (lockInAmount + 0.1 <= 100.0) // Max value check
+        {
+            lockInAmount = Math.Round(lockInAmount + 0.1, 1);
+            StateHasChanged();
+        }
+    }
+
+    private void DecreaseLockInAmount()
+    {
+        if (lockInAmount - 0.1 >= 0.0) // Min value check
+        {
+            lockInAmount = Math.Round(lockInAmount - 0.1, 1);
+            StateHasChanged();
+        }
+    }
+    private void OpenModal(string modalId)
+    {
+        currentModal = modalId;
+    }
+
+    private void CloseModal()
+    {
+        currentModal = null;
+    }
+       private void OpenWinningChanceModal()
+    {
+        OpenModal("winningChanceModal");
+    }
+
+    private void OpenTotalOddsModal()
+    {
+        OpenModal("totalOddsModal");
+    }
+
+    private void OpenTotalLockedInAmountModal()
+    {
+        OpenModal("totalLockedInAmountModal");
+    }
 
 }
 
 
-<div class="product-details">
-    @if (!productExists)
-    {
-        <p>The product you are trying to view no longer exists.</p>
-        <button @onclick="GoBack">Back to Products</button>
-    }
-    else
-    {
-        <!-- Always show the "Go Back" button -->
-        <button @onclick="GoBack" class="icon-button">
-            <i class="fas fa-arrow-left"></i>
-        </button>
+<div class="product-container">
+    <!-- Product Name outside and above the product -->
+    <p class="product-name">@productData?.ProductName</p>
 
-        @if (winner == null)
+    <div class="product-details" style="@(productData != null && !string.IsNullOrEmpty(productData.ImageUrl) ? $"background-image: url('{productData.ImageUrl}'); background-size: cover; background-position: center;" : "")">
+        @if (!productExists)
         {
-            <!-- Show the product details if no winner is set -->
-            <h3>$@price</h3>
-            <div class="stats-container">
-                <div class="stat-item">
-                    <p class="stat-value">@winningChance.ToString("0.0")%</p>
-                </div>
-                <div class="stat-item">
-                    <p class="stat-value">@totalOdds.ToString("0.0")x</p>
-                </div>
-                <div class="stat-item">
-                    <p class="stat-value">@lockedInOdds.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
-                </div>
-            </div>
-            <input type="range" min="0.0" max="9.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
-            <p>Selected Amount: @lockInAmount</p>
-            <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
-
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <p class="error-message">@errorMessage</p>
-            }
-
-            <!-- Countdown Timer, shown only if there is no winner -->
-            <div class="countdown-timer">
-                <h4>@selectedDay 20:00</h4>
-                <p>@timeRemaining</p>
-            </div>
+            <p>The product you are trying to view no longer exists.</p>
+            <button @onclick="GoBack">Back to Products</button>
         }
         else
         {
-            <!-- Show only the View Winner button if there is a winner -->
-            <div class="centered-container">
-                <button @onclick="NavigateToViewWinner" class="view-winner-button">View Winner</button>
-            </div>
-        }
+            <!-- Always show the "Go Back" button -->
+            <button @onclick="GoBack" class="icon-button">
+                <i class="fas fa-arrow-left"></i>
+            </button>
 
-        <!-- Popup to show the winner -->
-        @if (showPopup)
-        {
-            <div class="popup">
-                <h4>Winner for Product @productNumber</h4>
-                @if (winner != null)
+            @if (winner == null)
+            {
+                <!-- Show the product details if no winner is set -->
+                <h3 class="price">$@price</h3>
+
+                <div class="stats-container">
+                    <div class="stat-item" @onclick="OpenWinningChanceModal">
+                        <p class="stat-value @GetWinningChanceClass()">@winningChance</p>
+                    </div>
+                    <div class="stat-item" @onclick="OpenTotalOddsModal">
+                        <p class="stat-value">@totalOdds.ToString("0.0")x</p>
+                    </div>
+                    <div class="stat-item" @onclick="OpenTotalLockedInAmountModal">
+                        <p class="stat-value">@totalLockedInAmount.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
+                    </div>
+                </div>
+
+                <!-- Slider for Lock-In Amount -->
+                <input type="range" id="lockInAmount" min="0.0" max="100.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
+
+                <!-- Display Lock-In Amount with Increment and Decrement Buttons -->
+                <div class="lockin-controls">
+                    <button @onclick="DecreaseLockInAmount" class="adjust-button">-</button>
+                    <span class="slider-value">@lockInAmount.ToString("0.0")</span>
+                    <button @onclick="IncreaseLockInAmount" class="adjust-button">+</button>
+                </div>
+
+                <!-- Lock In Button -->
+                <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
                 {
-                    <p><strong>Winner: @winner</strong></p>
+                    <p class="error-message">@errorMessage</p>
                 }
-                <button @onclick="() => showPopup = false">Close</button>
-            </div>
+
+                <!-- Countdown Timer, shown only if there is no winner -->
+                <div class="countdown-timer @(winner != null ? "winner-present" : "")">
+                    <h4>@selectedDay 20:00</h4>
+                    <p>@timeRemaining</p>
+                </div>
+            }
+            else
+            {
+                <!-- Show only the View Winner button if there is a winner -->
+                <div class="centered-container">
+                    <button @onclick="NavigateToViewWinner" class="view-winner-button">View Winner</button>
+                </div>
+            }
+
+            <!-- Popup to show the winner -->
+            @if (showPopup)
+            {
+                <div class="popup">
+                    <h4>Winner for Product @productNumber</h4>
+                    @if (winner != null)
+                    {
+                        <p><strong>Winner: @winner</strong></p>
+                    }
+                    <button @onclick="() => showPopup = false">Close</button>
+                </div>
+            }
         }
-    }
+    </div>
 </div>
+
 
 <style>
     .popup {
@@ -349,52 +473,204 @@
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         z-index: 1000;
     }
+    .product-container {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .error-message {
+        color: #D8000C; /* Red color for errors */
+        background-color: #FFD2D2; /* Light red background for visibility */
+        padding: 10px;
+        border: 1px solid #D8000C;
+        border-radius: 5px;
+        font-weight: bold;
+        font-size: 1em;
+        text-align: center;
+        margin-top: 10px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    }
+
+
+    .product-name {
+        font-size: 1.5em;
+        color: #F0FFF0; /* Honeydew */
+        text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.7); /* Shadow for readability */
+        margin-bottom: 10px; /* Space between name and product */
+    }
 
     .product-details {
         text-align: center;
-        margin: 100px 20px 0px 20px;
+        margin: 20px;
         padding: 20px;
         border: 1px solid #ddd;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         border-radius: 10px;
         position: relative;
         transition: box-shadow 0.3s ease-in-out;
+        color: #F0FFF0; /* Honeydew */
+        background-color: white; /* Dark Olive Green */
     }
 
         .product-details:hover {
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         }
 
-        .product-details h3 {
+        .product-details h3.price {
             font-size: 2em;
-            margin-bottom: 20px;
-            color: #333;
+            margin-bottom: 10px;
+            color: #F0FFF0; /* Honeydew */
+            text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.7); /* Shadow for better readability */
         }
 
-        .product-details p {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-            color: #666;
-        }
+    .stats-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        margin-top: 10px;
+        margin-bottom: 135px; /* Space between stats and the slider */
+    }
 
-        .product-details button {
-            padding: 10px 20px;
-            font-size: 1em;
-            margin: 5px;
-            border: none;
-            border-radius: 5px;
+    .stat-item {
+        display: inline-block; /* Ensure the value and icon are in the same line */
+        vertical-align: middle;
+        background-color: #F0FFF0; /* Honeydew */
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        padding: 5px;
+        max-width: 60px;
+        max-height: 30px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin: 5px;
+    }
+
+    .stat-icon {
+        font-size: 0.7em; /* Reduce the size of the lock icon */
+        margin-left: 2px;
+        margin-bottom: 2px; /* Add left margin */
+        vertical-align: middle;
+    }
+
+    .stat-value {
+        font-size: 0.9rem; /* Adjusted font size */
+        margin: 0;
+        color: #556B2F; /* Dark Olive Green */
+    }
+
+    input[type="range"].slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 5px;
+        outline: none;
+        background: linear-gradient(to right, #556B2F 0%, #556B2F var(--slider-fill, 0%), silver var(--slider-fill, 0%), silver 100%);
+        transition: background 0.3s ease-in-out;
+    }
+
+        input[type="range"].slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #556B2F;
             cursor: pointer;
-            transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+            border-radius: 50%;
         }
 
-            .product-details button:hover {
-                background-color: mediumpurple;
-                color: white;
-            }
+        input[type="range"].slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #556B2F;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6); /* Mörk overlay för fokus */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000; /* För att alltid visas över andra element */
+    }
+
+    .modal-content {
+        background-color: #ffffff;
+        color: #556B2F;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.2);
+        max-width: 80%;
+        text-align: center;
+        margin: auto; /* Centerat modalfönster */
+    }
+
+    .modal-content p,
+    .modal-content ul li {
+        font-size: 0.8em; /* Adjusted to make text smaller */
+        line-height: 1.0em; /* Slightly increased line height for readability */
+    }
+    .close-button {
+        background-color: #556B2F; /* Honeydew */
+        color: #F0FFF0; /* Dark Olive Green */
+        float: right;
+        font-size: 18px;
+        font-weight: bold;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .lockin-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        margin-top: 10px;
+    }
+
+    .adjust-button {
+        background-color: transparent; /* Fully transparent background */
+        color: #556B2F; /* Button text color */
+        font-size: 1.5em;
+        padding: 5px 10px;
+        cursor: pointer;
+        outline: none; /* Removes focus outline */
+        border: none; /* Ensures no border is displayed */
+    }
+
+    .slider-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #556B2F;
+        display: inline-block;
+        text-align: center;
+        min-width: 50px; /* Ensures consistent spacing */
+    }
+
+    .slider-value {
+        font-size: 1.5rem;
+        margin: 0px;
+        font-weight: bold;
+        color: #556B2F; /* Honeydew */
+        text-align: center; /* Center the text horizontally */
+        display: flex;
+        justify-content: center; /* Horizontal centering using flexbox */
+    }
 
     .lock-in-button {
-        background-color: mediumpurple;
-        color: white;
+        background-color: #556B2F; /* Honeydew */
+        color: #F0FFF0; /* Dark Olive Green */
+        padding: 10px 20px;
+        font-size: 1em;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
     }
 
         .lock-in-button:hover {
@@ -413,115 +689,35 @@
         background: none;
         border: none;
         cursor: pointer;
-        font-size: 1.5em;
-        position: absolute;
-        top: 15px;
-        left: 8px;
-    }
-
-    .stats-container {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        margin-bottom: 20px;
-    }
-
-    .stat-item {
-        background-color: mediumpurple;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 10px;
-        max-width: 85px;
-        max-height: 60px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin: 5px;
-    }
-
-    .stat-value {
         font-size: 1.2em;
-        margin: 0;
-        color: black;
-    }
-
-    .stat-label {
-        font-size: 0.9em;
-        color: white;
-    }
-
-    .stat-icon {
-        font-size: 0.7em;
-        color: white;
-    }
-
-    input[type="range"].slider {
-        -webkit-appearance: none;
-        width: 100%;
-        height: 5px;
-        background: silver;
-        outline: none;
-        transition: opacity .2s;
-        background: linear-gradient(to right, mediumpurple 0%, mediumpurple var(--value), silver var(--value), silver 100%);
-    }
-
-        input[type="range"].slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            background: mediumpurple;
-            cursor: pointer;
-            border-radius: 50%;
-        }
-
-        input[type="range"].slider::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            background: mediumpurple;
-            cursor: pointer;
-            border-radius: 50%;
-        }
-
-    .error-message {
-        color: red;
-        font-size: 1em;
-        margin-top: 10px;
-    }
-
-    .success-message {
-        color: green;
-        font-size: 1em;
-        margin-top: 10px;
+        position: absolute;
+        top: 10px;
+        left: 6px;
     }
 
     .countdown-timer {
         position: absolute;
         top: 10px;
         right: 10px;
-        background-color: mediumpurple;
-        border: 1px solid mediumpurple;
-        padding: 5px 10px;
-        border-radius: 5px;
-        color: white;
-        font-size: 0.9em;
+        background-color: #556B2F; /* Honeydew */
+        border: 1px solid #556B2F; /* Honeydew */
+        padding: 3px 7px;
+        border-radius: 3px;
+        color: #F0FFF0; /* Dark Olive Green */
+        font-size: 0.75em;
         text-align: center;
-        display: block; /* Display only when no winner */
     }
-
-        .countdown-timer.winner-present {
-            display: none; /* Hide if there is a winner */
-        }
 
         .countdown-timer h4 {
             margin: 0;
-            font-size: 0.9em;
+            font-size: 0.75em;
             font-weight: normal;
         }
 
         .countdown-timer p {
             margin: 0;
-            color: white;
-            font-size: 0.9em;
+            font-size: 0.75em;
+            color: #F0FFF0; /* Dark Olive Green */
         }
 
     .view-winner-button {
@@ -548,13 +744,51 @@
         align-items: center;
         height: 40vh; /* Centers the button in the viewport */
     }
-</style>
+    .very-low-chance {
+        color: #FF4500; /* OrangeRed */
+        content: "V-Low";
+    }
 
+    .low-chance {
+        color: #FFA500; /* Orange */
+        content: "Low";
+    }
+
+    .medium-chance {
+        color: #FFD700; /* Gold */
+        content: "Med";
+    }
+
+    .high-chance {
+        color: #32CD32; /* LimeGreen */
+        content: "High";
+    }
+
+    .very-high-chance {
+        color: #228B22; /* ForestGreen */
+        content: "V-High";
+    }
+</style>
 
 <script>
     document.addEventListener('input', function (event) {
         if (event.target.classList.contains('slider')) {
-            event.target.style.setProperty('--value', (event.target.value - event.target.min) / (event.target.max - event.target.min) * 100 + '%');
+            const sliderValue = (event.target.value - event.target.min) / (event.target.max - event.target.min) * 100;
+            event.target.style.setProperty('--slider-fill', `${sliderValue}%`);
         }
     }, false);
+
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = "block";
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = "none";
+    }
+
+    window.onclick = function (event) {
+        if (event.target.classList.contains("modal")) {
+            event.target.style.display = "none";
+        }
+    }
 </script>
