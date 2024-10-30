@@ -1,18 +1,18 @@
-﻿﻿
-@page "/products"
+﻿@page "/products"
 @page "/products/{number:double}"
 @using lek4.Components.Service
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
 @inject lek4.Components.Service.ProductService ProductService
+@inject IJSRuntime JS
 
 @code {
     [Parameter]
     public double? number { get; set; }
 
-    private List<ProductService.ProductData> products = new List<ProductService.ProductData>(); // List to hold product data
-    private int unlockingProduct = -1; // Keep track of the product being unlocked
+    private List<ProductService.ProductData> products = new List<ProductService.ProductData>();
+    private int unlockingProduct = -1;
     private double remainingOdds;
 
     protected override async Task OnInitializedAsync()
@@ -23,66 +23,72 @@
         }
 
         NumberService.Number = number.Value;
-        remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0); // Limit odds to 100
+        remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0);
 
-        // Fetch the actual products from Firebase
+        // Hämta produkterna från Firebase
         await FetchProductsFromFirebase();
+
+        // Hämta vinnaren för varje produkt och uppdatera UI
+        await FetchWinner();
     }
 
     private async Task FetchProductsFromFirebase()
     {
-        // Fetch the product data from Firebase
         products = await ProductService.FetchAllProductsFromFirebaseAsync();
+    }
+
+    private async Task FetchWinner()
+    {
+        foreach (var product in products)
+        {
+            // Hämtar vinnaren från Firebase för varje produkt
+            product.Winner = await ProductService.GetWinnerFromFirebase(product.ProductNumber);
+        }
+
+        StateHasChanged(); // Uppdaterar UI när vinnaren har hämtats
     }
 
     private async Task GoToProduct(int productNumber)
     {
         unlockingProduct = productNumber;
-        StateHasChanged(); // Update the component to start the animation
-        await Task.Delay(1000); // Wait for the animation to complete (1 second)
+        StateHasChanged();
 
-        // Unlock the product in NumberService
+        await JS.InvokeVoidAsync("triggerAnimation", $"product-{productNumber}");
+
+        await Task.Delay(800);
+
         NumberService.UnlockProduct(productNumber);
-
-        // Navigate to the specific product page
         NavigationManager.NavigateTo($"/product/{productNumber}");
     }
 
-    private string GetIconClass(int productNumber)
+    private string GetProductClass(ProductService.ProductData product)
     {
-        // Return the correct icon class based on whether the product is unlocked
-        return NumberService.IsProductUnlocked(productNumber) ? "fas fa-unlock" : "fas fa-lock";
+        return !string.IsNullOrEmpty(product.Winner) ? "product gold" :
+               NumberService.IsProductLockedIn(product.ProductNumber) ? "product locked-in" : "product locked";
     }
 
-    private bool IsProductLockedIn(int productNumber)
+    private string GetIconClass(ProductService.ProductData product)
     {
-        // Check if the product is locked in via NumberService
-        return NumberService.IsProductLockedIn(productNumber);
-    }
-
-    private string GetProductClass(int productNumber)
-    {
-        // Return the correct CSS class based on the product's lock-in status
-        return NumberService.IsProductLockedIn(productNumber) ? "product locked-in" : "product locked";
+        return !string.IsNullOrEmpty(product.Winner) ? "fas fa-coins" :
+               NumberService.IsProductUnlocked(product.ProductNumber) ? "fas fa-unlock" : "fas fa-lock";
     }
 }
 
-<h3 class="center-title">Products</h3>
-<p class="remaining-odds">Odds: @remainingOdds.ToString("0.0")x</p> <!-- Display remaining odds -->
-
-<div class="product-grid @(products.Count == 1 ? "single-product" : (products.Count == 2 ? "two-products" : (products.Count == 3 ? "three-products" : (products.Count == 4 ? "four-products" : "many-products"))))">
+<div class="product-grid">
     @foreach (var product in products)
     {
-        <div class="@GetProductClass(product.ProductNumber) product-@(product.ProductNumber) @(unlockingProduct == product.ProductNumber ? "unlocking" : "")">
+        <div id="product-@product.ProductNumber" class="@GetProductClass(product) @(unlockingProduct == product.ProductNumber ? "unlocking" : "")" style="background-image: url('@product.ImageUrl');">
             <a @onclick="async () => await GoToProduct(product.ProductNumber)">
                 <div class="icon-wrapper">
-                    @if (!IsProductLockedIn(product.ProductNumber))
+                    @if (!string.IsNullOrEmpty(product.Winner))
                     {
-                        <i class="@GetIconClass(product.ProductNumber)"></i> <!-- Lock icon -->
+                        <!-- Stjärn- och diamantikoner för vinnande produkter -->
+                        <i class="fas fa-trophy winner-trophy-icon"></i>
                     }
-                    @if (IsProductLockedIn(product.ProductNumber))
+                    else
                     {
-                        <i class="fas fa-check checkmark"></i> <!-- Checkmark icon -->
+                        <!-- Standard ikon för andra produkter -->
+                        <i class="@GetIconClass(product)"></i>
                     }
                 </div>
             </a>
@@ -90,6 +96,14 @@
     }
 </div>
 
-<style>
-   
-</style>
+
+<script>
+    function triggerAnimation(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.classList.remove("unlocking");
+            void element.offsetWidth; // För att tvinga omritning
+            element.classList.add("unlocking");
+        }
+    }
+</script>

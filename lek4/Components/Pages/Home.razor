@@ -8,6 +8,11 @@
 @inject IJSRuntime JSRuntime
 
 <div class="container" style="background-color: @(GetBackgroundColor())">
+    <!-- Tre lager av förvrängda cirklar -->
+    <div class="oval-background oval-background-layer1" style="background-color: @(GetNextColor())"></div>
+    <div class="oval-background oval-background-layer2"></div>
+    <div class="oval-background oval-background-layer3"></div>
+
     <div class="main-number-container">
         <div class="main-number @GetSizeClass() @explodeClass">
             @number.ToString("0.0x")
@@ -25,6 +30,7 @@
         Steps: @steps
     </div>
 </div>
+
 
 <StepCounter OnStepsChanged="UpdateNumber" />
 
@@ -81,6 +87,26 @@
         CrossMauiMTAdmob.Current.OnRewardedImpression += OnRewardedImpression;
         CrossMauiMTAdmob.Current.OnUserEarnedReward += OnUserEarnedReward;
     }
+    private string[] colorSequence = new string[]
+      {
+        "#98FB98", // PaleGreen
+        "#FF1493", // DeepPink
+        "#cc99ff", // LightPurple
+        "#7FFF00", // Chartreuse
+        "#FFFF00", // Yellow
+        "#ffcc99", // Peach
+        "#ffff99", // LightYellow
+        "#99ccff", // LightBlue
+        "#99ff99"  // LightGreen
+      };
+
+    private string GetNextColor()
+    {
+        int colorIndex = Math.Min((int)number, colorSequence.Length - 1);
+        return colorSequence[colorIndex];
+    }
+
+
 
     private void OnRewardedImpression(object sender, EventArgs e)
     {

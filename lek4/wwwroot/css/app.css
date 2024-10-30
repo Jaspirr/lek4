@@ -229,7 +229,46 @@ h1:focus {
     margin: 5px;
     padding: 10px 20px;
 }
+.oval-background {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 150px; /* Storleken på alla cirklar */
+    height: 150px;
+    border-radius: 50%;
+    opacity: 0.5;
+    z-index: 0; /* Placera bakom huvudnumret */
+    animation: morphPulse 4s infinite ease-in-out alternate;
+}
 
+/* Varianter för varje cirkel för att få dem att pulsera vid olika tidpunkter */
+.oval-background-layer1 {
+    animation-delay: 0s;
+}
+
+.oval-background-layer2 {
+    background-color: rgba(153, 204, 255, 0.6); /* Blå ton */
+    animation-delay: 1s;
+}
+
+.oval-background-layer3 {
+    background-color: rgba(255, 204, 153, 0.6); /* Peach ton */
+    animation-delay: 2s;
+}
+
+/* Animation för att skapa pulserande och nästan triangelformad effekt */
+@keyframes morphPulse {
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+        border-radius: 50%; /* Full cirkel */
+    }
+
+    50% {
+        transform: translate(-50%, -50%) scale(1.1) rotate(10deg);
+        border-radius: 45% 55% 50% 50% / 50% 50% 45% 55%; /* Nästan triangel */
+    }
+}
 
 .locked {
     background-color: silver; /* Silvrig färg när låst */
@@ -239,7 +278,62 @@ h1:focus {
     background-color: gold; /* Guldglitter när upplåst */
     animation: shimmer 2s infinite;
 }
+.product {
+    position: relative;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, background-color 0.5s;
+    transform: rotate(45deg);
+    border: 1px solid #000000;
+    border-radius: 10px;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
 
+    .product::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: inherit;
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+        transform: rotate(-45deg); /* Counter rotate to keep background upright */
+        z-index: 1;
+    }
+
+    /* Klass för vinnande produkter */
+    .product.gold {
+        background-color: gold; /* Guld bakgrundsfärg för vinnare */
+        box-shadow: 0 0 15px 5px rgba(255, 215, 0, 0.8); /* Glow-effekt */
+        border: none; /* Ta bort border för vinnare */
+        animation: shimmer 2s infinite;
+    }
+
+
+.icon-wrapper {
+    position: relative;
+    z-index: 2;
+    transform: rotate(-45deg); /* Ser till att ikonen står upprätt */
+}
+
+/* Större och guldfärgad ikon för vinnare */
+.product.gold .icon-wrapper i {
+    font-size: 1.4em; /* Justera storlek efter behov */
+    color: #F0FFF0; /* Guldton för trofé */
+    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3); /* Skugga för djup */
+}
+/* Standard ikonstil */
+.icon-wrapper i {
+    font-size: 1.8em; /* Standardstorlek */
+}
+
+/* Shimmer-animation för vinnare */
 @keyframes shimmer {
     0% {
         box-shadow: 0 0 5px gold;
@@ -254,34 +348,8 @@ h1:focus {
     }
 }
 
-.icon-wrapper {
-    transform: rotate(-45deg);
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.product a {
-    text-decoration: none;
-    color: inherit;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    position: relative;
-    transition: color 0.3s ease-in-out;
-}
-
-    .product a i {
-        font-size: 2em;
-        transition: none; /* Ta bort animation från låsikonen */
-    }
-
 .product.unlocking {
-    animation: spinAndScale 1s; /* Snurr- och skalanimation */
+    animation: spinAndScale 0.7s ease-in-out;
 }
 
 @keyframes spinAndScale {
@@ -290,7 +358,7 @@ h1:focus {
     }
 
     50% {
-        transform: scale(1.2) rotate(225deg);
+        transform: scale(1.15) rotate(225deg);
     }
 
     100% {
@@ -298,16 +366,6 @@ h1:focus {
     }
 }
 
-.product span {
-    display: block;
-    width: 100%;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-/* Lägg till bakgrundsfärger till varje produkt */
 .product-1 {
     background-color: rgba(221, 160, 221, 0.8); /* Ljuslila */
 }
@@ -406,25 +464,7 @@ h1:focus {
     max-width: 100%; /* Full bredd så att alla produkter passar på skärmen */
 }
 
-.product {
-    border: none;
-    border-radius: 10px;
-    padding: 2px;
-    text-align: center;
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transform: rotate(45deg);
-    position: relative;
-    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, background-color 0.5s;
-}
 
-    .product:hover {
-        transform: scale(1.05) rotate(45deg);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-    }
 
     /* Större storlek för produkt 1 */
     .product:nth-child(1) {
