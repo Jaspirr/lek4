@@ -5,9 +5,21 @@
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.NumberService NumberService
 @inject GoogleFitService GoogleFitService
+@inject UserService UserService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
 @inject IJSRuntime JSRuntime
 
 <div class="container" style="background-color: @(GetBackgroundColor())">
+    <!-- Credits display in top-right corner -->
+    <div class="credits-box">
+        <div class="star-wrapper @starAnimationClass">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+            <i class="fa-solid fa-carrot"></i>
+        </div>
+        <span class="credits-count">@credits</span>
+    </div>
+
+
     <!-- Tre lager av förvrängda cirklar -->
     <div class="oval-background oval-background-layer1" style="background-color: @(GetNextColor())"></div>
     <div class="oval-background oval-background-layer2"></div>
@@ -19,7 +31,7 @@
         </div>
         @if (ShouldShowLockIcon())
         {
-            <i class="fas fa-lock lock-icon" @onclick="UnlockAd"></i>
+            <i class="fas fa-lock lock-icon" @onclick="() => UnlockAd()"></i>
         }
         @if (adReadyToWatch)
         {
@@ -31,7 +43,6 @@
     </div>
 </div>
 
-
 <StepCounter OnStepsChanged="UpdateNumber" />
 
 <div>
@@ -42,18 +53,91 @@
 
 <button @onclick="FetchStepsFromGoogleFit">Fetch Steps from Google Fit</button>
 <button @onclick="ShowAd">Watch Ad</button> <!-- Button to show ad -->
-<!-- New Admin Page Button -->
 <button @onclick="GoToAdminPage">Admin Page</button> <!-- Button to navigate to Admin Page -->
 
 @if (!string.IsNullOrEmpty(message))
 {
     <div class="alert">@message</div>
 }
+<style>
+   .credits-box {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    background-color: #F0FFF0; /* Light yellow background */
+    padding: 8px 12px;
+    border-radius: 20px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    font-weight: bold;
+    font-size: 16px;
+    color: #333;
+    z-index: 10;
+}
 
+.star-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.credits-icon {
+    font-size: 20px;
+        width: 20px; /* Adjust to fit the box */
+        height: 20px;
+        color: #ffca28; /* Gold color for icon */
+}
+
+    .credits-count {
+        font-size: 16px;
+        background-color: #F0FFF0; /* White background for circle */
+        color: #333; /* Text color */
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%; /* Makes it a circle */
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+        font-size: 16px;
+}
+
+/* Animation class */
+    .animate-star {
+        animation: flyToRightSmooth 1.5s ease-in-out forwards; /* Increased duration for smoother effect */
+    }
+
+@@keyframes flyToRightSmooth {
+    0% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    30% {
+        transform: translateX(10px);
+        opacity: 1;
+    }
+    60% {
+        transform: translateX(20px);
+        opacity: 0.8;
+    }
+    80% {
+        transform: translateX(22px) scale(1.1);
+        opacity: 0.6;
+    }
+    100% {
+        transform: translateX(25px) scale(1.2);
+        opacity: 0;
+    }
+}
+
+</style>
 @code {
+    private int credits = 0; 
+    private string starAnimationClass = "";// Display credits in the UI
     private double number
     {
-        get => NumberService.Number; 
+        get => NumberService.Number;
         set
         {
             NumberService.Number = Math.Round(value, 1); // Ensure number is rounded to 1 decimal place
@@ -63,18 +147,91 @@
     private int steps = 0;
     private string explodeClass = string.Empty;
     private string message;
-    private bool adWatched = false; // Track if the ad has been watched
-    private bool adReadyToWatch = false; // Track if the ad is ready to watch
+    private bool adWatched = false;
+    private bool adReadyToWatch = false;
     private static readonly HashSet<double> AdTriggerPoints = new HashSet<double>
     {
-        0.4, 0.9, 1.4, 1.9, 2.4, 2.9, 3.4, 3.9, 4.4, 4.9, 5.4, 5.9, 6.4, 6.9, 7.4, 7.9, 8.4, 8.9
+        0.3, 0.6, 0.9,
+        1.3, 1.6, 1.9,
+        2.3, 2.6, 2.9,
+        3.3, 3.6, 3.9,
+        4.3, 4.6, 4.9,
+        5.3, 5.6, 5.9,
+        6.3, 6.6, 6.9,
+        7.3, 7.6, 7.9,
+        8.3, 8.6, 8.9,
+        9.3, 9.6, 9.9
     };
-    private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917"; // Replace with your actual ad unit ID
+    private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         base.OnInitialized();
         InitializeAds();
+
+        // Fetch credits specifically for the credits display box
+        await FetchCreditsForDisplay();
+    }
+
+    private async Task FetchCreditsForDisplay()
+    {
+        var email = await localStorage.GetItemAsync<string>("userEmail");
+
+        if (string.IsNullOrEmpty(email))
+        {
+            Console.WriteLine("No email found in local storage.");
+            credits = 0;
+            return;
+        }
+
+        var user = await UserService.GetUserFromFirebase(email);
+        var newCredits = user?.Credits ?? 0;
+
+        // Check if credits have increased to trigger animation
+        if (newCredits > credits)
+        {
+            TriggerStarAnimation();
+        }
+
+        credits = newCredits;
+        StateHasChanged(); // Ensure UI updates
+    }
+
+    private void TriggerStarAnimation()
+    {
+        // Trigger animation class
+        starAnimationClass = "animate-star";
+        StateHasChanged();
+
+        // Reset animation class after a short delay to allow re-triggering
+        Task.Delay(1000).ContinueWith(_ =>
+        {
+            starAnimationClass = "";
+            InvokeAsync(StateHasChanged);
+        });
+    }
+    private async void UnlockAd()
+    {
+        adReadyToWatch = true;
+        StateHasChanged();
+        await Task.Delay(1000);
+        ShowAd();
+
+        // Retrieve email from localStorage
+        var email = await localStorage.GetItemAsync<string>("userEmail");
+
+        // Add credit to user upon unlocking the ad
+        if (!string.IsNullOrEmpty(email))
+        {
+            await UserService.AddCreditToUser(email);
+
+            // Fetch updated credits count for display
+            await FetchCreditsForDisplay(); // Independent fetch after incrementing
+        }
+        else
+        {
+            Console.WriteLine("User email not found in localStorage.");
+        }
     }
 
     private void InitializeAds()
@@ -105,8 +262,6 @@
         int colorIndex = Math.Min((int)number, colorSequence.Length - 1);
         return colorSequence[colorIndex];
     }
-
-
 
     private void OnRewardedImpression(object sender, EventArgs e)
     {
@@ -256,13 +411,6 @@
     private void GoToAdminPage()
     {
         NavigationManager.NavigateTo("/admin"); // Replace with the correct route to your Admin page
-    }
-    private async void UnlockAd()
-    {
-        adReadyToWatch = true;
-        StateHasChanged();
-        await Task.Delay(1000); // Delay to allow the user to see the unlocked icon
-        ShowAd(); // Show the ad after the delay
     }
 
     private bool ShouldShowLockIcon()

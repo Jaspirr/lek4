@@ -17,14 +17,18 @@
     <input type="email" id="userEmail" @bind="userEmail" />
 
     <label for="productName">Product Name</label>
-    <input type="text" id="productName" @bind="productName" /> <!-- New input for product name -->
+    <input type="text" id="productName" @bind="productName" />
 
     <label for="productImageUrl">Product Image URL</label>
-    <input type="text" id="productImageUrl" @bind="productImageUrl" /> <!-- New input for product image URL -->
+    <input type="text" id="productImageUrl" @bind="productImageUrl" />
+
+    <div>
+        <input type="checkbox" id="isJackpot" @bind="isJackpot" />
+        <label for="isJackpot">Jackpot Product</label>
+    </div>
 
     <button @onclick="SaveChanges">Save Changes</button>
 </div>
-
 
 @code {
     [Parameter]
@@ -33,9 +37,10 @@
     private double price;
     private double lockInAmount;
     private string userEmail;
-    private string productName;      // New field for product name
-    private string productImageUrl;  // New field for product image URL
-    private ProductService.ProductData productData; // Holds the product data
+    private string productName;
+    private string productImageUrl;
+    private bool isJackpot; // New field to hold the jackpot status
+    private ProductService.ProductData productData;
 
     protected override async Task OnInitializedAsync()
     {
@@ -44,45 +49,43 @@
 
         if (productData != null)
         {
-            // Set local values for price, lockInAmount, userEmail, productName, and productImageUrl based on the fetched data
+            // Set local values based on the fetched data
             price = productData.Price;
             lockInAmount = productData.LockInAmount;
             userEmail = productData.UserEmail;
-            productName = productData.ProductName;      // Set product name
-            productImageUrl = productData.ImageUrl;     // Set product image URL
+            productName = productData.ProductName;
+            productImageUrl = productData.ImageUrl;
+            isJackpot = productData.IsJackpot; // Set initial jackpot status
         }
         else
         {
-            // Handle if the product does not exist
             Console.WriteLine("Product not found.");
-            NavigationManager.NavigateTo("/change-products"); // Redirect back
+            NavigationManager.NavigateTo("/change-products");
         }
     }
 
     private async Task SaveChanges()
     {
-        // Update the product data with new values
         if (productData != null)
         {
-            // Update productData object with the new values from the form
+            // Update productData with new values
             productData.Price = price;
             productData.LockInAmount = lockInAmount;
             productData.UserEmail = userEmail;
-            productData.ProductName = productName;      // Update product name
-            productData.ImageUrl = productImageUrl;     // Update product image URL
+            productData.ProductName = productName;
+            productData.ImageUrl = productImageUrl;
+            productData.IsJackpot = isJackpot; // Update jackpot status
 
-            // Assuming you need to define a userId, you can either generate it or provide a value
-            int userId = 1; // You can set this to any unique value for the user
+            int userId = 1; // Assign unique ID as needed
 
-            // Use the updated SaveProductData method to save the updated product info including name and image URL
-            await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price, productName, productImageUrl);
+            // Save the updated product info, including the jackpot status
+            await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price, productName, productImageUrl, isJackpot);
 
-            // Save the user data with a unique userId
+            // Save the user data
             await ProductService.SaveUserToProduct(productNumber, userId, productData);
 
-            // After saving, navigate back to the products list
+            // Navigate back to the products list
             NavigationManager.NavigateTo("/change-products");
         }
     }
 }
-

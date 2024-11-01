@@ -54,6 +54,7 @@ namespace lek4
             builder.Services.AddSingleton<ProductDayCounterService>();
             builder.Services.AddSingleton<ProductService>();
             builder.Services.AddScoped<DrawService>();
+            builder.Services.AddScoped<JackpotService>();
             builder.Services.AddScoped<StatsService>();
             builder.Services.AddSingleton<Components.Service.NumberService>();
 

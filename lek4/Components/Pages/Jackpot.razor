@@ -1,0 +1,67 @@
+﻿@page "/jackpot"
+@inject NavigationManager NavigationManager
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject lek4.Components.Service.JackpotService JackpotService
+
+<h2>Jackpot</h2>
+<p>Current Jackpot Amount: @jackpotAmount kr</p>
+
+@if (!canParticipate)
+{
+    <p class="error-message">@errorMessage</p>
+}
+else
+{
+    <p>Your Credits: @userCredits</p>
+    <button @onclick="JoinJackpot" class="join-button">Join Jackpot (100 credits)</button>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <p class="success-message">@successMessage</p>
+}
+
+@code {
+    private double jackpotAmount;
+    private double userCredits;
+    private bool canParticipate;
+    private string errorMessage;
+    private string successMessage;
+    private string currentUserEmail;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUserEmail = await LocalStorage.GetItemAsync<string>("userEmail");
+
+        if (string.IsNullOrEmpty(currentUserEmail))
+        {
+            errorMessage = "User not logged in.";
+            return;
+        }
+
+        await LoadJackpotData();
+    }
+
+    private async Task LoadJackpotData()
+    {
+        userCredits = await JackpotService.GetUserCredits(currentUserEmail);
+        canParticipate = userCredits >= 100;
+
+        jackpotAmount = await JackpotService.GetJackpotAmount();
+        errorMessage = canParticipate ? null : "You need at least 100 credits to join the jackpot.";
+    }
+
+    private async Task JoinJackpot()
+    {
+        if (!canParticipate)
+        {
+            errorMessage = "Insufficient credits to participate.";
+            return;
+        }
+
+        await JackpotService.JoinJackpot(currentUserEmail);
+        successMessage = "You have successfully joined the jackpot!";
+
+        await LoadJackpotData();
+    }
+}

@@ -6,7 +6,7 @@
 @inject IJSRuntime js
 @inject lek4.Components.Service.ProductService ProductService
 
-<h3>Change Products</h3>
+<h2>Manage Products</h2>
 
 <div class="product-list">
     @if (products != null && products.Count > 0)
@@ -14,27 +14,33 @@
         @foreach (var product in products)
         {
             <div class="product-item">
-                <img src="@product.ImageUrl" alt="@product.ProductName" width="100" height="100" />
-                <p>Product Name: @product.ProductName</p>
-                <p>Product Number: @product.ProductNumber</p>
-                <p>Price: @product.Price</p>
+                <img src="@product.ImageUrl" alt="@product.ProductName" class="product-image" />
+                <div class="product-info">
+                    <p><strong>Product Name:</strong> @product.ProductName</p>
+                    <p><strong>Product Number:</strong> @product.ProductNumber</p>
+                    <p><strong>Price:</strong> $@product.Price</p>
+                    <p><strong>Type:</strong> @(product.IsJackpot ? "Jackpot" : "Standard")</p>
 
-                <!-- Display locked-in users for the product -->
-                <p>Users:</p>
-                <ul>
-                    @if (lockedInUsers.ContainsKey(product.ProductNumber))
-                    {
-                        @foreach (var user in lockedInUsers[product.ProductNumber])
+                    <p><strong>Locked-In Users:</strong></p>
+                    <ul>
+                        @if (lockedInUsers.ContainsKey(product.ProductNumber))
                         {
-                            <li>@user.UserEmail - Locked in amount: @user.LockInAmount</li>
+                            @foreach (var user in lockedInUsers[product.ProductNumber])
+                            {
+                                <li>@user.UserEmail - Locked in amount: @user.LockInAmount</li>
+                            }
                         }
-                    }
-                </ul>
-
-                <button @onclick="() => EditProduct(product.ProductNumber)">Edit Product</button>
-                <button @onclick="() => RemoveProduct(product.ProductNumber)" class="remove-button">Remove</button>
+                        else
+                        {
+                            <li>No users</li>
+                        }
+                    </ul>
+                </div>
+                <div class="product-actions">
+                    <button @onclick="() => EditProduct(product.ProductNumber)" class="edit-button">Edit</button>
+                    <button @onclick="() => RemoveProduct(product.ProductNumber)" class="remove-button">Remove</button>
+                </div>
             </div>
-
         }
     }
     else
@@ -57,32 +63,34 @@
     <label for="newProductImageUrl">Product Image URL</label>
     <input type="text" id="newProductImageUrl" @bind="newProductImageUrl" />
 
-    <button @onclick="AddProduct">Add Product</button>
-</div>
+    <div class="jackpot-option">
+        <input type="checkbox" id="isJackpotProduct" @bind="isJackpotProduct" />
+        <label for="isJackpotProduct">Jackpot Product</label>
+    </div>
 
+    <button @onclick="AddProduct" class="add-button">Add Product</button>
+</div>
 
 @code {
     private List<ProductData> products = new List<ProductData>();
     private int newProductNumber;
-    private string newProductName; // New variable for product name
+    private string newProductName;
     private double newProductPrice;
-    private string newProductImageUrl; // New variable for image URL
-    private string userEmail = "user@example.com"; // Placeholder, replace with actual user email if available
+    private string newProductImageUrl;
+    private bool isJackpotProduct = false; // Flag for jackpot product
     private Dictionary<int, List<ProductData>> lockedInUsers = new Dictionary<int, List<ProductData>>();
 
     protected override async Task OnInitializedAsync()
     {
-        // Fetch all products with their details from Firebase
         products = await ProductService.FetchAllProductsFromFirebaseAsync();
-        await LoadLockedInUsersForAllProducts(); // Load the locked-in users for all products
-        StateHasChanged(); // Refresh the UI after fetching data
+        await LoadLockedInUsersForAllProducts();
+        StateHasChanged();
     }
 
     private async Task LoadLockedInUsersForAllProducts()
     {
         foreach (var product in products)
         {
-            // Fetch locked-in users for each product
             var users = await ProductService.GetUsersForProduct(product.ProductNumber);
             lockedInUsers[product.ProductNumber] = users;
         }
@@ -92,38 +100,24 @@
     {
         if (newProductNumber > 0 && newProductPrice > 0 && !string.IsNullOrEmpty(newProductName))
         {
-            // Define lockInAmount (since it's 0 initially)
-            double lockInAmount = 0.0;
+            await ProductService.AddProductToFirebase(newProductNumber, newProductPrice, "user@example.com", newProductName, newProductImageUrl, isJackpotProduct);
+            products = await ProductService.FetchAllProductsFromFirebaseAsync();
+            await LoadLockedInUsersForAllProducts();
 
-            // Save the new product info with required parameters including name and image URL
-            await ProductService.AddProductToFirebase(newProductNumber, newProductPrice, userEmail, newProductName, newProductImageUrl);
-
-            // Refresh product list after adding
-            products = await ProductService.FetchAllProductsFromFirebaseAsync(); // Fetch all products again
-            await LoadLockedInUsersForAllProducts(); // Load users for all products again
-
-            // Reset fields
             newProductNumber = 0;
             newProductPrice = 0;
-            newProductName = ""; // Reset product name
-            newProductImageUrl = ""; // Reset image URL
+            newProductName = "";
+            newProductImageUrl = "";
+            isJackpotProduct = false;
         }
     }
 
     private async Task RemoveProduct(int productNumber)
     {
-        // Try removing the product from Firebase
         try
         {
-            await ProductService.RemoveProductFromFirebase(productNumber); // Remove product from Firebase
-
-            // Remove the product from the local list to avoid re-fetching all products
+            await ProductService.RemoveProductFromFirebase(productNumber);
             products = products.Where(p => p.ProductNumber != productNumber).ToList();
-
-            // Remove associated locked-in users for that product
-            lockedInUsers.Remove(productNumber);
-
-            // Refresh UI after the deletion
             StateHasChanged();
         }
         catch (Exception ex)
@@ -134,65 +128,129 @@
 
     private void EditProduct(int productNumber)
     {
-        if (products.Any(p => p.ProductNumber == productNumber))
-        {
-            NavigationManager.NavigateTo($"/edit-product/{productNumber}");
-        }
-        else
-        {
-            NavigationManager.NavigateTo("/change-products");
-        }
+        NavigationManager.NavigateTo($"/edit-product/{productNumber}");
     }
 }
 
 <style>
+    h2 {
+        color: #333;
+        text-align: center;
+    }
+
     .product-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
         margin-top: 20px;
+        justify-content: center;
     }
 
     .product-item {
-        margin-bottom: 20px;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
+        width: 300px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         display: flex;
         flex-direction: column;
-        align-items: start;
+        align-items: center;
+        padding: 15px;
+        background-color: #f9f9f9;
+    }
+
+    .product-image {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+
+    .product-info {
+        text-align: left;
+        width: 100%;
+    }
+
+        .product-info p {
+            margin: 5px 0;
+            font-size: 0.9em;
+            color: #333;
+        }
+
+    .product-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .edit-button,
+    .remove-button {
+        padding: 8px 16px;
+        border-radius: 5px;
+        font-size: 0.9em;
+        cursor: pointer;
+        border: none;
+    }
+
+    .edit-button {
+        background-color: #4CAF50;
+        color: white;
     }
 
     .remove-button {
-        background-color: red;
+        background-color: #f44336;
         color: white;
-        border: none;
-        padding: 5px 10px;
-        border-radius: 5px;
-        cursor: pointer;
     }
-
-        .remove-button:hover {
-            background-color: darkred;
-        }
 
     .add-product-form {
-        margin-top: 30px;
+        max-width: 400px;
+        margin: 30px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
 
-    input[type="number"] {
-        margin-right: 10px;
-        padding: 5px;
-        width: 80px;
+        .add-product-form label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .add-product-form input[type="number"],
+        .add-product-form input[type="text"] {
+            width: calc(100% - 10px);
+            padding: 8px;
+            margin-top: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+    .jackpot-option {
+        margin-top: 15px;
+        display: flex;
+        align-items: center;
     }
 
-    button {
-        padding: 5px 10px;
+        .jackpot-option label {
+            margin-left: 5px;
+        }
+
+    .add-button {
+        width: 100%;
+        padding: 10px;
         background-color: #4CAF50;
         color: white;
         border: none;
         border-radius: 5px;
         cursor: pointer;
+        font-size: 1em;
+        margin-top: 15px;
     }
 
-        button:hover {
+        .add-button:hover {
             background-color: #45a049;
         }
 </style>

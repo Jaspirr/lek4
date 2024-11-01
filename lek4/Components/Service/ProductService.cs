@@ -28,14 +28,34 @@ namespace lek4.Components.Service
         }
 
         // Add a new product to Firebase with productInfo.json
-        public async Task AddProductToFirebase(int productNumber, double price, string userEmail, string productName, string imageUrl)
+        public async Task AddProductToFirebase(int productNumber, double price, string userEmail, string productName, string imageUrl, bool isJackpot)
         {
             // Define the lock-in amount
             double lockInAmount = 0.0; // Initial lock-in amount
 
-            // Call SaveProductData with all the required arguments
-            await SaveProductData(productNumber, userEmail, lockInAmount, price, productName, imageUrl);
+            // Call SaveProductData with all the required arguments, including the new `isJackpot` parameter
+            await SaveProductData(productNumber, userEmail, lockInAmount, price, productName, imageUrl, isJackpot);
         }
+        public async Task AddJackpotToFirebase(string productName, string imageUrl, double startingPrizePool)
+        {
+            // Skapa en unik productNumber för jackpot, t.ex. 999
+            int productNumber = 999;
+
+            // Definiera och spara jackpot som en produkt
+            await SaveProductData(
+                productNumber,
+                userEmail: null,    // Ingen specifik användare vid skapande av jackpot
+                lockInAmount: 0,
+                price: 100,         // Pris för att delta
+                productName: productName,
+                imageUrl: imageUrl,
+                isJackpot: true     // Markera som jackpot
+            );
+
+            // Initialisera prispotten
+            await UpdatePrizePool(productNumber, startingPrizePool);
+        }
+
 
 
         public async Task SaveUserToProduct(int productNumber, int userId, ProductData productData)
@@ -58,7 +78,7 @@ namespace lek4.Components.Service
 
 
         // Save product info to Firebase
-        public async Task SaveProductData(int productNumber, string userEmail, double lockInAmount, double price, string productName, string imageUrl)
+        public async Task SaveProductData(int productNumber, string userEmail, double lockInAmount, double price, string productName, string imageUrl, bool isJackpot)
         {
             var productData = new ProductData
             {
@@ -66,8 +86,9 @@ namespace lek4.Components.Service
                 UserEmail = userEmail,
                 LockInAmount = lockInAmount,
                 Price = price,
-                ProductName = productName, // Save product name
-                ImageUrl = imageUrl        // Save image URL
+                ProductName = productName,
+                ImageUrl = imageUrl,
+                IsJackpot = isJackpot // Set jackpot status
             };
 
             var productJson = JsonSerializer.Serialize(productData);
@@ -92,7 +113,7 @@ namespace lek4.Components.Service
                 Console.WriteLine($"Failed to save product data for {productNumber}. Error: {response.StatusCode}");
             }
         }
-
+     
         public async Task<string> GetWinnerFromFirebase(int productNumber)
         {
             // Firebase URL to fetch winner data for a product
@@ -175,46 +196,32 @@ namespace lek4.Components.Service
                 return null;
             }
         }
-
-
-
-
-        // Remove a product from Firebase
         public async Task RemoveProductFromFirebase(int productNumber)
         {
-            // Path for productInfo.json (product data)
+            // Define the path to the product file
             var productInfoPath = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users/products/product{productNumber}/productInfo.json";
+            // JSON content marking the product as removed
+            var removedContent = new StringContent("{\"removed\": true}", Encoding.UTF8, "application/json");
 
-            // Path for winner.json (winner data)
-            var winnerPath = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users/winner/product{productNumber}/winner.json";
-
-            // Delete the product info file (productInfo.json)
-            var productInfoResponse = await _httpClient.DeleteAsync(productInfoPath);
-
-            if (productInfoResponse.IsSuccessStatusCode)
+            try
             {
-                Console.WriteLine($"Product {productNumber} removed from Firebase.");
+                // Send PATCH request to update the file with removed metadata/content
+                var response = await _httpClient.PatchAsync(productInfoPath, removedContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Product {productNumber} marked as removed in Firebase.");
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to mark product {productNumber} as removed. Status code: {response.StatusCode}");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine($"Failed to remove product {productNumber}. Status code: {productInfoResponse.StatusCode}");
-            }
-
-            // Delete the winner file (winner.json)
-            var winnerResponse = await _httpClient.DeleteAsync(winnerPath);
-
-            if (winnerResponse.IsSuccessStatusCode)
-            {
-                Console.WriteLine($"Winner file for product {productNumber} removed from Firebase.");
-            }
-            else
-            {
-                Console.WriteLine($"Failed to remove winner file for product {productNumber}. Status code: {winnerResponse.StatusCode}");
+                Console.WriteLine($"Exception occurred while trying to mark product {productNumber} as removed: {ex.Message}");
             }
         }
-
-
-
 
         // Lock in a user for a product
         public async Task LockInUser(int productNumber, string userEmail, double lockInAmount)
@@ -316,8 +323,6 @@ namespace lek4.Components.Service
             }
         }
 
-
-
         public async Task<int> GetLockInCount(int productNumber)
         {
             try
@@ -383,8 +388,6 @@ namespace lek4.Components.Service
             }
         }
 
-
-
         // Save the list of locked-in users to Firebase
         private async Task SaveLockedInUsersToFirebase(int productNumber, List<ProductData> users)
         {
@@ -418,9 +421,85 @@ namespace lek4.Components.Service
                 return 0.0;  // Default to 0 if the price cannot be fetched
             }
         }
+        public async Task JoinJackpot(int productNumber)
+        {
+            // Kontrollera att `CurrentUserEmail` är satt
+            if (string.IsNullOrEmpty(_userService.CurrentUserEmail))
+            {
+                Console.WriteLine("Current user email is not set. Cannot proceed with JoinJackpot.");
+                return;
+            }
 
+            // Hämta användarens krediter med `GetUserCredits`
+            double userCredits = await _userService.GetUserCredits();
+            if (userCredits < 100)
+            {
+                Console.WriteLine("User does not have enough credits to join the jackpot.");
+                return;
+            }
 
+            // Dra av 100 credits och uppdatera användarens saldo
+            userCredits -= 100;
+            await _userService.UpdateUserCredits(_userService.CurrentUserEmail, userCredits);
 
+            // Uppdatera prispotten och deltagarlista för jackpotten
+            double currentPrizePool = await GetPrizePool(productNumber);
+            currentPrizePool += 10; // Lägg till 10 credits i prispotten
+            await UpdatePrizePool(productNumber, currentPrizePool);
+
+            // Lägg till användaren som deltagare
+            var participants = await GetJackpotParticipants(productNumber);
+            if (!participants.Contains(_userService.CurrentUserEmail))
+            {
+                participants.Add(_userService.CurrentUserEmail);
+                await SaveParticipants(productNumber, participants);
+            }
+
+            Console.WriteLine($"{_userService.CurrentUserEmail} joined the jackpot for product {productNumber}.");
+        }
+        private async Task<List<string>> GetJackpotParticipants(int productNumber)
+        {
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2Fparticipants.json?alt=media";
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<List<string>>(jsonResponse) ?? new List<string>();
+            }
+            return new List<string>();
+        }
+
+        private async Task SaveParticipants(int productNumber, List<string> participants)
+        {
+            var participantsJson = JsonSerializer.Serialize(participants);
+            var content = new StringContent(participantsJson, Encoding.UTF8, "application/json");
+
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2Fparticipants.json";
+            await _httpClient.PutAsync(path, content);
+        }
+
+        private async Task<double> GetPrizePool(int productNumber)
+        {
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2FprizePool.json?alt=media";
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<double>(jsonResponse);
+            }
+            return 0.0;
+        }
+
+        private async Task UpdatePrizePool(int productNumber, double prizePool)
+        {
+            var prizeJson = JsonSerializer.Serialize(prizePool);
+            var content = new StringContent(prizeJson, Encoding.UTF8, "application/json");
+
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2FprizePool.json";
+            await _httpClient.PutAsync(path, content);
+        }
 
         public async Task<List<ProductData>> GetUsersForProduct(int productNumber)
         {
@@ -466,10 +545,6 @@ namespace lek4.Components.Service
             }
             return TimeSpan.Zero;
         }
-
-
-
-        // Hämta totalusers för en specifik produkt från Firebase
         // Hämta totalusers för en specifik produkt från Firebase
         public async Task UpdateTotalUsers(int productNumber, string userEmail, double lockInAmount)
         {
@@ -630,6 +705,9 @@ namespace lek4.Components.Service
             public DateTime Timestamp { get; set; }
             public string ProductName { get; set; }
             public string ImageUrl { get; set; }
+            public bool IsJackpot { get; set; } // Nytt fält för att markera om produkten är en jackpot
+            public double PrizePool { get; set; } = 0; // För att spåra jackpot-belopp
+            public List<string> Participants { get; set; } = new List<string>();
         }
        
 

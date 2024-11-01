@@ -11,6 +11,9 @@
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
 @inject NumberService NumberService;
 @inject StatsService StatsService;
+@inject JackpotService JackpotService;
+@inject UserService UserService;
+
 
 @using System.Security.Claims
 @using Firebase.Auth
@@ -28,6 +31,7 @@
     private string currentModal;
     private double lockInAmount;
     private double totalOdds = 1.0;
+    private bool isJackpotSelected = false;
     private double lockedInOdds;
     private string errorMessage;
     private bool isSuccess;
@@ -44,6 +48,14 @@
     private bool showPopup = false;
     private string userEmail;
     private ProductService.ProductData productData;
+
+    private double jackpotAmount;
+    private List<string> jackpotParticipants;
+    private int credits = 0;
+    private bool canJoinJackpot = false;
+    private const int joinCost = 100;
+    private int userCredits;
+    private string starAnimationClass = "";
    
 
     protected override async Task OnInitializedAsync()
@@ -58,20 +70,24 @@
         {
             productExists = true;
             price = productData.Price;
+            isJackpotSelected = productData.IsJackpot;
 
-            // Hämta vinnaren direkt efter att produktinformationen har hämtats
+            // Fetch the winner directly after fetching product information
             winner = await ProductService.GetWinnerFromFirebase(productNumber);
             if (!string.IsNullOrEmpty(winner))
             {
-                StateHasChanged(); // Uppdatera UI om det finns en vinnare
+                StateHasChanged(); // Update UI if there is a winner
             }
 
-            // Fetch total locked-in amount for the user from totalusers.json
+            // Fetch lock-in amount
             await FetchLockInAmount();
 
-            // Set totalOdds and lockInAmount to follow the "number" from Home page
+            // Initialize totalOdds and lockInAmount based on the "number" from the Home page
             totalOdds = NumberService.Number;
             lockInAmount = NumberService.Number;
+
+            // Fetch user credits
+            await FetchUserCredits();
         }
         else
         {
@@ -88,7 +104,16 @@
         // Calculate initial winning chance
         await UpdateWinningChance();
     }
-
+    private async Task FetchUserCredits()
+    {
+        // Retrieve user email from local storage
+        userEmail = await localStorage.GetItemAsync<string>("userEmail");
+        if (!string.IsNullOrEmpty(userEmail))
+        {
+            var user = await UserService.GetUserFromFirebase(userEmail);
+            userCredits = user?.Credits ?? 0; // Set userCredits based on fetched data
+        }
+    }
     private void InitializeAds()
     {
         CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
@@ -107,7 +132,18 @@
         adWatched = true;
         CompleteLockInPrice();
     }
-
+  
+    private async Task LoadJackpotData()
+    {
+        // Hämta jackpotbelopp och deltagare
+        jackpotAmount = await JackpotService.GetJackpotAmount();
+        jackpotParticipants = await JackpotService.GetJackpotParticipants();
+        StateHasChanged();
+    }
+    private void NavigateToJackpot()
+    {
+        NavigationManager.NavigateTo("/jackpot");
+    }
     private async Task LockInPrice()
     {
         if (!productExists) return;
@@ -177,7 +213,6 @@
         }
     }
 
-
     private async Task SaveProductData()
     {
         // Retrieve email from local storage
@@ -208,8 +243,6 @@
 
         GoBack();
     }
-
-
 
     private void CompleteLockInPrice()
     {
@@ -376,6 +409,57 @@
         OpenModal("totalLockedInAmountModal");
     }
 
+    private async Task JoinJackpot()
+    {
+        if (canJoinJackpot)
+        {
+            try
+            {
+                await JackpotService.JoinJackpot(userEmail);
+                credits -= joinCost;
+                canJoinJackpot = credits >= joinCost;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Kunde inte gå med i jackpot: {ex.Message}";
+            }
+        }
+        else
+        {
+            errorMessage = "Du har inte tillräckligt med credits för att delta i jackpotten.";
+        }
+    }
+    private async Task LockInJackpot()
+    {
+        if (credits >= 100)
+        {
+            // Deduct credits
+            credits -= 100;
+
+            // Update jackpot amount (you may want to increase it by a fixed value)
+            jackpotAmount += 10.0; // Example: increase by 10
+
+            // Save the updated credits and jackpot information (use services if necessary)
+            var userEmail = await localStorage.GetItemAsync<string>("userEmail");
+            if (!string.IsNullOrEmpty(userEmail))
+            {
+                await UserService.UpdateUserCredits(userEmail, credits);
+                await JackpotService.UpdateJackpotAmount(jackpotAmount);
+            }
+            else
+            {
+                Console.WriteLine("User email not found in localStorage.");
+            }
+
+            // Refresh UI to reflect changes
+            StateHasChanged();
+        }
+        else
+        {
+            // Display error if not enough credits
+            errorMessage = "Du har inte tillräckligt med credits för att delta i jackpotten.";
+        }
+    }
 }
 
 
@@ -391,58 +475,87 @@
         }
         else
         {
-            <!-- Always show the "Go Back" button -->
+            <!-- Back Button and Timer (always visible) -->
             <button @onclick="GoBack" class="icon-button">
                 <i class="fas fa-arrow-left"></i>
             </button>
+            <div class="countdown-timer">
+                <h4>@selectedDay 20:00</h4>
+                <p>@timeRemaining</p>
+            </div>
 
-            @if (winner == null)
+            @if (isJackpotSelected)
             {
-                <!-- Show the product details if no winner is set -->
-                <h3 class="price">$@price</h3>
+                <!-- Jackpot View with "Purchase" style -->
+                <div class="jackpot-details">
+                    <p class="jackpotamount">$@jackpotAmount</p>
 
-                <div class="stats-container">
-                    <div class="stat-item" @onclick="OpenWinningChanceModal">
-                        <p class="stat-value @GetWinningChanceClass()">@winningChance</p>
+                    <!-- Lock In Button with Credits Box Above -->
+                    <div class="jackpot-credits-wrapper">
+                        <div class="jackpot-credits-box">
+                            <div class="jackpot-star-wrapper @starAnimationClass">
+                                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+                                <i class="fa-solid fa-carrot"></i>
+                            </div>
+                            <span class="jackpot-credits-count">@userCredits</span>
+                        </div>
+
+                        <button @onclick="LockInJackpot" class="jackpot-lock-in-button" disabled="@(userCredits < 100)">
+                            @(userCredits < 100 ? "Not enough" : "LOCK IN")
+
+                            @if (userCredits < 100)
+                            {
+                                <div class="insufficient-credits-box">-100</div> <!-- Red box indicating insufficient credits -->
+                            }
+                        </button>
                     </div>
-                    <div class="stat-item" @onclick="OpenTotalOddsModal">
-                        <p class="stat-value">@totalOdds.ToString("0.0")x</p>
-                    </div>
-                    <div class="stat-item" @onclick="OpenTotalLockedInAmountModal">
-                        <p class="stat-value">@totalLockedInAmount.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
-                    </div>
-                </div>
-
-                <!-- Slider for Lock-In Amount -->
-                <input type="range" id="lockInAmount" min="0.0" max="100.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
-
-                <!-- Display Lock-In Amount with Increment and Decrement Buttons -->
-                <div class="lockin-controls">
-                    <button @onclick="DecreaseLockInAmount" class="adjust-button">-</button>
-                    <span class="slider-value">@lockInAmount.ToString("0.0")</span>
-                    <button @onclick="IncreaseLockInAmount" class="adjust-button">+</button>
-                </div>
-
-                <!-- Lock In Button -->
-                <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
-
-                @if (!string.IsNullOrEmpty(errorMessage))
-                {
-                    <p class="error-message">@errorMessage</p>
-                }
-
-                <!-- Countdown Timer, shown only if there is no winner -->
-                <div class="countdown-timer @(winner != null ? "winner-present" : "")">
-                    <h4>@selectedDay 20:00</h4>
-                    <p>@timeRemaining</p>
                 </div>
             }
             else
             {
-                <!-- Show only the View Winner button if there is a winner -->
-                <div class="centered-container">
-                    <button @onclick="NavigateToViewWinner" class="view-winner-button">View Winner</button>
-                </div>
+                <!-- Regular Product View -->
+                @if (winner == null)
+                {
+                    <!-- Show the product details if no winner is set -->
+                    <h3 class="price">$@price</h3>
+
+                    <div class="stats-container">
+                        <div class="stat-item" @onclick="OpenWinningChanceModal">
+                            <p class="stat-value @GetWinningChanceClass()">@winningChance</p>
+                        </div>
+                        <div class="stat-item" @onclick="OpenTotalOddsModal">
+                            <p class="stat-value">@totalOdds.ToString("0.0")x</p>
+                        </div>
+                        <div class="stat-item" @onclick="OpenTotalLockedInAmountModal">
+                            <p class="stat-value">@totalLockedInAmount.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
+                        </div>
+                    </div>
+
+                    <!-- Slider for Lock-In Amount -->
+                    <input type="range" id="lockInAmount" min="0.0" max="20.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
+
+                    <!-- Display Lock-In Amount with Increment and Decrement Buttons -->
+                    <div class="lockin-controls">
+                        <button @onclick="DecreaseLockInAmount" class="adjust-button">-</button>
+                        <span class="slider-value">@lockInAmount.ToString("0.0")</span>
+                        <button @onclick="IncreaseLockInAmount" class="adjust-button">+</button>
+                    </div>
+
+                    <!-- Lock In Button -->
+                    <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <p class="error-message">@errorMessage</p>
+                    }
+                }
+                else
+                {
+                    <!-- Show only the View Winner button if there is a winner -->
+                    <div class="centered-container">
+                        <button @onclick="NavigateToViewWinner" class="view-winner-button">View Winner</button>
+                    </div>
+                }
             }
 
             <!-- Popup to show the winner -->
@@ -461,8 +574,87 @@
     </div>
 </div>
 
-
 <style>
+    .jackpot-details {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .jackpotamount {
+        font-size: 44px;
+        font-weight: bold;
+        margin-bottom: 300px;
+        color: #556B2F;
+    }
+
+    .jackpot-credits-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .jackpot-credits-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        background-color: #F0FFF0;
+        padding: 8px 12px;
+        border-radius: 20px;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        font-weight: bold;
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 25px;
+    }
+
+    .jackpot-star-wrapper {
+        display: inline-block;
+        margin-right: 5px;
+    }
+
+    .jackpot-credits-count {
+        font-size: 16px;
+        background-color: #F0FFF0;
+        color: #333;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+        position: relative;
+    }
+
+    .jackpot-lock-in-button {
+        position: relative;
+        padding: 10px 20px;
+        font-size: 16px;
+        color: #F0FFF0;
+        background-color: #556B2F; /* Change as needed */
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease-in-out;
+    }
+
+
+    .insufficient-credits-box {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background-color: red;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        padding: 2px 6px;
+        border-radius: 3px;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
     .popup {
         position: fixed;
         top: 50%;
