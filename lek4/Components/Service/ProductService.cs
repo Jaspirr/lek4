@@ -269,7 +269,7 @@ namespace lek4.Components.Service
                 Console.WriteLine($"Lock-in for {userEmail} saved successfully for product {productNumber}.");
 
                 // Uppdatera totalusers.json med användarens lock-in amount
-                await UpdateTotalUsers(productNumber, userEmail, lockInAmount);
+                await UpdateTotalUsers(productNumber, userEmail);
 
                 // Uppdatera totalstats.json med det nya beloppet
                 await _statsService.UpdateTotalStats(productNumber, userEmail, lockInAmount);
@@ -546,45 +546,52 @@ namespace lek4.Components.Service
             return TimeSpan.Zero;
         }
         // Hämta totalusers för en specifik produkt från Firebase
-        public async Task UpdateTotalUsers(int productNumber, string userEmail, double lockInAmount)
+        public async Task UpdateTotalUsers(int productNumber, string userEmail)
         {
-            // Ensure the userEmail is valid
             if (string.IsNullOrEmpty(userEmail))
             {
                 Console.WriteLine("User email is null or empty, cannot update total users.");
                 return;
             }
 
-            // Fetch existing lock-in data from Firebase
+            // Hämta det låsta beloppet från användarens individuella fil
+            var individualUserData = await GetUserFromFirebase(productNumber, userEmail);
+
+            if (individualUserData == null)
+            {
+                Console.WriteLine($"No individual lock-in data found for {userEmail}, skipping update.");
+                return;
+            }
+
+            double lockInAmount = individualUserData.LockInAmount;
+
+            // Hämta nuvarande totalusers.json data för produkten
             var totalUsers = await GetTotalUsersFromFirebase(productNumber);
 
-            // Check if the user's lock-in amount exists in totalUsers data
-            if (totalUsers.ContainsKey(userEmail))
-            {
-                // Update the existing user's lock-in amount and round it
-                totalUsers[userEmail] = Math.Round(totalUsers[userEmail] + lockInAmount, 2);
-            }
-            else
-            {
-                // Add a new entry for the user if not present and round it
-                totalUsers[userEmail] = Math.Round(lockInAmount, 2);
-            }
+            // Uppdatera eller sätt användarens belopp till exakt belopp från den individuella filen
+            totalUsers[userEmail] = lockInAmount;
 
-            // Serialize the updated dictionary back to JSON and save it to Firebase
-            var usersJson = JsonSerializer.Serialize(totalUsers);
-            var content = new StringContent(usersJson, Encoding.UTF8, "application/json");
+            // Serialisera och spara uppdaterad total users data tillbaka till totalusers.json
+            var usersJson = JsonSerializer.Serialize(totalUsers, new JsonSerializerOptions { WriteIndented = false });
+            var usersContent = new StringContent(usersJson, Encoding.UTF8, "application/json");
+            var usersPath = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2Ftotalusers.json";
 
-            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2Ftotalusers.json";
-            var response = await _httpClient.PostAsync(path, content);
+            var response = await _httpClient.PostAsync(usersPath, usersContent);
 
-            if (response.IsSuccessStatusCode)
-            {
-                Console.WriteLine($"Total users for product {productNumber} updated successfully.");
-            }
-            else
+            if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"Failed to update total users for product {productNumber}. Error: {response.StatusCode}");
             }
+            else
+            {
+                Console.WriteLine($"Total users for product {productNumber} updated successfully.");
+            }
+        }
+
+
+        private string GetFirebasePath(int productNumber, string endpoint)
+        {
+            return $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2F{endpoint}";
         }
 
         private async Task<ProductData> GetUserFromUserStats(string userEmail)

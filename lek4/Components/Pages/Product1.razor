@@ -162,7 +162,7 @@
                 {
                     await SaveProductData();
                     totalLockedInAmount += lockInAmount; // Update totalLockedInAmount with the new lock-in amount
-                    await ProductService.UpdateTotalUsers(productNumber, userEmail, totalLockedInAmount); // Save to Firebase
+                    await ProductService.UpdateTotalUsers(productNumber, userEmail); // Save to Firebase
                     lockInAmount = 0.0; // Reset lockInAmount after saving
                     await UpdateWinningChance(); // Recalculate winning chance
                     StateHasChanged(); // Refresh the UI
@@ -213,6 +213,7 @@
         }
     }
 
+
     private async Task SaveProductData()
     {
         // Retrieve email from local storage
@@ -243,6 +244,8 @@
 
         GoBack();
     }
+
+
 
     private void CompleteLockInPrice()
     {
