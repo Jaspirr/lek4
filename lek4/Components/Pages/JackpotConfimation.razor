@@ -1,0 +1,16 @@
+﻿@page "/jackpot/{productNumber}/confirmation"
+@inject NavigationManager NavigationManager
+
+<h3>Your Jackpot Ticket Has Been Submitted!</h3>
+<p>Thank you for entering the jackpot. Stay tuned for the results!</p>
+
+<button @onclick="GoBackToHome">Back to Products</button>
+
+@code {
+    [Parameter] public int productNumber { get; set; }
+
+    private void GoBackToHome()
+    {
+        NavigationManager.NavigateTo("/products");
+    }
+}

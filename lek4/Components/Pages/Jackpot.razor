@@ -2,6 +2,7 @@
 @inject NavigationManager NavigationManager
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 @inject lek4.Components.Service.JackpotService JackpotService
+@inject UserService UserService
 
 <h2>Jackpot</h2>
 <p>Current Jackpot Amount: @jackpotAmount kr</p>
@@ -28,6 +29,7 @@ else
     private string errorMessage;
     private string successMessage;
     private string currentUserEmail;
+    private int productNumber = 1; // Ange ett produktnummer för jackpot om det är specifikt
 
     protected override async Task OnInitializedAsync()
     {
@@ -48,20 +50,44 @@ else
         canParticipate = userCredits >= 100;
 
         jackpotAmount = await JackpotService.GetJackpotAmount();
+        double totalCredits = await UserService.GetTotalCredits(); // Hämta total credits från UserService
+
+        // Om du vill inkludera totalCredits i jackpotAmount
+        jackpotAmount += totalCredits;
+
         errorMessage = canParticipate ? null : "You need at least 100 credits to join the jackpot.";
     }
 
+
     private async Task JoinJackpot()
     {
+        Console.WriteLine($"Försöker gå med i jackpot med användare: {currentUserEmail} och credits: {userCredits}");
+
         if (!canParticipate)
         {
             errorMessage = "Insufficient credits to participate.";
             return;
         }
 
-        await JackpotService.JoinJackpot(currentUserEmail);
-        successMessage = "You have successfully joined the jackpot!";
+        try
+        {
+            await JackpotService.JoinJackpot(currentUserEmail, productNumber);
+            userCredits -= 100; // Minska credits efter att ha gått med i jackpotten
+            jackpotAmount += 10; // Uppdatera jackpotbeloppet lokalt för att reflektera förändringen
+            canParticipate = userCredits >= 100; // Kontrollera om användaren kan gå med igen
 
-        await LoadJackpotData();
+            successMessage = "You have successfully joined the jackpot!";
+            errorMessage = null; // Rensa eventuella tidigare felmeddelanden
+
+            Console.WriteLine("Lyckades gå med i jackpot, omdirigerar till biljettvalssidan.");
+
+            // Omdirigera till biljettvalssidan
+            NavigationManager.NavigateTo($"/jackpot/{productNumber}/select-ticket");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Kunde inte gå med i jackpot: {ex.Message}";
+            Console.WriteLine(errorMessage);
+        }
     }
 }

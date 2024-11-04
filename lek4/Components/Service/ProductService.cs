@@ -56,8 +56,6 @@ namespace lek4.Components.Service
             await UpdatePrizePool(productNumber, startingPrizePool);
         }
 
-
-
         public async Task SaveUserToProduct(int productNumber, int userId, ProductData productData)
         {
             var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/products/product{productNumber}/user{userId}.json";
@@ -75,7 +73,6 @@ namespace lek4.Components.Service
                 Console.WriteLine($"Failed to save user {productData.UserEmail} for product {productNumber}. Error: {response.StatusCode}");
             }
         }
-
 
         // Save product info to Firebase
         public async Task SaveProductData(int productNumber, string userEmail, double lockInAmount, double price, string productName, string imageUrl, bool isJackpot)
@@ -421,42 +418,41 @@ namespace lek4.Components.Service
                 return 0.0;  // Default to 0 if the price cannot be fetched
             }
         }
-        public async Task JoinJackpot(int productNumber)
+        public async Task JoinJackpot(string userEmail, int productNumber)
         {
-            // Kontrollera att `CurrentUserEmail` är satt
-            if (string.IsNullOrEmpty(_userService.CurrentUserEmail))
-            {
-                Console.WriteLine("Current user email is not set. Cannot proceed with JoinJackpot.");
-                return;
-            }
-
-            // Hämta användarens krediter med `GetUserCredits`
-            double userCredits = await _userService.GetUserCredits();
+            int userCredits = (int)await _userService.GetUserCredits();
             if (userCredits < 100)
             {
-                Console.WriteLine("User does not have enough credits to join the jackpot.");
+                Console.WriteLine("Insufficient credits to join the jackpot.");
                 return;
             }
 
-            // Dra av 100 credits och uppdatera användarens saldo
+            // Dra av 100 credits endast från användarens stats (ej från totalCredits)
             userCredits -= 100;
-            await _userService.UpdateUserCredits(_userService.CurrentUserEmail, userCredits);
+            await _userService.UpdateUserCredits(userEmail, userCredits);
 
-            // Uppdatera prispotten och deltagarlista för jackpotten
-            double currentPrizePool = await GetPrizePool(productNumber);
-            currentPrizePool += 10; // Lägg till 10 credits i prispotten
-            await UpdatePrizePool(productNumber, currentPrizePool);
+            // Lägg till användaren i listan av deltagare i jackpotten
+            await AddParticipantToJackpot(userEmail, productNumber);
 
-            // Lägg till användaren som deltagare
+
+            Console.WriteLine($"User {userEmail} joined the jackpot.");
+        }
+
+        public async Task AddParticipantToJackpot(string userEmail, int productNumber)
+        {
+            // Hämta den aktuella deltagarlistan från Firebase
             var participants = await GetJackpotParticipants(productNumber);
-            if (!participants.Contains(_userService.CurrentUserEmail))
+
+            if (!participants.Contains(userEmail))
             {
-                participants.Add(_userService.CurrentUserEmail);
+                participants.Add(userEmail);
+
+                // Spara den uppdaterade deltagarlistan tillbaka till Firebase
                 await SaveParticipants(productNumber, participants);
             }
-
-            Console.WriteLine($"{_userService.CurrentUserEmail} joined the jackpot for product {productNumber}.");
         }
+
+        // Hämta deltagare för jackpot från Firebase
         private async Task<List<string>> GetJackpotParticipants(int productNumber)
         {
             var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fproducts%2Fproduct{productNumber}%2Fparticipants.json?alt=media";
@@ -470,6 +466,7 @@ namespace lek4.Components.Service
             return new List<string>();
         }
 
+        // Spara uppdaterad deltagarlista till Firebase
         private async Task SaveParticipants(int productNumber, List<string> participants)
         {
             var participantsJson = JsonSerializer.Serialize(participants);
@@ -587,7 +584,6 @@ namespace lek4.Components.Service
                 Console.WriteLine($"Total users for product {productNumber} updated successfully.");
             }
         }
-
 
         private string GetFirebasePath(int productNumber, string endpoint)
         {

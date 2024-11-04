@@ -411,27 +411,36 @@
     {
         OpenModal("totalLockedInAmountModal");
     }
-
     private async Task JoinJackpot()
     {
-        if (canJoinJackpot)
+        Console.WriteLine($"Försöker gå med i jackpot med användare: {userEmail} och credits: {credits}");
+
+        if (credits >= joinCost)
         {
             try
             {
-                await JackpotService.JoinJackpot(userEmail);
+                await JackpotService.JoinJackpot(userEmail, productNumber);
                 credits -= joinCost;
                 canJoinJackpot = credits >= joinCost;
+
+                // Bekräftelsemeddelande eller omdirigering till biljettvalssidan
+                Console.WriteLine("Lyckades gå med i jackpot, omdirigerar till biljettvalssidan.");
+                NavigationManager.NavigateTo($"/jackpot/{productNumber}/select-ticket");
             }
             catch (Exception ex)
             {
                 errorMessage = $"Kunde inte gå med i jackpot: {ex.Message}";
+                Console.WriteLine(errorMessage);
             }
         }
         else
         {
             errorMessage = "Du har inte tillräckligt med credits för att delta i jackpotten.";
+            Console.WriteLine(errorMessage);
         }
     }
+
+
     private async Task LockInJackpot()
     {
         if (credits >= 100)

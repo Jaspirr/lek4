@@ -1,0 +1,181 @@
+﻿@page "/jackpot/{productNumber}/select-ticket"
+@inject JackpotService JackpotService
+@inject NavigationManager NavigationManager
+    @using lek4.Components.Service
+
+<h3>Select Your Jackpot Ticket</h3>
+
+<div class="ticket-selection-form">
+    <div>
+        <label>Number:</label>
+        <select @bind="selectedNumber">
+            @foreach (var number in numbers)
+            {
+                <option value="@number">@number</option>
+            }
+        </select>
+    </div>
+
+    <!-- Similar blocks for Colors, Symbols, Planets, and Exoplanets with images -->
+    <div>
+        <label>Color:</label>
+        <div class="image-options">
+            @foreach (var color in colors)
+            {
+                <div class="option">
+                    <input type="radio" id="@color.Name" name="color" @onclick="() => selectedColor = color.Name" />
+                    <label for="@color.Name">
+                        <img src="@color.ImageUrl" alt="@color.Name" title="@color.Name" />
+                    </label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div>
+        <label>Symbol:</label>
+        <div class="image-options">
+            @foreach (var symbol in symbols)
+            {
+                <div class="option">
+                    <input type="radio" id="@symbol.Name" name="symbol" @onclick="() => selectedSymbol = symbol.Name" />
+                    <label for="@symbol.Name">
+                        <img src="@symbol.ImageUrl" alt="@symbol.Name" title="@symbol.Name" />
+                    </label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div>
+        <label>Planet:</label>
+        <div class="image-options">
+            @foreach (var planet in planets)
+            {
+                <div class="option">
+                    <input type="radio" id="@planet.Name" name="planet" @onclick="() => selectedPlanet = planet.Name" />
+                    <label for="@planet.Name">
+                        <img src="@planet.ImageUrl" alt="@planet.Name" title="@planet.Name" />
+                    </label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div>
+        <label>Exoplanet:</label>
+        <div class="image-options">
+            @foreach (var exoplanet in exoplanets)
+            {
+                <div class="option">
+                    <input type="radio" id="@exoplanet.Name" name="exoplanet" @onclick="() => selectedExoplanet = exoplanet.Name" />
+                    <label for="@exoplanet.Name">
+                        <img src="@exoplanet.ImageUrl" alt="@exoplanet.Name" title="@exoplanet.Name" />
+                    </label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <button @onclick="SubmitTicket">Submit Ticket</button>
+</div>
+
+@code {
+    [Parameter] public int productNumber { get; set; }
+
+    private int selectedNumber;
+    private string selectedColor;
+    private string selectedSymbol;
+    private string selectedPlanet;
+    private string selectedExoplanet;
+
+    private List<int> numbers = Enumerable.Range(1, 50).ToList();
+    private List<ColorOption> colors = new List<ColorOption>
+    {
+        new ColorOption { Name = "Red", ImageUrl = "https://your-firebase-url/colors/red.png" },
+        // Additional colors...
+    };
+
+    private List<SymbolOption> symbols = new List<SymbolOption>
+    {
+        new SymbolOption { Name = "Star", ImageUrl = "https://your-firebase-url/symbols/star.png" },
+        // Additional symbols...
+    };
+
+    private List<PlanetOption> planets = new List<PlanetOption>
+    {
+        new PlanetOption { Name = "Mercury", ImageUrl = "https://your-firebase-url/planets/mercury.png" },
+        // Additional planets...
+    };
+
+    private List<ExoplanetOption> exoplanets = new List<ExoplanetOption>
+    {
+        new ExoplanetOption { Name = "Proxima Centauri b", ImageUrl = "https://your-firebase-url/exoplanets/proxima_centauri_b.png" },
+        // Additional exoplanets...
+    };
+
+    private async Task SubmitTicket()
+    {
+        var ticket = new JackpotTicket
+        {
+            Number = selectedNumber.ToString(),
+            Color = selectedColor,
+            Symbol = selectedSymbol,
+            Planet = selectedPlanet,
+            Exoplanet = selectedExoplanet
+        };
+
+        string userEmail = "user@example.com"; // Replace with actual user email logic
+        await JackpotService.SaveUserTicket(productNumber, userEmail, ticket);
+        NavigationManager.NavigateTo($"/jackpot/{productNumber}");
+    }
+
+    // Models for each option
+    public class ColorOption { public string Name { get; set; } public string ImageUrl { get; set; } }
+    public class SymbolOption { public string Name { get; set; } public string ImageUrl { get; set; } }
+    public class PlanetOption { public string Name { get; set; } public string ImageUrl { get; set; } }
+    public class ExoplanetOption { public string Name { get; set; } public string ImageUrl { get; set; } }
+}
+
+<style>
+    .ticket-selection-form {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .image-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+        gap: 10px;
+    }
+
+    .option {
+        text-align: center;
+    }
+
+    .option img {
+        width: 60px;
+        height: 60px;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: transform 0.2s ease;
+    }
+
+    .option img:hover {
+        transform: scale(1.1);
+    }
+
+    button {
+        padding: 10px 20px;
+        font-size: 1rem;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    button:hover {
+        background-color: #0056b3;
+    }
+</style>

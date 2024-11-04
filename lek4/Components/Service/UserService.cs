@@ -71,20 +71,42 @@ public class UserService
             Console.WriteLine($"Failed to update credits for {userEmail}. Error: {response.StatusCode}");
         }
     }
+    public async Task AddCreditToUser(string userEmail, int creditsToAdd = 1)
+    {
+        userEmail = userEmail.Trim().Trim('"');
+        if (string.IsNullOrEmpty(userEmail) || userEmail == "Anonymous")
+        {
+            Console.WriteLine("Invalid email. Cannot add credits for Anonymous user.");
+            return;
+        }
+
+        // Fetch the existing user data from Firebase (if available)
+        var existingUser = await GetUserFromFirebase(userEmail);
+        int currentCredits = (int)(existingUser?.Credits ?? 0);
+
+        // Increment user's credits
+        currentCredits += creditsToAdd;
+
+        // Update user's stats in Firebase
+        await UpdateUserCredits(userEmail, currentCredits);
+
+        // Update total credits in Firebase
+        await UpdateTotalCredits(creditsToAdd);
+    }
+
     public async Task<double> GetUserCredits()
     {
-        // Use CurrentUserEmail instead of userEmail
         if (string.IsNullOrEmpty(CurrentUserEmail))
         {
             throw new InvalidOperationException("Current user email is not set.");
         }
 
-        var response = await _httpClient.GetAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{CurrentUserEmail}.json");
+        var response = await _httpClient.GetAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{CurrentUserEmail}.json?alt=media");
         if (response.IsSuccessStatusCode)
         {
             var responseBody = await response.Content.ReadAsStringAsync();
             var userStats = JsonSerializer.Deserialize<UserStats>(responseBody);
-            return userStats?.Credits ?? 0.0; // Return the credits or 0 if userStats is null
+            return userStats?.Credits ?? 0.0;
         }
         else
         {
@@ -92,58 +114,48 @@ public class UserService
         }
     }
 
-    public async Task<double> GetTotalCredits(List<string> userEmails)
+    public async Task<double> GetTotalCredits()
     {
-        double totalCredits = 0.0;
-        // Iterate over each email in the provided list of user emails
-        foreach (var userEmail in userEmails)
-        {
-            var response = await _httpClient.GetAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{userEmail}.json");
-            if (response.IsSuccessStatusCode)
-            {
-                var responseBody = await response.Content.ReadAsStringAsync();
-                var userStats = JsonSerializer.Deserialize<UserStats>(responseBody);
-                if (userStats != null)
-                {
-                    totalCredits += userStats.Credits;
-                }
-            }
-        }
-        return totalCredits * 0.1; // Each credit adds 0.1kr to jackpot
-    }
-    public async Task<bool> UpdateUserCredits(string userEmail, double newCredits)
-    {
-        var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{userEmail}.json";
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2Ftotalcredits.json?alt=media";
+        var response = await _httpClient.GetAsync(path);
 
-        // Fetch current user stats
-        var userStats = await GetUserFromFirebase(userEmail);
-        if (userStats == null)
-        {
-            Console.WriteLine("User stats not found, cannot update credits.");
-            return false;
-        }
-
-        // Update the credits
-        userStats.Credits = (int)newCredits;
-
-        // Serialize updated user stats back to JSON
-        var updatedUserJson = JsonSerializer.Serialize(userStats);
-        var content = new StringContent(updatedUserJson, Encoding.UTF8, "application/json");
-
-        // Send the updated data to Firebase
-        var response = await _httpClient.PutAsync(path, content);
         if (response.IsSuccessStatusCode)
         {
-            Console.WriteLine($"User credits for {userEmail} updated successfully.");
-            return true;
+            var responseBody = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<double>(responseBody);
         }
         else
         {
-            Console.WriteLine($"Failed to update credits for user {userEmail}. Status code: {response.StatusCode}");
-            return false;
+            // Return 0 as default if the file doesn't exist
+            return 0.0;
         }
     }
 
+    public async Task UpdateTotalCredits(double deltaCredits)
+    {
+        // Hämta nuvarande total credits
+        double currentTotalCredits = await GetTotalCredits();
+
+        // Beräkna ny summa
+        double newTotalCredits = currentTotalCredits + deltaCredits;
+
+        // Spara uppdaterad summa
+        await SaveTotalCredits(newTotalCredits);
+    }
+
+    private async Task SaveTotalCredits(double totalCredits)
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2Ftotalcredits.json";
+        var creditsJson = JsonSerializer.Serialize(totalCredits);
+        var content = new StringContent(creditsJson, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PutAsync(path, content);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Failed to update total credits in Firebase.");
+        }
+    }
 
     // Helper method to fetch existing user data from Firebase
     public async Task<UserStats?> GetUserFromFirebase(string userEmail)
@@ -176,55 +188,28 @@ public class UserService
     }
 
     // Method to update the user profile in Firebase Storage
-    public async Task UpdateUserProfile(string email)
+    public async Task<bool> UpdateUserCredits(string userEmail, int newCredits)
     {
-        // Fetch the current JSON file from Firebase Storage
-        var response = await _httpClient.GetAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{email}.json");
+        var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{userEmail}.json";
 
-        if (response.IsSuccessStatusCode)
+        // Fetch current user stats
+        var userStats = await GetUserFromFirebase(userEmail);
+        if (userStats == null)
         {
-            var responseBody = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"Response Body: {responseBody}");
-
-            try
-            {
-                var userProfile = JsonSerializer.Deserialize<UserProfile>(responseBody);
-
-                if (userProfile != null)
-                {
-                    // Update IsAdmin to true (example)
-                    userProfile.IsAdmin = true;
-
-                    // Serialize the updated user profile back to JSON
-                    var updatedJson = JsonSerializer.Serialize(userProfile);
-
-                    // Upload the updated JSON file back to Firebase Storage
-                    var content = new StringContent(updatedJson, Encoding.UTF8, "application/json");
-                    var putResponse = await _httpClient.PutAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{email}.json", content);
-
-                    if (putResponse.IsSuccessStatusCode)
-                    {
-                        Console.WriteLine("User profile updated successfully.");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Failed to update user profile. Status code: {putResponse.StatusCode}");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("Failed to deserialize user profile.");
-                }
-            }
-            catch (JsonException ex)
-            {
-                Console.WriteLine($"JSON deserialization error: {ex.Message}");
-            }
+            Console.WriteLine("User stats not found, cannot update credits.");
+            return false;
         }
-        else
-        {
-            Console.WriteLine($"Failed to fetch user profile. Status code: {response.StatusCode}");
-        }
+
+        // Update the credits
+        userStats.Credits = newCredits;
+
+        // Serialize updated user stats back to JSON
+        var updatedUserJson = JsonSerializer.Serialize(userStats);
+        var content = new StringContent(updatedUserJson, Encoding.UTF8, "application/json");
+
+        // Send the updated data to Firebase
+        var response = await _httpClient.PutAsync(path, content);
+        return response.IsSuccessStatusCode;
     }
 
     // User profile model
