@@ -1,4 +1,5 @@
-﻿using System;
+﻿using lek4.Components.Service;
+using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -24,7 +25,7 @@ public class UserService
     }
     public async Task AddCreditToUser(string userEmail)
     {
-        // Trim any surrounding whitespace or quotes from the email
+        // Trimma eventuella vita tecken eller citationstecken från e-posten
         userEmail = userEmail.Trim().Trim('"');
 
         if (string.IsNullOrEmpty(userEmail) || userEmail == "Anonymous")
@@ -33,44 +34,47 @@ public class UserService
             return;
         }
 
-        // Fetch the existing user data from Firebase (if available)
+        // Hämta den befintliga användardatan från Firebase (om tillgänglig)
         var existingUser = await GetUserFromFirebase(userEmail);
         int currentCredits = (int)(existingUser?.Credits ?? 0);
-        // Use existing credits or default to 0
 
-        // Increment credits
+        // Öka användarens kredit med 1
         currentCredits++;
 
-        // Create or update user data
+        // Skapa eller uppdatera användardatan
         var userStats = new
         {
             UserEmail = userEmail,
-            LockInAmount = existingUser?.LockInAmount ?? 0.0,  // Preserve the existing LockInAmount
-            Credits = currentCredits                           // Incremented Credits
+            LockInAmount = existingUser?.LockInAmount ?? 0.0,  // Behåll det befintliga LockInAmount
+            Credits = currentCredits                           // Uppdaterad Credits
         };
 
-        // Serialize user data to JSON
+        // Serialisera användardatan till JSON
         var userJson = JsonSerializer.Serialize(userStats);
         var content = new StringContent(userJson, Encoding.UTF8, "application/json");
 
-        // Set the Firebase path for saving user data based on email, adding ?alt=media
+        // Sätt Firebase-sökvägen för att spara användardata baserat på e-post, med ?alt=media
         var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{userEmail}.json?alt=media";
 
-        // Use POST to save data to Firebase
+        // Använd POST för att spara data till Firebase
         var response = await _httpClient.PostAsync(path, content);
 
-        var responseContent = await response.Content.ReadAsStringAsync();  // Log the response for debugging
+        var responseContent = await response.Content.ReadAsStringAsync();  // Logga svaret för felsökning
         Console.WriteLine($"Response content: {responseContent}");
 
         if (response.IsSuccessStatusCode)
         {
             Console.WriteLine($"Credits for {userEmail} updated successfully.");
+
+            // Uppdatera totalcredits.json med den nya krediten
+            await AddToTotalCredits(1); // Lägg till 1 kredit till den totala summan
         }
         else
         {
             Console.WriteLine($"Failed to update credits for {userEmail}. Error: {response.StatusCode}");
         }
     }
+
     public async Task AddCreditToUser(string userEmail, int creditsToAdd = 1)
     {
         userEmail = userEmail.Trim().Trim('"');
@@ -93,6 +97,66 @@ public class UserService
         // Update total credits in Firebase
         await UpdateTotalCredits(creditsToAdd);
     }
+    public async Task AddToTotalCredits(double creditAmount)
+    {
+        // GET-förfrågan med ?alt=media för att hämta nuvarande total credits
+        var getPath = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2Ftotalcredits.json?alt=media";
+        // PUT-förfrågan utan ?alt=media för att uppdatera total credits
+        var putPath = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2Ftotalcredits.json";
+
+        try
+        {
+            // Hämta nuvarande värde av totalCredits från Firebase
+            double currentTotalCredits = 0;
+            var response = await _httpClient.GetAsync(getPath);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                var totalCreditsData = JsonSerializer.Deserialize<Dictionary<string, double>>(responseBody);
+
+                if (totalCreditsData != null && totalCreditsData.ContainsKey("totalCredits"))
+                {
+                    currentTotalCredits = totalCreditsData["totalCredits"];
+                }
+
+                Console.WriteLine($"Current total credits: {currentTotalCredits}");
+            }
+            else
+            {
+                Console.WriteLine("totalcredits.json does not exist, starting with 0.");
+            }
+
+            // Lägg till det nya kreditbeloppet
+            currentTotalCredits += creditAmount;
+            Console.WriteLine($"New total credits after addition: {currentTotalCredits}");
+
+            // Skapa JSON-objekt för uppladdning
+            var updatedTotalCreditsData = new { totalCredits = currentTotalCredits };
+            var totalCreditsJson = JsonSerializer.Serialize(updatedTotalCreditsData);
+            Console.WriteLine($"Serialized totalCredits JSON for upload: {totalCreditsJson}");
+
+            var content = new StringContent(totalCreditsJson, Encoding.UTF8, "application/json");
+
+            // Skicka PUT-begäran utan ?alt=media
+            var putResponse = await _httpClient.PostAsync(putPath, content);
+            if (!putResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to update totalCredits. Status Code: {putResponse.StatusCode}");
+                var putResponseContent = await putResponse.Content.ReadAsStringAsync();
+                Console.WriteLine($"Response content: {putResponseContent}"); // Logga svaret för ytterligare felsökning
+            }
+            else
+            {
+                Console.WriteLine("Total credits updated successfully in totalcredits.json.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating totalCredits: {ex.Message}");
+        }
+    }
+
 
     public async Task<double> GetUserCredits()
     {
@@ -122,26 +186,78 @@ public class UserService
         if (response.IsSuccessStatusCode)
         {
             var responseBody = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<double>(responseBody);
+
+            try
+            {
+                // Försök att deserialisera direkt som en double
+                var totalCreditsData = JsonSerializer.Deserialize<Dictionary<string, double>>(responseBody);
+
+                if (totalCreditsData != null && totalCreditsData.ContainsKey("totalCredits"))
+                {
+                    return totalCreditsData["totalCredits"];
+                }
+                else
+                {
+                    Console.WriteLine("Key 'totalCredits' not found in JSON data.");
+                }
+            }
+            catch (JsonException jsonEx)
+            {
+                // Logga JSON-data för felsökning
+                Console.WriteLine($"Failed to deserialize JSON to double. JSON content: {responseBody}");
+                Console.WriteLine($"Deserialization error: {jsonEx.Message}");
+            }
         }
         else
         {
-            // Return 0 as default if the file doesn't exist
-            return 0.0;
+            Console.WriteLine($"Failed to fetch total credits. Status code: {response.StatusCode}");
+        }
+
+        // Returnera 0 som standard om något går fel
+        return 0.0;
+    }
+
+
+    public async Task UpdateTotalCredits(int creditChange)
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2Ftotalcredits.json";
+
+        try
+        {
+            // Hämta nuvarande värde av totalCredits från Firebase
+            var response = await _httpClient.GetAsync(path + "?alt=media");
+
+            double currentTotalCredits;
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                currentTotalCredits = JsonSerializer.Deserialize<double>(responseBody);
+            }
+            else
+            {
+                // Om filen inte existerar, sätt currentTotalCredits till 0
+                currentTotalCredits = 0;
+            }
+
+            // Uppdatera totalCredits med förändringen
+            currentTotalCredits += creditChange;
+
+            // Spara det nya värdet av totalCredits i totalcredits.json
+            var totalCreditsJson = JsonSerializer.Serialize(currentTotalCredits);
+            var content = new StringContent(totalCreditsJson, Encoding.UTF8, "application/json");
+
+            var putResponse = await _httpClient.PutAsync(path, content);
+            if (!putResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to update totalCredits. Status Code: {putResponse.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating totalCredits: {ex.Message}");
         }
     }
 
-    public async Task UpdateTotalCredits(double deltaCredits)
-    {
-        // Hämta nuvarande total credits
-        double currentTotalCredits = await GetTotalCredits();
-
-        // Beräkna ny summa
-        double newTotalCredits = currentTotalCredits + deltaCredits;
-
-        // Spara uppdaterad summa
-        await SaveTotalCredits(newTotalCredits);
-    }
 
     private async Task SaveTotalCredits(double totalCredits)
     {
@@ -192,7 +308,7 @@ public class UserService
     {
         var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{userEmail}.json";
 
-        // Fetch current user stats
+        // Hämta nuvarande användardata
         var userStats = await GetUserFromFirebase(userEmail);
         if (userStats == null)
         {
@@ -200,17 +316,48 @@ public class UserService
             return false;
         }
 
-        // Update the credits
+        // Uppdatera credits
         userStats.Credits = newCredits;
 
-        // Serialize updated user stats back to JSON
+        // Serialisera och skicka uppdaterad data till Firebase
         var updatedUserJson = JsonSerializer.Serialize(userStats);
         var content = new StringContent(updatedUserJson, Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync(path, content);
 
-        // Send the updated data to Firebase
-        var response = await _httpClient.PutAsync(path, content);
-        return response.IsSuccessStatusCode;
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine($"Failed to update credits for {userEmail}. Response: {response.StatusCode}");
+            return false;
+        }
+        return true;
     }
+
+    public async Task LockInJackpotAsync(string userEmail, JackpotService jackpotService)
+    {
+        const int lockInCost = 100;
+
+        // 1. Kontrollera och uppdatera användarens krediter
+        var userStats = await GetUserFromFirebase(userEmail);
+        if (userStats == null || userStats.Credits < lockInCost)
+        {
+            Console.WriteLine("Du har inte tillräckligt med credits för att delta i jackpotten.");
+            return;
+        }
+
+        // Dra av kostnaden från användarens credits
+        userStats.Credits -= lockInCost;
+        bool updateCreditsSuccess = await UpdateUserCredits(userEmail, userStats.Credits);
+        if (!updateCreditsSuccess)
+        {
+            Console.WriteLine("Misslyckades med att uppdatera användarens credits.");
+            return;
+        }
+        Console.WriteLine($"Credits för {userEmail} har uppdaterats till {userStats.Credits}.");
+
+        // 2. Uppdatera JackpotTotalLockin.json med användarens e-post och låst belopp
+        await jackpotService.UpdateJackpotTotalLockin(userEmail, lockInCost);
+    }
+
 
     // User profile model
     public class UserProfile

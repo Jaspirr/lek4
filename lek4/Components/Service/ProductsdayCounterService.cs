@@ -1,33 +1,39 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace lek4.Components.Service
 {
-    public class ProductDayCounterService
+    public class ProductDrawDateService
     {
-        // Dictionary to store day counters for products
-        private Dictionary<int, int> productDayCounters = new Dictionary<int, int>();
+        // Dictionary to store draw dates for products
+        private Dictionary<int, DateTime> productDrawDates = new Dictionary<int, DateTime>();
 
-        // Method to get the day counter for a product
-        public int GetDayCounter(int productNumber)
+        // Method to get the draw date for a product
+        public DateTime? GetDrawDate(int productNumber)
         {
-            if (productDayCounters.ContainsKey(productNumber))
+            if (productDrawDates.TryGetValue(productNumber, out DateTime drawDate))
             {
-                return productDayCounters[productNumber];
+                return drawDate;
             }
-            return 1; // Default value if no day counter exists for the product
+            return null; // Return null if no draw date exists for the product
         }
 
-        // Method to set the day counter for a product
-        public void SetDayCounter(int productNumber, int day)
+        // Method to set the draw date for a product
+        public void SetDrawDate(int productNumber, DateTime drawDate)
         {
-            if (productDayCounters.ContainsKey(productNumber))
-            {
-                productDayCounters[productNumber] = day;
-            }
-            else
-            {
-                productDayCounters.Add(productNumber, day);
-            }
+            productDrawDates[productNumber] = drawDate;
+        }
+
+        // Method to check if a product has a draw date set
+        public bool HasDrawDate(int productNumber)
+        {
+            return productDrawDates.ContainsKey(productNumber);
+        }
+
+        // Method to remove the draw date for a product
+        public void RemoveDrawDate(int productNumber)
+        {
+            productDrawDates.Remove(productNumber);
         }
     }
 }

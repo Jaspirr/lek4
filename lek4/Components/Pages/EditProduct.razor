@@ -3,6 +3,7 @@
 
 @inject NavigationManager NavigationManager
 @inject lek4.Components.Service.ProductService ProductService
+@inject ProductDrawDateService ProductDrawDateService
 
 <h3>Edit Product @productNumber</h3>
 
@@ -22,12 +23,18 @@
     <label for="productImageUrl">Product Image URL</label>
     <input type="text" id="productImageUrl" @bind="productImageUrl" />
 
-    <div>
+    <div class="checkbox-container">
         <input type="checkbox" id="isJackpot" @bind="isJackpot" />
         <label for="isJackpot">Jackpot Product</label>
     </div>
 
-    <button @onclick="SaveChanges">Save Changes</button>
+    <label for="drawDate">Draw Date</label>
+    <input type="date" id="drawDate" @bind="drawDate" min="@minDate" max="@maxDate" />
+
+    <label for="drawTime">Draw Time</label>
+    <input type="time" id="drawTime" @bind="drawTime" />
+
+    <button @onclick="SaveChanges" class="save-button">Save Changes</button>
 </div>
 
 @code {
@@ -39,23 +46,33 @@
     private string userEmail;
     private string productName;
     private string productImageUrl;
-    private bool isJackpot; // New field to hold the jackpot status
+    private bool isJackpot;
+    private DateTime? drawDate;
+    private TimeOnly? drawTime;
     private ProductService.ProductData productData;
+
+    private string minDate = DateTime.Now.ToString("yyyy-MM-dd");
+    private string maxDate = DateTime.Now.AddDays(31).ToString("yyyy-MM-dd");
 
     protected override async Task OnInitializedAsync()
     {
-        // Fetch the product data from Firebase
         productData = await ProductService.GetProductFromFirebaseAsync(productNumber);
 
         if (productData != null)
         {
-            // Set local values based on the fetched data
             price = productData.Price;
             lockInAmount = productData.LockInAmount;
             userEmail = productData.UserEmail;
             productName = productData.ProductName;
             productImageUrl = productData.ImageUrl;
-            isJackpot = productData.IsJackpot; // Set initial jackpot status
+            isJackpot = productData.IsJackpot;
+
+            DateTime? existingDrawDateTime = ProductDrawDateService.GetDrawDate(productNumber);
+            if (existingDrawDateTime.HasValue)
+            {
+                drawDate = existingDrawDateTime.Value.Date;
+                drawTime = TimeOnly.FromDateTime(existingDrawDateTime.Value);
+            }
         }
         else
         {
@@ -68,24 +85,118 @@
     {
         if (productData != null)
         {
-            // Update productData with new values
             productData.Price = price;
             productData.LockInAmount = lockInAmount;
             productData.UserEmail = userEmail;
             productData.ProductName = productName;
             productData.ImageUrl = productImageUrl;
-            productData.IsJackpot = isJackpot; // Update jackpot status
+            productData.IsJackpot = isJackpot;
 
-            int userId = 1; // Assign unique ID as needed
+            DateTime drawDateTime = DateTime.Now; // Default value if no date and time are provided
 
-            // Save the updated product info, including the jackpot status
-            await ProductService.SaveProductData(productNumber, userEmail, lockInAmount, price, productName, productImageUrl, isJackpot);
+            if (drawDate.HasValue && drawTime.HasValue)
+            {
+                drawDateTime = drawDate.Value.Add(drawTime.Value.ToTimeSpan());
+                ProductDrawDateService.SetDrawDate(productNumber, drawDateTime);
+            }
 
-            // Save the user data
+            await ProductService.SaveProductData(
+                productNumber,
+                userEmail,
+                price,
+                productName,
+                productImageUrl,
+                isJackpot,
+                drawDateTime
+            );
+
+            int userId = 1;
             await ProductService.SaveUserToProduct(productNumber, userId, productData);
 
-            // Navigate back to the products list
             NavigationManager.NavigateTo("/change-products");
         }
     }
 }
+
+<style>
+    h3 {
+        text-align: center;
+        font-size: 1.8em;
+        color: #333;
+        margin-bottom: 20px;
+    }
+
+    .edit-product-form {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    label {
+        font-size: 1em;
+        color: #333;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    input[type="number"],
+    input[type="email"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"] {
+        width: 100%;
+        padding: 10px;
+        font-size: 1em;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-sizing: border-box;
+        background-color: #ffffff; /* White background */
+        color: #000000; /* Black text */
+    }
+
+        /* Ensure date and time picker elements are visible */
+        input[type="date"]::-webkit-inner-spin-button,
+        input[type="time"]::-webkit-inner-spin-button {
+            display: block;
+        }
+
+    .checkbox-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .save-button {
+        background-color: #28a745;
+        color: white;
+        font-size: 1.1em;
+        font-weight: bold;
+        padding: 12px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .save-button:hover {
+            background-color: #218838;
+        }
+
+    input[type="number"]:focus,
+    input[type="email"]:focus,
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    input[type="time"]:focus {
+        border-color: #28a745;
+        outline: none;
+        box-shadow: 0 0 5px rgba(40, 167, 69, 0.3);
+    }
+</style>
+

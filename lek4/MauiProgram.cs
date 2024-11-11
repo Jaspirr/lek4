@@ -51,9 +51,10 @@ namespace lek4
             builder.Services.AddSingleton<GoogleFitService>();
             builder.Services.AddSingleton<AdService>();
             builder.Services.AddSingleton<UserService>();
-            builder.Services.AddSingleton<ProductDayCounterService>();
+            builder.Services.AddSingleton<ProductDrawDateService>();
             builder.Services.AddSingleton<ProductService>();
             builder.Services.AddScoped<DrawService>();
+            builder.Services.AddScoped<DrawJackpotService>();
             builder.Services.AddScoped<JackpotService>();
             builder.Services.AddScoped<StatsService>();
             builder.Services.AddSingleton<Components.Service.NumberService>();

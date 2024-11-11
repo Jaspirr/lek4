@@ -1,7 +1,7 @@
 ﻿@page "/change-products"
-
+@using lek4.Components.Service
 @using static lek4.Components.Service.ProductService
-
+@inject ProductDrawDateService ProductDrawDateService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime js
 @inject lek4.Components.Service.ProductService ProductService
@@ -20,6 +20,7 @@
                     <p><strong>Product Number:</strong> @product.ProductNumber</p>
                     <p><strong>Price:</strong> $@product.Price</p>
                     <p><strong>Type:</strong> @(product.IsJackpot ? "Jackpot" : "Standard")</p>
+                    <p><strong>Draw Date:</strong> @(ProductDrawDateService.GetDrawDate(product.ProductNumber)?.ToString("yyyy-MM-dd HH:mm") ?? "Not set")</p>
 
                     <p><strong>Locked-In Users:</strong></p>
                     <ul>
@@ -68,6 +69,10 @@
         <label for="isJackpotProduct">Jackpot Product</label>
     </div>
 
+    <!-- New Draw Date input with max date 31 days from today -->
+    <label for="drawDate">Draw Date</label>
+    <input type="datetime-local" id="drawDate" @bind="newDrawDate" min="@minDate" max="@maxDate" />
+
     <button @onclick="AddProduct" class="add-button">Add Product</button>
 </div>
 
@@ -77,8 +82,12 @@
     private string newProductName;
     private double newProductPrice;
     private string newProductImageUrl;
-    private bool isJackpotProduct = false; // Flag for jackpot product
+    private bool isJackpotProduct = false;
+    private DateTime newDrawDate = DateTime.Now.AddDays(1); // Default to 1 day from now
+
     private Dictionary<int, List<ProductData>> lockedInUsers = new Dictionary<int, List<ProductData>>();
+    private string minDate = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
+    private string maxDate = DateTime.Now.AddDays(31).ToString("yyyy-MM-ddTHH:mm");
 
     protected override async Task OnInitializedAsync()
     {
@@ -100,15 +109,23 @@
     {
         if (newProductNumber > 0 && newProductPrice > 0 && !string.IsNullOrEmpty(newProductName))
         {
-            await ProductService.AddProductToFirebase(newProductNumber, newProductPrice, "user@example.com", newProductName, newProductImageUrl, isJackpotProduct);
-            products = await ProductService.FetchAllProductsFromFirebaseAsync();
-            await LoadLockedInUsersForAllProducts();
+            await ProductService.AddProductToFirebase(
+                newProductNumber,
+                newProductPrice,
+                "user@example.com",
+                newProductName,
+                newProductImageUrl,
+                isJackpotProduct,
+                newDrawDate // Pass the DrawDate
+            );
 
+            // Reset form fields
             newProductNumber = 0;
             newProductPrice = 0;
             newProductName = "";
             newProductImageUrl = "";
             isJackpotProduct = false;
+            newDrawDate = DateTime.Now.AddDays(1); // Reset default date
         }
     }
 

@@ -3,6 +3,7 @@
 
 @inject DrawService DrawService
 @inject ProductService ProductService
+@inject DrawJackpotService DrawJackpotService
 
 <h3>Draw Page</h3>
 
@@ -21,12 +22,12 @@
                 @if (!winners.ContainsKey(productNumber) || winners[productNumber] == "No winner yet")
                 {
                     <!-- Button to draw a winner -->
-                    <button @onclick="() => DrawWinnerFromTotalUsers(productNumber)" class="draw-winner-button">Draw Winner</button>
+                    <button @onclick="() => DrawWinnerForProduct(productNumber)" class="draw-winner-button">Draw Winner</button>
 
                     <!-- Button to fetch the winner if needed -->
                     <button @onclick="() => FetchWinnerFromFirebase(productNumber)" class="fetch-winner-button">Fetch Winner</button>
                 }
-             
+
             </div>
         }
     }
@@ -35,9 +36,6 @@
         <p>Loading products...</p>
     }
 </div>
-
-
-
 
 @code {
     private List<int> productNumbers = new List<int>();
@@ -77,7 +75,52 @@
             return "No winner yet";
         }
     }
-    public async Task DrawWinnerFromTotalUsers(int productNumber)
+
+    // Determine if the product is a jackpot and draw accordingly
+    public async Task DrawWinnerForProduct(int productNumber)
+    {
+        bool isJackpotProduct = await ProductService.CheckIfJackpotProduct(productNumber);
+
+        if (isJackpotProduct)
+        {
+            await DrawJackpotWinner(productNumber);
+        }
+        else
+        {
+            await DrawRegularWinner(productNumber);
+        }
+    }
+
+    // Draw a winner for a jackpot product
+    private async Task DrawJackpotWinner(int productNumber)
+    {
+        // Fetch tickets from JackpotConfirmedTickets.json
+        var tickets = await DrawJackpotService.GetJackpotTickets();
+
+        if (tickets == null || tickets.Count == 0)
+        {
+            Console.WriteLine("No jackpot tickets available for draw.");
+            return;
+        }
+
+        // Perform the draw and get the winning ticket
+        var winnerTicket = DrawJackpotService.DrawRandomWinner(tickets);
+
+        // In DrawJackpotWinner method
+        if (winnerTicket != null)
+        {
+            // Save the winning ticket to Firebase with the current date
+            await DrawJackpotService.SaveWinnerToFirebase(productNumber, winnerTicket.UserEmail, DateTime.Now, winnerTicket);
+
+            // Update UI with the new winner
+            winners[productNumber] = $"Winner: {winnerTicket.UserEmail} - Ticket: {winnerTicket.Number}, {winnerTicket.Color}, {winnerTicket.Symbol}, {winnerTicket.Planet}, {winnerTicket.Element}";
+            StateHasChanged();
+        }
+
+    }
+
+    // Draw a winner for a regular product
+    private async Task DrawRegularWinner(int productNumber)
     {
         // Fetch totalusers.json from Firebase
         var totalUsers = await DrawService.GetAllUserLockInData(productNumber);
@@ -108,29 +151,13 @@
         StateHasChanged();
     }
 
-    // Fetch the winner from Firebase using DrawService
-   
-
     // Fetch emails, lock-in amounts, draw winner, and save to Firebase
-    public async Task DrawWinnerForProduct(int productNumber)
+    public async Task DrawWinnerFromTotalUsers(int productNumber)
     {
-        // Perform the draw and get the winner's email
-        var winnerEmail = await ProductService.GetWinnerFromFirebase(productNumber);
-
-        if (!string.IsNullOrEmpty(winnerEmail))
-        {
-            // Pass the winner email to the product logic, update UI, etc.
-            Console.WriteLine($"Winner for product {productNumber}: {winnerEmail}");
-
-            // You can now use this winnerEmail in the relevant logic or send it to the product display/UI
-            // For example, update product information or UI
-            await UpdateProductWithWinner(productNumber, winnerEmail);
-        }
-        else
-        {
-            Console.WriteLine($"No winner found for product {productNumber}");
-        }
+        // Draw a winner from all users for a non-jackpot product
+        await DrawRegularWinner(productNumber);
     }
+
 
     // Sample method to update product info with winner (modify as needed)
     private async Task UpdateProductWithWinner(int productNumber, string winnerEmail)
@@ -139,9 +166,7 @@
         Console.WriteLine($"Product {productNumber} updated with winner {winnerEmail}");
         // You can implement the logic to save the winner to the UI or Firebase here
     }
-
 }
-
 
 <style>
     .product-draw {

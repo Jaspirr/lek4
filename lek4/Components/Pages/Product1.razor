@@ -49,7 +49,7 @@
     private string userEmail;
     private ProductService.ProductData productData;
 
-    private double jackpotAmount;
+    private double jackpotAmount = 0;
     private List<string> jackpotParticipants;
     private int credits = 0;
     private bool canJoinJackpot = false;
@@ -72,6 +72,15 @@
             price = productData.Price;
             isJackpotSelected = productData.IsJackpot;
 
+            if (productData.DrawDate != DateTime.MinValue) // Ensure DrawDate is valid
+            {
+                remainingTime = productData.DrawDate - DateTime.Now;
+                timeRemaining = FormatRemainingTime(remainingTime);
+            }
+            else
+            {
+                timeRemaining = "Draw date not set";
+            }
             // Fetch the winner directly after fetching product information
             winner = await ProductService.GetWinnerFromFirebase(productNumber);
             if (!string.IsNullOrEmpty(winner))
@@ -104,16 +113,36 @@
         // Calculate initial winning chance
         await UpdateWinningChance();
     }
+    private string FormatRemainingTime(TimeSpan timeSpan)
+    {
+        return $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadJackpotData(); // Kör jackpot-laddningen efter första rendering
+        }
+    }
+
+
     private async Task FetchUserCredits()
     {
-        // Retrieve user email from local storage
         userEmail = await localStorage.GetItemAsync<string>("userEmail");
         if (!string.IsNullOrEmpty(userEmail))
         {
             var user = await UserService.GetUserFromFirebase(userEmail);
-            userCredits = user?.Credits ?? 0; // Set userCredits based on fetched data
+            userCredits = user?.Credits ?? 0; // Spara värdet i userCredits
+            Console.WriteLine($"Fetched user credits: {userCredits} for user {userEmail}");
+        }
+        else
+        {
+            Console.WriteLine("No user email found in local storage.");
         }
     }
+
+
+
     private void InitializeAds()
     {
         CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
@@ -133,13 +162,24 @@
         CompleteLockInPrice();
     }
   
+
     private async Task LoadJackpotData()
     {
-        // Hämta jackpotbelopp och deltagare
-        jackpotAmount = await JackpotService.GetJackpotAmount();
+        // Hämta det beräknade jackpot-beloppet
+        double newJackpotAmount = await JackpotService.GetCalculatedJackpotAmount();
+
+        // Använd JSRuntime för att animera övergången om värdet har ändrats
+        if (Math.Abs(newJackpotAmount - jackpotAmount) > 0.01)
+        {
+            await JSRuntime.InvokeVoidAsync("animateValue", "jackpotAmount", jackpotAmount, newJackpotAmount, 2000);
+            jackpotAmount = newJackpotAmount; // Uppdatera jackpotAmount för att hålla det aktuellt
+        }
+
+        // Hämta deltagarlistan (om du behöver detta)
         jackpotParticipants = await JackpotService.GetJackpotParticipants();
         StateHasChanged();
     }
+
     private void NavigateToJackpot()
     {
         NavigationManager.NavigateTo("/jackpot");
@@ -245,13 +285,11 @@
         GoBack();
     }
 
-
-
-    private void CompleteLockInPrice()
+    private async Task CompleteLockInPrice()
     {
         if (shouldLockIn)
         {
-            SaveProductData().Wait();
+            await SaveProductData();
         }
     }
 
@@ -270,29 +308,30 @@
 
     private void UpdateTimer(object state)
     {
-        if (!productExists) return;
+        if (!productExists || productData.DrawDate == DateTime.MinValue) return;
 
         var now = DateTime.Now;
-        var nextDay = GetNextSelectedDayAt20();
-        var timeSpan = nextDay - now;
+        remainingTime = productData.DrawDate - now;
 
-        if (timeSpan.TotalSeconds <= 0)
+        if (remainingTime.TotalSeconds <= 0)
         {
-            nextDay = GetNextSelectedDayAt20();
-            timeSpan = nextDay - now;
-
+            // Time has elapsed
             Task.Run(async () =>
             {
                 winner = await ProductService.GetWinnerFromFirebase(productNumber); // Fetch the winner
                 if (winner != null)
                 {
                     showPopup = false;
-                    InvokeAsync(StateHasChanged); // Update UI after the async task completes
+                    InvokeAsync(StateHasChanged); // Update UI after async task completes
                 }
             });
+            timeRemaining = "Time is up!";
+        }
+        else
+        {
+            timeRemaining = FormatRemainingTime(remainingTime);
         }
 
-        timeRemaining = $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
         InvokeAsync(StateHasChanged);
     }
 
@@ -440,37 +479,38 @@
         }
     }
 
-
     private async Task LockInJackpot()
     {
-        if (credits >= 100)
+        Console.WriteLine("LockInJackpot method was called.");
+        Console.WriteLine($"Current user credits: {userCredits}");
+
+        if (userCredits >= 100)
         {
-            // Deduct credits
-            credits -= 100;
+            // Dra av 100 credits och uppdatera användarens data
+            userCredits -= 100;
+            bool creditsUpdated = await UserService.UpdateUserCredits(userEmail, userCredits);
 
-            // Update jackpot amount (you may want to increase it by a fixed value)
-            jackpotAmount += 10.0; // Example: increase by 10
+            // Uppdatera jackpot med användarens e-post och låsta credits
+            bool jackpotUpdated = await JackpotService.UpdateJackpotTotalLockin(userEmail, 100);
 
-            // Save the updated credits and jackpot information (use services if necessary)
-            var userEmail = await localStorage.GetItemAsync<string>("userEmail");
-            if (!string.IsNullOrEmpty(userEmail))
+            if (creditsUpdated && jackpotUpdated)
             {
-                await UserService.UpdateUserCredits(userEmail, credits);
-                await JackpotService.UpdateJackpotAmount(jackpotAmount);
+                Console.WriteLine("Successfully locked in jackpot and updated credits.");
+                NavigationManager.NavigateTo($"/jackpot/{productNumber}/SelectTicket");
             }
             else
             {
-                Console.WriteLine("User email not found in localStorage.");
+                Console.WriteLine("Failed to update either credits or jackpot lock-in.");
+                errorMessage = "Ett fel uppstod vid uppdatering av dina krediter eller jackpot-låset.";
             }
-
-            // Refresh UI to reflect changes
-            StateHasChanged();
         }
         else
         {
-            // Display error if not enough credits
             errorMessage = "Du har inte tillräckligt med credits för att delta i jackpotten.";
+            Console.WriteLine(errorMessage);
         }
+
+        StateHasChanged();  // Uppdatera UI för att visa eventuella ändringar
     }
 }
 
@@ -492,15 +532,14 @@
                 <i class="fas fa-arrow-left"></i>
             </button>
             <div class="countdown-timer">
-                <h4>@selectedDay 20:00</h4>
+                <h4>@productData?.DrawDate.ToString("yyyy-MM-dd HH:mm")</h4>
                 <p>@timeRemaining</p>
             </div>
 
             @if (isJackpotSelected)
             {
-                <!-- Jackpot View with "Purchase" style -->
                 <div class="jackpot-details">
-                    <p class="jackpotamount">$@jackpotAmount</p>
+                    <p id="jackpotAmount" class="jackpotamount">@jackpotAmount.ToString("0.0")</p>
 
                     <!-- Lock In Button with Credits Box Above -->
                     <div class="jackpot-credits-wrapper">
@@ -517,7 +556,7 @@
 
                             @if (userCredits < 100)
                             {
-                                <div class="insufficient-credits-box">-100</div> <!-- Red box indicating insufficient credits -->
+                                <div class="insufficient-credits-box">100:-</div> <!-- Red box indicating insufficient credits -->
                             }
                         </button>
                     </div>
@@ -582,6 +621,35 @@
                     <button @onclick="() => showPopup = false">Close</button>
                 </div>
             }
+
+            <!-- Modals for Winning Chance, Total Odds, and Total Locked In Amount -->
+            @if (currentModal == "winningChanceModal")
+            {
+                <div class="modal-overlay" @onclick="CloseModal">
+                    <div class="modal-content">
+                        <p>Your Winning Chance is @winningChance</p>
+                        <button class="lock-in-button" @onclick="CloseModal">Close</button>
+                    </div>
+                </div>
+            }
+            @if (currentModal == "totalOddsModal")
+            {
+                <div class="modal-overlay" @onclick="CloseModal">
+                    <div class="modal-content">
+                        <p>Total Odds: @totalOdds.ToString("0.0")x</p>
+                        <button class="lock-in-button" @onclick="CloseModal">Close</button>
+                    </div>
+                </div>
+            }
+            @if (currentModal == "totalLockedInAmountModal")
+            {
+                <div class="modal-overlay" @onclick="CloseModal">
+                    <div class="modal-content">
+                        <p>Total Locked In Amount: @totalLockedInAmount.ToString("0.0")</p>
+                        <button class="lock-in-button" @onclick="CloseModal">Close</button>
+                    </div>
+                </div>
+            }
         }
     </div>
 </div>
@@ -597,8 +665,13 @@
     .jackpotamount {
         font-size: 44px;
         font-weight: bold;
+        color: #DAA520; /* Exklusiv färg, t.ex. gyllene */
+        background-color: #ffffff; /* Vit bakgrund */
+        padding: 10px 20px; /* Extra padding för att skapa rektangelform */
+        border-radius: 25px; /* Rundade hörn för rektangeln */
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Lätt skugga för djup */
+        display: inline-block; /* Gör det till en inline-block för bättre placering */
         margin-bottom: 300px;
-        color: #556B2F;
     }
 
     .jackpot-credits-wrapper {
@@ -994,5 +1067,29 @@
         if (event.target.classList.contains("modal")) {
             event.target.style.display = "none";
         }
+    }
+
+    function animateValue(id, start, end, duration) {
+        const obj = document.getElementById(id);
+        if (!obj) {
+            console.warn(`Element with ID "${id}" not found.`);
+            return;
+        }
+
+        if (start === end) return;
+
+        const range = end - start;
+        let current = start;
+        const increment = end > start ? 0.01 : -0.01;
+        const stepTime = Math.abs(Math.floor(duration / (range / increment)));
+
+        const timer = setInterval(function () {
+            current = Math.round((current + increment) * 100) / 100;
+            obj.innerText = current.toFixed(2);
+            if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                clearInterval(timer);
+                obj.innerText = end.toFixed(2);
+            }
+        }, stepTime);
     }
 </script>

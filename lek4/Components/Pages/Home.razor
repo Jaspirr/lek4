@@ -50,6 +50,11 @@
     <span>@number.ToString("0.0")</span>
     <button @onclick="IncrementNumber">+</button>
 </div>
+<div class="update-credits-section">
+    <label for="creditsInput">Ange nya credits:</label>
+    <input type="number" id="creditsInput" @bind="newCredits" min="0" />
+    <button @onclick="UpdateUserCredits">Uppdatera Credits</button>
+</div>
 
 <button @onclick="FetchStepsFromGoogleFit">Fetch Steps from Google Fit</button>
 <button @onclick="ShowAd">Watch Ad</button> <!-- Button to show ad -->
@@ -163,6 +168,31 @@
         9.3, 9.6, 9.9
     };
     private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
+    private int newCredits; // Variabel för att hålla det nya kreditvärdet
+
+    private async Task UpdateUserCredits()
+    {
+        var email = await localStorage.GetItemAsync<string>("userEmail");
+
+        if (string.IsNullOrEmpty(email))
+        {
+            Console.WriteLine("No email found in local storage.");
+            return;
+        }
+
+        // Uppdatera användarens credits i Firebase
+        bool isUpdated = await UserService.UpdateUserCredits(email, newCredits);
+
+        if (isUpdated)
+        {
+            credits = newCredits; // Uppdatera UI med nya värdet
+            Console.WriteLine($"Credits for {email} updated to {newCredits}.");
+        }
+        else
+        {
+            Console.WriteLine($"Failed to update credits for {email}.");
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

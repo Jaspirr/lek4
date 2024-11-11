@@ -1,0 +1,65 @@
+﻿<h3>CountdownTimer</h3>
+
+@code {
+    [Parameter] public DateTime TargetDate { get; set; }
+    private string timeRemaining;
+    private Timer timer;
+
+    protected override void OnInitialized()
+    {
+        timer = new Timer(UpdateTimer, null, 0, 1000); // Update every second
+    }
+
+    private void UpdateTimer(object state)
+    {
+        var now = DateTime.Now;
+        var timeSpan = TargetDate - now;
+
+        if (timeSpan.TotalSeconds > 0)
+        {
+            timeRemaining = $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m {timeSpan.Seconds}s";
+        }
+        else
+        {
+            timeRemaining = "The jackpot draw has closed!";
+            timer.Dispose(); // Stop the timer
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}
+
+<div class="countdown-timer">
+    <h4>Time Remaining</h4>
+    <p>@timeRemaining</p>
+</div>
+
+<style>
+    .countdown-timer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #e9f7ef;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .countdown-timer h4 {
+        font-size: 1.2em;
+        color: #28a745;
+        margin: 0;
+    }
+
+    .countdown-timer p {
+        font-size: 1.5em;
+        color: #155724;
+        font-weight: bold;
+    }
+</style>
+
+
