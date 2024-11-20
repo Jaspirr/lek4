@@ -1,9 +1,11 @@
 ﻿using lek4.Components.Service;
+using Microsoft.JSInterop;
 using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using static lek4.Components.Pages.PriceConfig;
 
 public class UserService
 {
@@ -12,12 +14,20 @@ public class UserService
     // Property to store the current user's email globally
     public string CurrentUserEmail { get; set; }
     private double newCredits;
+
+    private static UserService _instance;
+    public static UserService Instance => _instance ?? throw new InvalidOperationException("UserService is not initialized.");
+
+
     // Constructor to initialize the HttpClient
     public UserService(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
-
+    public static void InitializeService(HttpClient httpClient)
+    {
+        _instance = new UserService(httpClient);
+    }
     // Method to set the current user's email after login
     public void SetCurrentUserEmail(string userEmail)
     {
@@ -356,6 +366,132 @@ public class UserService
 
         // 2. Uppdatera JackpotTotalLockin.json med användarens e-post och låst belopp
         await jackpotService.UpdateJackpotTotalLockin(userEmail, lockInCost);
+    }
+    public async Task<Dictionary<string, Dictionary<string, bool>>> GetOrCreateClaimedPrizes(string claimDataUrl)
+    {
+        var claimedPrizes = new Dictionary<string, Dictionary<string, bool>>();
+
+        try
+        {
+            var response = await _httpClient.GetAsync(claimDataUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                claimedPrizes = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, bool>>>(responseBody)
+                                ?? new Dictionary<string, Dictionary<string, bool>>();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                Console.WriteLine("ClaimedPrizes file not found. Initializing empty structure.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching ClaimedPrizes: {ex.Message}");
+        }
+
+        return claimedPrizes;
+    }
+    public async Task SaveClaimedPrizes(Dictionary<string, Dictionary<string, bool>> claimedPrizes)
+    {
+        var url = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FClaimedPrizes.json";
+        var jsonData = JsonSerializer.Serialize(claimedPrizes, new JsonSerializerOptions { WriteIndented = true });
+        var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await _httpClient.PostAsync(url, content);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("ClaimedPrizes saved successfully.");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to save ClaimedPrizes: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in SaveClaimedPrizes: {ex.Message}");
+        }
+    }
+    [JSInvokable("ClaimPrizeFromService")]
+    public static async Task<bool> ClaimPrizeFromService(string userEmail, string prizeType, double prizeValue)
+    {
+        // Using the singleton instance
+        return await UserService.Instance.ProcessClaimPrize(userEmail, prizeType, prizeValue);
+    }
+    public async Task<bool> ProcessClaimPrize(string userEmail, string prizeType, double prizeValue)
+    {
+        if (string.IsNullOrEmpty(userEmail))
+        {
+            Console.WriteLine("User email is empty or null. Cannot process claim.");
+            return false;
+        }
+
+        try
+        {
+            // Om priset är Credits, uppdatera användarens krediter
+            if (prizeType == "Credits")
+            {
+                await AddCreditToUser(userEmail, (int)prizeValue);
+                Console.WriteLine($"Added {prizeValue} credits to user {userEmail}.");
+                return true;
+            }
+
+            // Här kan du lägga till logik för andra typer av priser om det behövs
+            Console.WriteLine($"Processing other prize types is not implemented yet: {prizeType}.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing claim for {userEmail}: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task AwardPrizeToUser(string userEmail, OutcomeConfiguration prizeOutcome)
+    {
+        // Check if prize is credits and PrizeValue is greater than 0
+        if (prizeOutcome.PrizeType == "Credits" && prizeOutcome.PrizeValue > 0)
+        {
+            // Fetch the user's current stats from Firebase
+            var existingUser = await GetUserFromFirebase(userEmail);
+            if (existingUser == null)
+            {
+                Console.WriteLine($"User {userEmail} not found.");
+                return;
+            }
+
+            // Add the prize credits to the user’s existing credits
+            existingUser.Credits += (int)prizeOutcome.PrizeValue;
+
+            // Update the user’s stats in Firebase
+            bool updateSuccess = await UpdateUserCredits(userEmail, existingUser.Credits);
+            if (updateSuccess)
+            {
+                Console.WriteLine($"Awarded {prizeOutcome.PrizeValue} credits to {userEmail}. New total: {existingUser.Credits}");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to update credits for {userEmail}.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("No credits awarded, as the prize type is not 'Credits' or the value is zero.");
+        }
+    }
+    public class OutcomeConfiguration
+    {
+        public int CorrectAnswersRequired { get; set; }
+        public string Message { get; set; }
+        public string IconClass { get; set; }
+        public string BackgroundColor { get; set; }
+        public string AnimationClass { get; set; }
+        public string PrizeType { get; set; }
+        public double PrizeValue { get; set; }
     }
 
 

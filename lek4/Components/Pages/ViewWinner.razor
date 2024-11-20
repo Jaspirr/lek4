@@ -14,28 +14,39 @@
     private bool showWinner = false;
     private string selectedWinner;
     private Dictionary<string, double> userLockInData;
+    private bool isJackpot = false; // Add a flag to check if the product is a jackpot
 
     protected override async Task OnInitializedAsync()
     {
-        // Hämta alla användares odds och namn för den specifika produkten
+        // Check if the current product is a jackpot
+        isJackpot = await ProductService.CheckIfJackpotProduct(productNumber); // Using the method to check for jackpot
+
+        if (isJackpot)
+        {
+            // If it's a jackpot, redirect to the jackpot winner page
+            NavigationManager.NavigateTo($"/viewjackpotwinner/{productNumber}");
+            return; // Exit early to prevent the rest of the code from running
+        }
+
+        // Otherwise, proceed as normal for regular product winners
         userLockInData = await DrawService.GetAllUserLockInData(productNumber);
 
-        // Starta hjulanimationen
+        // Start the wheel animation
         await JSRuntime.InvokeVoidAsync("startDynamicWheelAnimation", userLockInData);
 
-        // Vänta tills hjulet stannar innan vinnaren och konfettin visas
-        await Task.Delay(2500); // 2,5 sekunder för snurr
+        // Wait until the wheel stops before showing the winner and confetti
+        await Task.Delay(2500); // 2.5 seconds for spinning
 
-        // Fade ut hjulet och fade in vinnaren
+        // Fade out the wheel and fade in the winner
         showWheel = false;
-        await Task.Delay(800); // Vänta på fade-out (0,8 sekunder)
+        await Task.Delay(800); // Wait for fade-out (0.8 seconds)
 
-        // Hämta och visa vinnaren
+        // Get and display the winner
         winner = await ProductService.GetWinnerFromFirebase(productNumber);
         selectedWinner = winner;
         showWinner = true;
 
-        // Trigga konfettin över vinnaren
+        // Trigger confetti over the winner
         await JSRuntime.InvokeVoidAsync("triggerConfettiOverPopup");
     }
 
@@ -50,7 +61,7 @@
     <div class="wheel-container">
         <canvas id="wheel-canvas" width="300" height="300" class="wheel-animation"></canvas>
 
-        <!-- Rundad pil som pekar mot hjulets vinnande sektion -->
+        <!-- Arrow pointer -->
         <div class="arrow-pointer"></div>
     </div>
 }
@@ -72,7 +83,6 @@ else if (showWinner)
     </div>
 }
 
-<!-- Detta är canvasen för konfetti -->
 <canvas id="confetti-canvas" style="position:absolute;z-index:1001;"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/confetti-js@0.0.17/dist/index.min.js"></script>
@@ -82,20 +92,19 @@ else if (showWinner)
         const popup = document.getElementById('popup-container');
 
         if (popup && confettiCanvas) {
-            // Positionera konfetti canvas
             confettiCanvas.width = window.innerWidth;
             confettiCanvas.height = window.innerHeight;
 
             const confettiSettings = {
                 target: 'confetti-canvas',
-                max: 100,  // Färre konfetti
-                size: 2,   // Liten storlek på konfettin
+                max: 100,
+                size: 2,
                 animate: true,
-                props: ["circle", "square", "triangle"], // Olika konfetti former
+                props: ["circle", "square", "triangle"],
                 colors: [[165, 42, 42], [255, 215, 0], [138, 43, 226], [64, 224, 208]],
-                clock: 25,  // Sänkt hastighet
-                start_from_edge: false,  // Starta konfetti från mitten
-                origin: { x: 0.5, y: 0.5 },  // Starta från mitten
+                clock: 25,
+                start_from_edge: false,
+                origin: { x: 0.5, y: 0.5 },
             };
 
             const confetti = new ConfettiGenerator(confettiSettings);
@@ -109,16 +118,15 @@ else if (showWinner)
         const canvas = document.getElementById('wheel-canvas');
         const ctx = canvas.getContext('2d');
 
-        const users = Object.keys(userLockInData);  // Användarens e-post
-        const odds = Object.values(userLockInData); // Användarens odds
-        const totalOdds = odds.reduce((sum, current) => sum + current, 0);  // Totalt antal odds
+        const users = Object.keys(userLockInData);
+        const odds = Object.values(userLockInData);
+        const totalOdds = odds.reduce((sum, current) => sum + current, 0);
 
-        // Definiera färgerna för varannan bit: mintgrön, ljusgul och ljuslila
-        const colors = ['#98FF98', '#FFFACD', '#E6E6FA']; // Mintgrönt, ljusgul och ljuslila
+        const colors = ['#98FF98', '#FFFACD', '#E6E6FA'];
 
         let rotation = 0;
-        const totalRotationTime = 2500; // Förläng snurrtiden till 2.5 sekunder
-        const slowDownTime = 1600; // Börja sakta ner efter 1.6 sekunder
+        const totalRotationTime = 2500;
+        const slowDownTime = 1600;
         const animationInterval = 10;
         let timeElapsed = 0;
         let intervalId;
@@ -139,7 +147,7 @@ else if (showWinner)
                 ctx.moveTo(centerX, centerY);
                 ctx.arc(centerX, centerY, radius, startAngle, endAngle);
                 ctx.closePath();
-                ctx.fillStyle = colors[i % colors.length]; // Alternera mellan mintgrönt, ljusgul och ljuslila
+                ctx.fillStyle = colors[i % colors.length];
                 ctx.fill();
 
                 ctx.strokeStyle = '#fff';
@@ -208,14 +216,13 @@ else if (showWinner)
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        height: 80vh; /* Anpassa denna höjd för att centrera hjulet i mitten */
+        height: 80vh;
     }
 
     .wheel-animation {
         margin: 0 auto;
     }
 
-    /* Rundad pil */
     .arrow-pointer {
         width: 0;
         height: 0;
@@ -224,7 +231,7 @@ else if (showWinner)
         border-bottom: 40px solid black;
         margin: 10px auto;
         transform: translateY(-20px);
-        border-radius: 10px; /* Gör pilen rundad */
+        border-radius: 10px;
     }
 
     #confetti-canvas {

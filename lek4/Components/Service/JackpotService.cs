@@ -409,6 +409,23 @@ namespace lek4.Components.Service
                 Console.WriteLine($"Failed to save ticket. Status Code: {putResponse.StatusCode}");
             }
         }
+        public async Task<string> GetWinnerTicketFromFirebase(int productNumber, string winnerEmail)
+        {
+            var path = $"https://firebasestorage.googleapis.com/v0/b/your-project-id.appspot.com/o/users%2Fjackpot%2F{productNumber}%2F{winnerEmail}.json?alt=media";
+
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                return jsonResponse;  // Assuming the ticket data is stored as a JSON string
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch winner's ticket for {winnerEmail}. Status: {response.StatusCode}");
+                return null;
+            }
+        }
     }
     // Skapa en klass för att hantera dataformatet i JackpotTotalLockin.json
     public class JackpotLockinEntry

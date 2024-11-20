@@ -729,7 +729,6 @@ namespace lek4.Components.Service
             }
         }
 
-
         public class ProductData
         {
             public int ProductNumber { get; set; }

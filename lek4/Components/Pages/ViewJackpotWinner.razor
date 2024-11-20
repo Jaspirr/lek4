@@ -1,0 +1,1334 @@
+﻿@page "/viewjackpotwinner/{productNumber:int}"
+@using Blazored.LocalStorage
+@using System.Text.Json
+@using System.Text
+@using lek4.Components.Service
+@inject NavigationManager NavigationManager
+@inject JackpotService JackpotService
+@inject ProductService ProductService
+@inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
+@inject ILocalStorageService LocalStorage
+@inject IJSRuntime JS
+@inject HttpClient Http
+@inject UserService UserService
+
+@using lek4.Components.Models
+@using static lek4.Components.Models.Models
+@using Microsoft.JSInterop
+@using static lek4.Components.Pages.PriceConfig
+@code {
+        [Parameter] public int productNumber { get; set; }
+    private string winnerEmail;
+    private string winnerTicket;
+    private bool showWinner = false;
+    private string winnerStatus = "No winner";
+
+    // Ticket data placeholders
+    private string winnerNumber;
+    private string winnerColor;
+    private string winnerSymbol;
+    private string winnerChineseSymbol;
+    private string winnerPlanet;
+    private string winnerElement;
+
+    private List<OutcomeConfiguration> OutcomeConfigurations = new List<OutcomeConfiguration>();
+
+    private string userEmail;
+    private string userTicket;
+    private bool showUserTicket = false;
+
+    private double jackpotAmount;
+    private bool isClaimed = false;
+    private string prizeType = "Credits"; // Dynamisk typ
+    private double prizeValue = 100;
+    private Dictionary<string, Dictionary<string, bool>> claimedPrizes;
+
+    // Listor för att hämta bilder och färger från SelectTicket
+    private List<string> imageUrls = new List<string>
+    {
+        "images/Orion.webp",
+        "images/Andromeda.webp",
+        "images/Lejonet.webp",
+        "images/Skytten.webp",
+        "images/Skorpionen.webp",
+        "images/Vaduren.webp",
+        "images/Tvillingarna.webp",
+        "images/Oxen.webp",
+        "images/Vagen.webp",
+        "images/Jungfrun.webp",
+        "images/Kraftan.webp",
+        "images/Storabjornen.webp",
+        "images/Stenbocken.webp",
+        "images/Fiskarna.webp",
+        "images/Draken.webp",
+        "images/Ornen.webp",
+        "images/Kentauren.webp",
+        "images/Lyra.webp",
+        "images/Orionhunden.webp",
+        "images/Delfinen.webp",
+        "images/Korpen.webp",
+        "images/Krukan.webp",
+        "images/Hydran.webp",
+        "images/Kameleonten.webp",
+        "images/Teleskopet.webp",
+        "images/Svardfisken.webp",
+        "images/Pafageln.webp",
+        "images/Fenix.webp",
+        "images/Flygfisken.webp",
+        "images/Vargen.webp",
+        "images/Enhorningen.webp",
+        "images/Kaninen.webp"
+        };
+
+    private List<ColorOption> colors = new List<ColorOption>
+    {
+        new ColorOption { Name = "Red", ColorCode = "#FF5733" },
+        new ColorOption { Name = "Green", ColorCode = "#33FF57" },
+        new ColorOption { Name = "Blue", ColorCode = "#3357FF" },
+        new ColorOption { Name = "Yellow", ColorCode = "#FFFF33" },
+        new ColorOption { Name = "Purple", ColorCode = "#9B33FF" },
+        new ColorOption { Name = "Orange", ColorCode = "#FF8C33" },
+        new ColorOption { Name = "Pink", ColorCode = "#FF33A8" },
+        new ColorOption { Name = "Brown", ColorCode = "#8B4513" },
+        new ColorOption { Name = "Cyan", ColorCode = "#33FFF6" },
+        new ColorOption { Name = "Magenta", ColorCode = "#FF33FF" },
+        new ColorOption { Name = "Teal", ColorCode = "#008080" },
+        new ColorOption { Name = "Lime", ColorCode = "#BFFF00" },
+        new ColorOption { Name = "Olive", ColorCode = "#808000" },
+        new ColorOption { Name = "Maroon", ColorCode = "#800000" },
+        new ColorOption { Name = "Navy", ColorCode = "#000080" },
+        new ColorOption { Name = "Gold", ColorCode = "#FFD700" },
+        new ColorOption { Name = "Silver", ColorCode = "#C0C0C0" },
+        new ColorOption { Name = "Coral", ColorCode = "#FF7F50" },
+        new ColorOption { Name = "Turquoise", ColorCode = "#40E0D0" },
+        new ColorOption { Name = "Indigo", ColorCode = "#4B0082" },
+        new ColorOption { Name = "Lavender", ColorCode = "#E6E6FA" },
+        new ColorOption { Name = "Salmon", ColorCode = "#FA8072" },
+        new ColorOption { Name = "SlateBlue", ColorCode = "#6A5ACD" },
+        new ColorOption { Name = "Mint", ColorCode = "#98FF98" },
+        new ColorOption { Name = "Crimson", ColorCode = "#DC143C" },
+        new ColorOption { Name = "Peach", ColorCode = "#FFE5B4" },
+        new ColorOption { Name = "ForestGreen", ColorCode = "#228B22" },
+        new ColorOption { Name = "SkyBlue", ColorCode = "#87CEEB" },
+        new ColorOption { Name = "Violet", ColorCode = "#EE82EE" },
+        new ColorOption { Name = "Tan", ColorCode = "#D2B48C" },
+        new ColorOption { Name = "Sienna", ColorCode = "#A0522D" },
+        new ColorOption { Name = "Khaki", ColorCode = "#F0E68C" },
+        new ColorOption { Name = "Orchid", ColorCode = "#DA70D6" },
+        new ColorOption { Name = "Chocolate", ColorCode = "#D2691E" },
+        new ColorOption { Name = "Tomato", ColorCode = "#FF6347" },
+        new ColorOption { Name = "SteelBlue", ColorCode = "#4682B4" },
+        new ColorOption { Name = "Periwinkle", ColorCode = "#CCCCFF" },
+        new ColorOption { Name = "Lemon", ColorCode = "#FFF44F" },
+        new ColorOption { Name = "SeaGreen", ColorCode = "#2E8B57" },
+        new ColorOption { Name = "Fuchsia", ColorCode = "#FF00FF" },
+        new ColorOption { Name = "Aqua", ColorCode = "#00FFFF" },
+        new ColorOption { Name = "Amethyst", ColorCode = "#9966CC" },
+        new ColorOption { Name = "Copper", ColorCode = "#B87333" },
+        new ColorOption { Name = "Ruby", ColorCode = "#E0115F" },
+        new ColorOption { Name = "Emerald", ColorCode = "#50C878" },
+        new ColorOption { Name = "Charcoal", ColorCode = "#36454F" },
+        new ColorOption { Name = "Ivory", ColorCode = "#FFFFF0" },
+        new ColorOption { Name = "Sand", ColorCode = "#C2B280" },
+        new ColorOption { Name = "MidnightBlue", ColorCode = "#191970" },
+        new ColorOption { Name = "Rose", ColorCode = "#FF007F" }
+    };
+    private List<SymbolOption> symbols = new List<SymbolOption>
+    {
+        new SymbolOption { Name = "Anchor", IconClass = "fas fa-anchor" },
+        new SymbolOption { Name = "Frog", IconClass = "fas fa-frog" },
+        new SymbolOption { Name = "Balance Scale", IconClass = "fas fa-balance-scale" },
+        new SymbolOption { Name = "Bell", IconClass = "fas fa-bell" },
+        new SymbolOption { Name = "Bicycle", IconClass = "fas fa-bicycle" },
+        new SymbolOption { Name = "Binoculars", IconClass = "fas fa-binoculars" },
+        new SymbolOption { Name = "Bolt", IconClass = "fas fa-bolt" },
+        new SymbolOption { Name = "Bomb", IconClass = "fas fa-bomb" },
+        new SymbolOption { Name = "Book", IconClass = "fas fa-book" },
+        new SymbolOption { Name = "Briefcase", IconClass = "fas fa-briefcase" },
+        new SymbolOption { Name = "Camera", IconClass = "fas fa-camera" },
+        new SymbolOption { Name = "Car", IconClass = "fas fa-car" },
+        new SymbolOption { Name = "Certificate", IconClass = "fas fa-certificate" },
+        new SymbolOption { Name = "Cloud", IconClass = "fas fa-cloud" },
+        new SymbolOption { Name = "Code", IconClass = "fas fa-code" },
+        new SymbolOption { Name = "Coffee", IconClass = "fas fa-coffee" },
+        new SymbolOption { Name = "Compass", IconClass = "fas fa-compass" },
+        new SymbolOption { Name = "Crown", IconClass = "fas fa-crown" },
+        new SymbolOption { Name = "Dice", IconClass = "fas fa-dice" },
+        new SymbolOption { Name = "Dragon", IconClass = "fas fa-dragon" },
+        new SymbolOption { Name = "Feather", IconClass = "fas fa-feather" },
+        new SymbolOption { Name = "Fire", IconClass = "fas fa-fire" },
+        new SymbolOption { Name = "Football", IconClass = "fas fa-football-ball" },
+        new SymbolOption { Name = "Ghost", IconClass = "fas fa-ghost" },
+        new SymbolOption { Name = "Globe", IconClass = "fas fa-globe" },
+        new SymbolOption { Name = "Guitar", IconClass = "fas fa-guitar" },
+        new SymbolOption { Name = "Heart", IconClass = "fas fa-heart" },
+        new SymbolOption { Name = "Horse", IconClass = "fas fa-horse" },
+        new SymbolOption { Name = "Key", IconClass = "fas fa-key" },
+        new SymbolOption { Name = "Leaf", IconClass = "fas fa-leaf" },
+        new SymbolOption { Name = "Lightbulb", IconClass = "fas fa-lightbulb" },
+        new SymbolOption { Name = "Magic", IconClass = "fas fa-magic" },
+        new SymbolOption { Name = "Medal", IconClass = "fas fa-medal" },
+        new SymbolOption { Name = "Mobile", IconClass = "fas fa-mobile-alt" },
+        new SymbolOption { Name = "Moon", IconClass = "fas fa-moon" },
+        new SymbolOption { Name = "Music", IconClass = "fas fa-music" },
+        new SymbolOption { Name = "Paper Plane", IconClass = "fas fa-paper-plane" },
+        new SymbolOption { Name = "Paw", IconClass = "fas fa-paw" },
+        new SymbolOption { Name = "Plane", IconClass = "fas fa-plane" },
+        new SymbolOption { Name = "Robot", IconClass = "fas fa-robot" },
+        new SymbolOption { Name = "Rocket", IconClass = "fas fa-rocket" },
+        new SymbolOption { Name = "Skull", IconClass = "fas fa-skull" },
+        new SymbolOption { Name = "Snowflake", IconClass = "fas fa-snowflake" },
+        new SymbolOption { Name = "Star", IconClass = "fas fa-star" },
+        new SymbolOption { Name = "Sun", IconClass = "fas fa-sun" },
+        new SymbolOption { Name = "Theater Masks", IconClass = "fas fa-theater-masks" },
+        new SymbolOption { Name = "Thumbs Up", IconClass = "fas fa-thumbs-up" },
+        new SymbolOption { Name = "Tree", IconClass = "fas fa-tree" },
+        new SymbolOption { Name = "Umbrella", IconClass = "fas fa-umbrella" },
+        new SymbolOption { Name = "Volleyball", IconClass = "fas fa-volleyball-ball" }
+    };
+
+    private List<ChineseSymbolOption> chineseSymbols = new List<ChineseSymbolOption>
+    {
+        new ChineseSymbolOption { Name = "Orion", ImageUrl = "images/Orion.webp" },
+        new ChineseSymbolOption { Name = "Andromeda", ImageUrl = "images/Andromeda.webp" },
+        new ChineseSymbolOption { Name = "Leo", ImageUrl = "images/Lejonet.webp" },
+        new ChineseSymbolOption { Name = "Sagittarius", ImageUrl = "images/Skytten.webp" },
+        new ChineseSymbolOption { Name = "Scorpius", ImageUrl = "images/Skorpionen.webp" },
+        new ChineseSymbolOption { Name = "Aries", ImageUrl = "images/Vaduren.webp" },
+        new ChineseSymbolOption { Name = "Gemini", ImageUrl = "images/Tvillingarna.webp" },
+        new ChineseSymbolOption { Name = "Taurus", ImageUrl = "images/Oxen.webp" },
+        new ChineseSymbolOption { Name = "Libra", ImageUrl = "images/Vagen.webp" },
+        new ChineseSymbolOption { Name = "Virgo", ImageUrl = "images/Jungfrun.webp" },
+        new ChineseSymbolOption { Name = "Cancer", ImageUrl = "images/Kraftan.webp" },
+        new ChineseSymbolOption { Name = "Ursa Major", ImageUrl = "images/Storabjornen.webp" },
+        new ChineseSymbolOption { Name = "Capricornus", ImageUrl = "images/Stenbocken.webp" },
+        new ChineseSymbolOption { Name = "Pisces", ImageUrl = "images/Fiskarna.webp" },
+        new ChineseSymbolOption { Name = "Draco", ImageUrl = "images/Draken.webp" },
+        new ChineseSymbolOption { Name = "Aquila", ImageUrl = "images/Ornen.webp" },
+        new ChineseSymbolOption { Name = "Centaurus", ImageUrl = "images/Kentauren.webp" },
+        new ChineseSymbolOption { Name = "Lyra", ImageUrl = "images/Lyra.webp" },
+        new ChineseSymbolOption { Name = "Canis Major", ImageUrl = "images/Orionhunden.webp" },
+        new ChineseSymbolOption { Name = "Delphinus", ImageUrl = "images/Delfinen.webp" },
+        new ChineseSymbolOption { Name = "Corvus", ImageUrl = "images/Korpen.webp" },
+        new ChineseSymbolOption { Name = "Crater", ImageUrl = "images/Krukan.webp" },
+        new ChineseSymbolOption { Name = "Hydra", ImageUrl = "images/Hydran.webp" },
+        new ChineseSymbolOption { Name = "Chamaeleon", ImageUrl = "images/Kameleonten.webp" },
+        new ChineseSymbolOption { Name = "Telescopium", ImageUrl = "images/Teleskopet.webp" },
+        new ChineseSymbolOption { Name = "Dorado", ImageUrl = "images/Svardfisken.webp" },
+        new ChineseSymbolOption { Name = "Pavo", ImageUrl = "images/Pafageln.webp" },
+        new ChineseSymbolOption { Name = "Phoenix", ImageUrl = "images/Fenix.webp" },
+        new ChineseSymbolOption { Name = "Volans", ImageUrl = "images/Flygfisken.webp" },
+        new ChineseSymbolOption { Name = "Lupus", ImageUrl = "images/Vargen.webp" },
+        new ChineseSymbolOption { Name = "Monoceros", ImageUrl = "images/Enhorningen.webp" },
+        new ChineseSymbolOption { Name = "Lepus", ImageUrl = "images/Kaninen.webp" },
+    };
+
+    private List<PlanetOption> planets = new List<PlanetOption>
+    {
+        new PlanetOption { Name = "Mercury", ImageUrl = "images/mercurus.webp" },
+        new PlanetOption { Name = "Venus", ImageUrl = "images/Venus.webp" },
+        new PlanetOption { Name = "Earth", ImageUrl = "images/earth.webp" },
+        new PlanetOption { Name = "Mars", ImageUrl = "images/Mars.webp" },
+        new PlanetOption { Name = "Jupiter", ImageUrl = "images/jupiter.webp" },
+        new PlanetOption { Name = "Saturn", ImageUrl = "images/Saturnus.webp" },
+        new PlanetOption { Name = "Uranus", ImageUrl = "images/uranus.webp" },
+        new PlanetOption { Name = "Neptune", ImageUrl = "images/Neptunus.webp" }
+    };
+    private List<ElementOption> elements = new List<ElementOption>
+    {
+        new ElementOption { Name = "Earth", ImageUrl = "/images/elements/Jord.webp" },
+        new ElementOption { Name = "Fire", ImageUrl = "/images/elements/Fire.webp" },
+        new ElementOption { Name = "Water", ImageUrl = "/images/elements/Water.webp" },
+        new ElementOption { Name = "Air", ImageUrl = "/images/elements/Air.webp" },
+    };
+    public class ColorOption
+    {
+        public string Name { get; set; }
+        public string ColorCode { get; set; }
+    }
+    public class SymbolOption
+    {
+        public string Name { get; set; }
+        public string IconClass { get; set; } // Add this line
+    }
+    public class PlanetOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+    public class ElementOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+    public class ChineseSymbolOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+    private void RevealWinnerTicket()
+    {
+        JS.InvokeVoidAsync("revealElements");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Hämta användarens e-post från LocalStorage
+            userEmail = await LocalStorage.GetItemAsync<string>("userEmail");
+            UserService.InitializeService(HttpClient);
+
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                Console.WriteLine("No user email found in LocalStorage. Cannot proceed.");
+                return;
+            }
+
+            // Sätt CurrentUserEmail i UserService
+            UserService.Instance.SetCurrentUserEmail(userEmail);
+            Console.WriteLine($"UserService: CurrentUserEmail set to {userEmail}");
+
+            // Hämta ClaimedPrizes
+            var claimDataUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FClaimedPrizes.json?alt=media";
+            claimedPrizes = await UserService.Instance.GetOrCreateClaimedPrizes(claimDataUrl);
+
+            // Hämta vinnardata från Firebase
+            var winnerDataUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner%2Fproduct4%2Fwinner.json?alt=media";
+            var winnerDataResponse = await HttpClient.GetStringAsync(winnerDataUrl);
+
+            if (!string.IsNullOrEmpty(winnerDataResponse))
+            {
+                var winnerData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(winnerDataResponse);
+                if (winnerData != null && winnerData.WinningTicket != null)
+                {
+                    winnerNumber = (string)winnerData.WinningTicket.Number;
+                    winnerColor = (string)winnerData.WinningTicket.Color;
+                    winnerSymbol = (string)winnerData.WinningTicket.Symbol;
+                    winnerChineseSymbol = (string)winnerData.WinningTicket.ChineseSymbol;
+                    winnerPlanet = (string)winnerData.WinningTicket.Planet;
+                    winnerElement = (string)winnerData.WinningTicket.Element;
+                    showWinner = true;
+                }
+                else
+                {
+                    Console.WriteLine("No winner data available.");
+                }
+            }
+
+            // Hämta användarens biljetter
+            var ticketDataUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FJackpotConfirmedTickets.json?alt=media";
+            var ticketDataResponse = await HttpClient.GetStringAsync(ticketDataUrl);
+            var jackpotTickets = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(ticketDataResponse);
+
+            if (jackpotTickets != null && jackpotTickets.ContainsKey(userEmail))
+            {
+                var userTicketDataList = jackpotTickets[userEmail];
+                var userTickets = new List<string>();
+
+                foreach (var ticket in userTicketDataList)
+                {
+                    var ticketParts = ticket.Split(',');
+                    if (ticketParts.Length == 6)
+                    {
+                        var formattedTicket = $"{ticketParts[0]},{ticketParts[1]},{ticketParts[2]},{ticketParts[3]},{ticketParts[4]},{ticketParts[5]}";
+                        userTickets.Add(formattedTicket);
+                    }
+                }
+
+                userTicket = string.Join("<br>", userTickets);
+                showUserTicket = true;
+            }
+
+            // Hämta outcome-konfigurationer från Firebase
+            var outcomeConfigUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2Foutcomeconfigurations.json?alt=media";
+            var outcomeConfigResponse = await Http.GetStringAsync(outcomeConfigUrl);
+
+            if (!string.IsNullOrEmpty(outcomeConfigResponse))
+            {
+                OutcomeConfigurations = JsonSerializer.Deserialize<List<OutcomeConfiguration>>(outcomeConfigResponse) ?? new List<OutcomeConfiguration>();
+                Console.WriteLine($"Loaded {OutcomeConfigurations.Count} outcome configurations.");
+            }
+
+            // Hämta jackpotbelopp från JackpotService
+            jackpotAmount = await JackpotService.GetCalculatedJackpotAmount();
+
+            // Skicka outcome-konfigurationer till JavaScript
+            await JS.InvokeVoidAsync("initializeOutcomeConfigurations", JsonSerializer.Serialize(OutcomeConfigurations));
+
+            // Skicka jackpotbeloppet till JavaScript
+            await JS.InvokeVoidAsync("setJackpotAmount", jackpotAmount);
+
+            Console.WriteLine("Initialization completed successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during initialization: {ex.Message}");
+        }
+    }
+
+    public class JackpotTicket
+    {
+        public string Number { get; set; }
+        public string Color { get; set; }
+        public string Symbol { get; set; }
+        public string ChineseSymbol { get; set; }
+        public string Planet { get; set; }
+        public string Element { get; set; }
+    }
+
+
+    private void GoBack() => NavigationManager.NavigateTo("/products");
+
+    private void ShowUserTicket() => showUserTicket = true; // Method to display user's ticket after "Rätta" is clicked
+
+
+    private string GetChineseSymbolImage(string chineseSymbolName)
+    {
+        var chineseSymbol = chineseSymbols.FirstOrDefault(cs => cs.Name == chineseSymbolName);
+        return chineseSymbol?.ImageUrl ?? "default_image_url";
+    }
+
+    private string GetPlanetImage(string planetName)
+    {
+        var planet = planets.FirstOrDefault(p => p.Name == planetName);
+        return planet?.ImageUrl ?? "default_planet_image_url";
+    }
+
+    private string GetElementImage(string elementName)
+    {
+        var element = elements.FirstOrDefault(e => e.Name == elementName);
+        return element?.ImageUrl ?? "default_element_image_url";
+    }
+
+    private string GetColorCode(string colorName)
+    {
+        var color = colors.FirstOrDefault(c => c.Name == colorName);
+        return color?.ColorCode ?? "#000000";
+    }
+
+    private string GetSymbolIcon(string symbolName)
+    {
+        var symbol = symbols.FirstOrDefault(s => s.Name == symbolName);
+        return symbol?.IconClass ?? "fas fa-question-circle";
+    }
+    [JSInvokable("ClaimPrizeFromWinner")]
+    public static async Task<bool> ClaimPrizeFromWinner(string prizeType, double prizeValue)
+    {
+        var userEmail = UserService.Instance.CurrentUserEmail;
+
+        if (string.IsNullOrEmpty(userEmail))
+        {
+            Console.WriteLine("No user email found. Cannot claim prize.");
+            return false;
+        }
+
+        try
+        {
+            // Hämta redan hämtade priser från Firebase
+            var claimDataUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FClaimedPrizes.json?alt=media";
+            var allClaimedPrizes = await UserService.Instance.GetOrCreateClaimedPrizes(claimDataUrl);
+
+            // Kontrollera om priset redan är hämtat
+            if (allClaimedPrizes.ContainsKey(userEmail) &&
+                allClaimedPrizes[userEmail].ContainsKey(prizeType) &&
+                allClaimedPrizes[userEmail][prizeType])
+            {
+                Console.WriteLine($"Prize '{prizeType}' already claimed by {userEmail}.");
+                return false;
+            }
+
+            // Markera priset som hämtat
+            if (!allClaimedPrizes.ContainsKey(userEmail))
+            {
+                allClaimedPrizes[userEmail] = new Dictionary<string, bool>();
+            }
+
+            allClaimedPrizes[userEmail][prizeType] = true;
+
+            // Spara uppdaterad status i Firebase
+            await UserService.Instance.SaveClaimedPrizes(allClaimedPrizes);
+
+            // Hantera olika typer av priser
+            if (prizeType == "Credits")
+            {
+                await UserService.Instance.AddCreditToUser(userEmail, (int)prizeValue);
+            }
+            else if (prizeType == "Product" || prizeType == "GiftCard" || prizeType == "Jackpot")
+            {
+                Console.WriteLine($"User {userEmail} won a {prizeType} with value {prizeValue}.");
+                // Här kan vi lägga till extra logik för att exempelvis meddela administratör
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error claiming prize: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task SaveClaimedPrizes(Dictionary<string, Dictionary<string, bool>> claimedPrizes)
+    {
+        var url = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FClaimedPrizes.json";
+        var jsonData = JsonSerializer.Serialize(claimedPrizes, new JsonSerializerOptions { WriteIndented = true });
+        var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await HttpClient.PostAsync(url, content);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("ClaimedPrizes saved successfully.");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to save ClaimedPrizes: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in SaveClaimedPrizes: {ex.Message}");
+        }
+    }
+
+    private async Task<Dictionary<string, Dictionary<string, bool>>> GetOrCreateClaimedPrizes(string claimDataUrl)
+    {
+        var claimedPrizes = new Dictionary<string, Dictionary<string, bool>>();
+
+        try
+        {
+            var response = await HttpClient.GetAsync(claimDataUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                claimedPrizes = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, bool>>>(responseBody)
+                                ?? new Dictionary<string, Dictionary<string, bool>>();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                Console.WriteLine("ClaimedPrizes file not found. Initializing empty structure.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching ClaimedPrizes: {ex.Message}");
+        }
+
+        return claimedPrizes;
+    }
+    [JSInvokable("GetClaimedPrizes")]
+    public static async Task<Dictionary<string, bool>> GetClaimedPrizes()
+    {
+        var userEmail = UserService.Instance.CurrentUserEmail;
+
+        if (string.IsNullOrEmpty(userEmail))
+        {
+            Console.WriteLine("No user email found.");
+            return new Dictionary<string, bool>();
+        }
+
+        try
+        {
+            var claimDataUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FClaimedPrizes.json?alt=media";
+            var allClaimedPrizes = await UserService.Instance.GetOrCreateClaimedPrizes(claimDataUrl);
+
+            return allClaimedPrizes.ContainsKey(userEmail)
+                ? allClaimedPrizes[userEmail]
+                : new Dictionary<string, bool>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching claimed prizes: {ex.Message}");
+            return new Dictionary<string, bool>();
+        }
+    }
+
+    public class OutcomeConfiguration
+    {
+        public int CorrectAnswersRequired { get; set; }
+        public string Message { get; set; }
+        public string IconClass { get; set; }
+        public string BackgroundColor { get; set; }
+        public string PrizeType { get; set; }
+        public double PrizeValue { get; set; }
+    }
+}
+<script>
+    let outcomeConfigurations = [];
+    let currentJackpotAmount = 0;
+
+    function initializeOutcomeConfigurations(configurations) {
+        outcomeConfigurations = configurations;
+    }
+
+    function revealElements() {
+        const winnerElements = document.querySelectorAll('.fade-element.hidden');
+        console.log("Found winnerElements:", winnerElements);
+
+        const userTickets = document.querySelectorAll('.user-ticket-row');
+        console.log("Found userTickets:", userTickets);
+
+        let correctCountPerTicket = [];
+
+        userTickets.forEach((ticket, ticketIndex) => {
+            let correctCount = 0; // Track correct count for each ticket
+            const userItems = ticket.querySelectorAll('.user-item'); // Get user items in the current ticket row
+
+            winnerElements.forEach((winnerEl, winnerIndex) => {
+                setTimeout(() => {
+                    // Only reveal winner elements once
+                    if (ticketIndex === 0) {
+                        winnerEl.classList.remove('hidden');
+                        winnerEl.classList.add('fade-in');
+                    }
+
+                    // Delay check/cross appearance after fade-in
+                    setTimeout(() => {
+                        const category = winnerEl.getAttribute('data-category'); // Get category of winner element
+                        const winnerValue = winnerEl.getAttribute('data-value'); // Winner element's value
+
+                        // Find matching user item in the current ticket row
+                        const userEl = Array.from(userItems).find(el => el.getAttribute('data-category') === category);
+                        const userValue = userEl.getAttribute('data-match'); // User item’s value for this category
+
+                        // Check if user item matches winner item for this category
+                        if (userValue === winnerValue) {
+                            userEl.innerHTML += '<i class="fas fa-check check-icon green"></i>';
+                            correctCount++; // Increment correct count for this ticket
+                        } else {
+                            userEl.innerHTML += '<i class="fas fa-times check-icon red large-cross"></i>';
+                        }
+                        userEl.classList.add('shake'); // Add shake animation
+
+                        // If last item of this ticket, record correct count
+                        if (winnerIndex === winnerElements.length - 1) {
+                            correctCountPerTicket.push(correctCount);
+
+                            // If last ticket processed, show popup
+                            if (ticketIndex === userTickets.length - 1) {
+                                setTimeout(() => showPopup(correctCountPerTicket), 1000); // Show popup with a slight delay
+                            }
+                        }
+                    }, 1200); // Delay icon appearance after fade-in
+                }, winnerIndex * 1400); // Delay for each winner element reveal
+            });
+        });
+    }
+    function showPopup(correctCountPerTicket) {
+        console.log("showPopup called with:", correctCountPerTicket);
+
+        DotNet.invokeMethodAsync('lek4', 'GetClaimedPrizes')
+            .then(claimedPrizes => {
+                const resultMessages = correctCountPerTicket.map((count, index) => {
+                    let outcome = count === 0
+                        ? { Message: "Better luck next time!", IconClass: "fas fa-crown", BackgroundColor: "#f0f8ff", AnimationClass: "shake" }
+                        : outcomeConfigurations.find(config => config.CorrectAnswersRequired === count) || {
+                            Message: "Keep trying!",
+                            IconClass: "fas fa-smile",
+                            BackgroundColor: "#ff9999",
+                            AnimationClass: "shake"
+                        };
+
+                    const prizeAvailable = outcome.PrizeType && outcome.PrizeValue !== undefined;
+                    const alreadyClaimed = claimedPrizes[outcome.PrizeType];
+
+                    let additionalInfo = "";
+                    if (outcome.PrizeType === "Product") {
+                        additionalInfo = `<p class="additional-info">Product: ${outcome.ProductName}</p>
+                                          <p class="additional-info">Value: ${outcome.PrizeValue}</p>`;
+                    } else if (outcome.PrizeType === "GiftCard") {
+                        additionalInfo = `<p class="additional-info">Company: ${outcome.CompanyName}</p>
+                                          <p class="additional-info">Value: ${outcome.PrizeValue}</p>`;
+                    } else if (outcome.PrizeType === "Jackpot") {
+                        additionalInfo = `<p class="additional-info">${currentJackpotAmount}kr</p>`;
+                    }
+
+                    const buttonHtml = outcome.PrizeType === "Credits"
+                        ? `
+                            <button id="claim-btn-${index}" class="claim-combined-button" onclick="claimPrize(${outcome.PrizeValue}, '${outcome.PrizeType}', ${index})">
+                                <span class="prize-amount">+${outcome.PrizeValue} ${outcome.PrizeType}</span>
+                                <span class="claim-text">Claim</span>
+                            </button>
+                          `
+                        : `
+                            <button id="claim-btn-${index}" class="claim-combined-button" onclick="claimPrize(0, '${outcome.PrizeType}', ${index})">
+                                <span class="claim-text">Get Contacted</span>
+                            </button>
+                          `;
+
+                    return `
+                        <div class="result-outcome" style="background-color: ${outcome.BackgroundColor}; animation: ${outcome.AnimationClass} 1s;">
+                            <div class="result-header">
+                                <span class="result-ticket">Ticket ${index + 1}</span>
+                                <span class="result-score">${count}</span>
+                            </div>
+                            <div class="result-message">
+                                <i class="${outcome.IconClass}" style="color: #FFD700;"></i>
+                                <p>${outcome.Message}</p>
+                                            ${additionalInfo ? `<div class="exclusive-container">${additionalInfo}</div>` : ""}
+                            </div>
+                            ${prizeAvailable
+                            ? alreadyClaimed
+                                ? `<i class="fas fa-check green" style="font-size: 2em;"></i>`
+                                : buttonHtml
+                            : ''
+                        }
+                        </div>
+                    `;
+                }).join('');
+
+                document.getElementById('popup-content').innerHTML = `
+                    <h2>Results Summary</h2>
+                    ${resultMessages}
+                `;
+                document.getElementById('result-popup').classList.add('show-popup');
+            })
+            .catch(error => console.error("Error fetching claimed prizes:", error));
+    }
+
+    function claimPrize(prizeValue, prizeType, index) {
+        console.log("claimPrize called with value:", prizeValue, "type:", prizeType, "index:", index);
+
+        DotNet.invokeMethodAsync('lek4', 'ClaimPrizeFromWinner', prizeType, prizeValue)
+            .then(response => {
+                if (response) {
+                    console.log('Prize claimed successfully!');
+                    const claimBtn = document.getElementById(`claim-btn-${index}`);
+                    if (claimBtn) {
+                        claimBtn.outerHTML = `<i class="fas fa-check green" style="font-size: 2em;"></i>`;
+                    }
+                } else {
+                    console.error('Failed to claim prize.');
+                }
+            })
+            .catch(error => console.error('Error invoking ClaimPrizeFromWinner:', error));
+    }
+
+
+    function showClaimSuccessMessage() {
+        alert('You successfully claimed your prize!');
+    }
+
+
+    // Function to close the popup
+    function closePopup() {
+        document.getElementById('result-popup').classList.remove('show-popup');
+    }
+
+    function initializeOutcomeConfigurations(configurations) {
+        console.log("initializeOutcomeConfigurations called with:", configurations);
+        try {
+            outcomeConfigurations = JSON.parse(configurations); // Parsar JSON-strängen
+
+            console.log("Parsed Outcome Configurations:", outcomeConfigurations);
+            console.log("First Config - CorrectAnswersRequired:", outcomeConfigurations[0]?.CorrectAnswersRequired);
+            console.log("First Config - Message:", outcomeConfigurations[0]?.Message);
+
+            outcomeConfigurations.forEach((config, index) => {
+                console.log(`Config ${index + 1}:`, config);
+            });
+        } catch (error) {
+            console.error("Error parsing configurations:", error);
+        }
+    }
+    function setJackpotAmount(amount) {
+        currentJackpotAmount = amount;
+    }
+</script>
+@if (showWinner)
+{
+    <div class="winner-details">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <p><strong>Winner Ticket</strong></p>
+        <div class="ticket-display winner-ticket-display">
+            <div class="selection-items">
+                <div class="selection-box number-box fade-element hidden" data-category="number" data-value="@winnerNumber">@winnerNumber</div>
+                <div class="selection-box color-box fade-element hidden" style="background-color:@GetColorCode(winnerColor)" data-category="color" data-value="@winnerColor"></div>
+                <div class="selection-box symbol-box fade-element hidden" data-category="symbol" data-value="@winnerSymbol">
+                    <i class="@GetSymbolIcon(winnerSymbol)"></i>
+                </div>
+                <div class="selection-box chinese-symbol-box fade-element hidden" data-category="chineseSymbol" data-value="@winnerChineseSymbol">
+                    <img src="@GetChineseSymbolImage(winnerChineseSymbol)" alt="@winnerChineseSymbol" />
+                </div>
+                <div class="selection-box planet-box fade-element hidden" data-category="planet" data-value="@winnerPlanet">
+                    <img src="@GetPlanetImage(winnerPlanet)" alt="@winnerPlanet" />
+                </div>
+                <div class="selection-box element-box fade-element hidden" data-category="element" data-value="@winnerElement">
+                    <img src="@GetElementImage(winnerElement)" alt="@winnerElement" />
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showUserTicket)
+{
+    <div class="user-ticket">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <p><strong>Your Tickets</strong></p>
+        <div class="ticket-display">
+            <div class="selection-items">
+                @foreach (var ticket in userTicket.Split("<br>"))
+                {
+                    var ticketParts = ticket.Split(',');
+
+                    if (ticketParts.Length == 6)
+                    {
+                        var number = ticketParts[0].Trim();
+                        var color = ticketParts[1].Trim();
+                        var symbol = ticketParts[2].Trim();
+                        var chineseSymbol = ticketParts[3].Trim();
+                        var planet = ticketParts[4].Trim();
+                        var element = ticketParts[5].Trim();
+
+                        <div class="ticket-row user-ticket-row">
+                            <div class="selection-box number-box user-item" data-category="number" data-match="@number">@number</div>
+                            <div class="selection-box color-box user-item" style="background-color:@GetColorCode(color)" data-category="color" data-match="@color"></div>
+                            <div class="selection-box symbol-box user-item" data-category="symbol" data-match="@symbol">
+                                <i class="@GetSymbolIcon(symbol)"></i>
+                            </div>
+                            <div class="selection-box chinese-symbol-box user-item" data-category="chineseSymbol" data-match="@chineseSymbol">
+                                <img src="@GetChineseSymbolImage(chineseSymbol)" alt="@chineseSymbol" />
+                            </div>
+                            <div class="selection-box planet-box user-item" data-category="planet" data-match="@planet">
+                                <img src="@GetPlanetImage(planet)" alt="@planet" />
+                            </div>
+                            <div class="selection-box element-box user-item" data-category="element" data-match="@element">
+                                <img src="@GetElementImage(element)" alt="@element" />
+                            </div>
+                        </div>
+                        <hr class="ticket-divider" />
+                    }
+                }
+            </div>
+        </div>
+    </div>
+    <div class="button-container">
+        <button @onclick="RevealWinnerTicket">Correct</button>
+    </div>
+}
+<div id="result-popup" class="popup-overlay">
+    <div class="popup-content">
+        <span class="close-btn" onclick="closePopup()">×</span>
+        <div id="popup-content">
+            <!-- Dynamic content injected from showPopup -->
+        </div>
+        <button class="back-button fade-in" @onclick="GoBack">Go Back</button>
+    </div>
+</div>
+
+
+
+
+<style>
+    .winner-details, .user-ticket {
+        text-align: center;
+        margin-top: 50px;
+    }
+
+        .winner-details h4, .user-ticket h4 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+    .ticket-display {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        background-color: #f5f5f5;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+    }
+
+    .winner-ticket-display .selection-items {
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .ticket-row {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        position: relative;
+    }
+
+    .ticket-divider {
+        width: 70%;
+        height: 1px;
+        background-color: mintcream;
+        margin: 10px auto;
+        border: none;
+    }
+
+    .selection-box {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: #f0f0f0;
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #333;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .color-box {
+        background-color: var(--color);
+    }
+
+    .symbol-box i {
+        font-size: 1.5em;
+        color: #333;
+    }
+
+    .chinese-symbol-box, .planet-box, .element-box {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: #f5f5f5;
+        overflow: hidden;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+        .chinese-symbol-box img, .planet-box img, .element-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+    /* Hide elements initially and use a gold color */
+    .hidden {
+        visibility: hidden;
+        background-color: gold;
+    }
+
+    /* Fade-in effect with shake */
+    .fade-in {
+        animation: fadeInUp 1s ease-in-out forwards, shake 0.3s ease-in-out 1s;
+    }
+
+    /* Slower fade-in with upward motion */
+    @@keyframes fadeInUp {
+        0% {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Shake animation */
+    @@keyframes shake {
+        0%, 100% {
+            transform: translateX(0);
+        }
+
+        20%, 60% {
+            transform: translateX(-2px);
+        }
+
+        40%, 80% {
+            transform: translateX(2px);
+        }
+    }
+
+    .check-icon {
+        position: absolute;
+        font-size: 2em;
+    }
+
+        .check-icon.green {
+            color: green;
+        }
+
+        .check-icon.red {
+            color: red;
+            font-size: 2.5em; /* Make the red cross bigger */
+        }
+
+    .button-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 10px;
+    }
+
+    button {
+        padding: 10px 20px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+    .check-icon {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5em;
+    }
+
+    .green {
+        color: green;
+    }
+
+    .red {
+        color: red;
+    }
+
+    .large-cross {
+        font-size: 2.5em; /* Larger size for the red cross */
+    }
+
+    .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5); /* Adjusting for a subtle overlay */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        visibility: hidden;
+        opacity: 0;
+        transition: visibility 0s, opacity 0.3s ease;
+    }
+
+    .show-popup {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .popup-content {
+        background: #fff; /* Changing background from gray to white */
+        padding: 20px;
+        border-radius: 12px;
+        width: 80%;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 24px;
+        cursor: pointer;
+    }
+
+    .go-back-btn {
+        background-color: #ff4d4f; /* Red color for emphasis */
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        margin-top: 15px;
+        font-size: 1em;
+        font-weight: bold;
+        transition: background-color 0.3s;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+        .go-back-btn:hover {
+            background-color: #e63946;
+        }
+
+@@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+
+#popup-content h2 {
+    font-size: 1.6em;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+#popup-content p {
+    font-size: 1.1em;
+    color: #555;
+    margin: 5px 0;
+}
+
+    .popup-content .result-outcome {
+        padding: 15px;
+        color: white;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        margin-top: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+.result-outcome {
+    padding: 25px;
+    color: white;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-top: 15px;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    background-color: #ff9999;
+    animation: shake 0.3s ease-in-out;
+}
+
+    .result-header, .result-score, .result-message, .prize-text, .claim-btn {
+        width: 85%;
+        padding: 12px;
+        background-color: white;
+        color: #333;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        font-weight: bold;
+        text-align: center;
+    }
+
+.result-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* Space between ticket and score */
+    font-size: 1em;
+    color: #333;
+    width: 100%;
+}
+
+.result-ticket {
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+}
+
+.result-score {
+    width: 40px;
+    height: 40px;
+    background-color: white; /* White background */
+    color: #28a745; /* Green text color */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2em;
+    font-weight: bold;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.result-message {
+    font-size: 1.4em;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-direction: column;
+}
+
+.result-message i {
+    font-size: 2em;
+    color: #ff9999;
+    display: block;
+    text-align: center;
+}
+
+.prize-text {
+    font-weight: bold;
+    color: #ff9999;
+    background-color: greenyellow; /* New color for prize box */
+    padding: 12px 20px;
+    border-radius: 12px;
+    width: auto;
+    text-align: center;
+    font-size: 1.1em;
+    position: relative;
+    animation: pulse 1.5s infinite; /* Pulsing effect */
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+    .claim-combined-button {
+        background-color: mediumspringgreen;
+        color: white;
+        padding: 12px;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 1.2em;
+        font-weight: bold;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        transition: background-color 0.3s;
+        margin-top: 10px;
+        width: 70%;
+        max-width: 160px;
+        max-height: 80px;
+    }
+
+        .claim-combined-button:hover {
+            background-color: #218838;
+        }
+
+    .prize-amount {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: honeydew;
+    }
+
+    .claim-text {
+        font-size: 0.9em;
+        font-weight: normal;
+        color: darkgrey;
+        margin-top: 2px;
+    }
+
+@@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+    .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        visibility: hidden;
+        opacity: 0;
+        transition: visibility 0s, opacity 0.3s ease;
+    }
+
+    .show-popup {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .popup-content {
+        background: #F0FFF0;
+        padding: 20px;
+        border-radius: 10px;
+        width: 80%;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 24px;
+        cursor: pointer;
+    }
+
+    #popup-content h2 {
+        font-size: 1.5em;
+        margin-bottom: 10px;
+    }
+
+    #popup-content p {
+        font-size: 1.1em;
+        margin: 5px 0;
+    }
+
+    .back-button {
+        padding: 6px 12px; /* Smaller padding for a compact button */
+        font-size: 0.9em; /* Reduce font size */
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 8px; /* Rounded corners */
+        cursor: pointer;
+        transition: background-color 0.3s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+        margin-top: 10px;
+    }
+
+        .back-button:hover {
+            background-color: #218838;
+        }
+
+        .back-button.fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .exclusive-container {
+            max-height: 50px;
+            border: 2px solid #FFD700; /* Guld */
+            border-radius: 10px;
+            padding-left: 10px;
+            padding-right: 10px;
+            background: linear-gradient(135deg, #fff4d7, #ffe8a3); /* Mjuk gul gradient */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Mjuk skugga */
+            font-weight: bold;
+            color: #b38b00; /* Lyxig guldfärg */
+            text-align: center;
+            font-size: 1.1em;
+            animation: popIn 0.5s ease-out; /* Animera in */
+        }
+
+        @@keyframes popIn {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+</style>
+
+

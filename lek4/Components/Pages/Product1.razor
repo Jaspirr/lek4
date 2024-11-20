@@ -56,6 +56,7 @@
     private const int joinCost = 100;
     private int userCredits;
     private string starAnimationClass = "";
+
    
 
     protected override async Task OnInitializedAsync()
@@ -81,11 +82,20 @@
             {
                 timeRemaining = "Draw date not set";
             }
-            // Fetch the winner directly after fetching product information
-            winner = await ProductService.GetWinnerFromFirebase(productNumber);
-            if (!string.IsNullOrEmpty(winner))
+
+            // Check if the product is a jackpot
+            if (isJackpotSelected)
             {
-                StateHasChanged(); // Update UI if there is a winner
+                // Fetch the winner directly after fetching product information
+                winner = await ProductService.GetWinnerFromFirebase(productNumber);
+
+                // If there is a winner, navigate to the jackpot winner view page
+                if (!string.IsNullOrEmpty(winner))
+                {
+                    // Redirect to the jackpot winner page
+                    NavigationManager.NavigateTo($"/viewjackpotwinner/{productNumber}");
+                    return; // Exit early after redirection
+                }
             }
 
             // Fetch lock-in amount
@@ -113,6 +123,7 @@
         // Calculate initial winning chance
         await UpdateWinningChance();
     }
+
     private string FormatRemainingTime(TimeSpan timeSpan)
     {
         return $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
@@ -539,7 +550,7 @@
             @if (isJackpotSelected)
             {
                 <div class="jackpot-details">
-                    <p id="jackpotAmount" class="jackpotamount">@jackpotAmount.ToString("0.0")</p>
+                    <p id="jackpotAmount" class="jackpotamount">@jackpotAmount.ToString("0.0")kr</p>
 
                     <!-- Lock In Button with Credits Box Above -->
                     <div class="jackpot-credits-wrapper">
@@ -663,14 +674,17 @@
     }
 
     .jackpotamount {
-        font-size: 44px;
+        max-height: 50px;
+        border: 2px solid #FFD700; /* Guld */
+        border-radius: 10px;
+        padding-left: 10px;
+        padding-right: 10px;
+        background: linear-gradient(135deg, #fff4d7, #ffe8a3); /* Mjuk gul gradient */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Mjuk skugga */
         font-weight: bold;
-        color: #DAA520; /* Exklusiv färg, t.ex. gyllene */
-        background-color: #ffffff; /* Vit bakgrund */
-        padding: 10px 20px; /* Extra padding för att skapa rektangelform */
-        border-radius: 25px; /* Rundade hörn för rektangeln */
-        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Lätt skugga för djup */
-        display: inline-block; /* Gör det till en inline-block för bättre placering */
+        color: #b38b00; /* Lyxig guldfärg */
+        text-align: center;
+        font-size: 1.1em;
         margin-bottom: 300px;
     }
 
@@ -998,15 +1012,17 @@
         }
 
     .view-winner-button {
-        background-color: mediumpurple;
-        color: white;
-        padding: 20px 40px;
-        border: none;
+        max-height: 50px;
+        border: 2px solid #FFD700; /* Guld */
         border-radius: 10px;
-        font-size: 2em;
-        cursor: pointer;
-        margin-top: 20px;
+        padding-left: 10px;
+        padding-right: 10px;
+        background: linear-gradient(135deg, #fff4d7, #ffe8a3); /* Mjuk gul gradient */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Mjuk skugga */
+        font-weight: bold;
+        color: #b38b00; /* Lyxig guldfärg */
         text-align: center;
+        font-size: 1.1em;
     }
 
         .view-winner-button:hover {

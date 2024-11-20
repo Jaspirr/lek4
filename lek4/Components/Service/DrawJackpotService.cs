@@ -143,7 +143,14 @@ namespace lek4.Components.Service
                 }
             }
 
-            await SaveWinnerToFirebase(productNumber, winnerEmail, DateTime.Now, winningTicket);
+            if (winnerEmail != null)
+            {
+                await SaveWinnerToFirebase(productNumber, winnerEmail, DateTime.Now, winningTicket);
+            }
+            else
+            {
+                Console.WriteLine("No matching ticket found.");
+            }
         }
     }
 }

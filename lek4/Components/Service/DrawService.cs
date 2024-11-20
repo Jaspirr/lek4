@@ -26,34 +26,43 @@ namespace lek4.Components.Service
         }
         public async Task<string> GetWinnerFromFirebase(int productNumber)
         {
-            // Firebase URL to fetch winner data for a product
             var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner%2Fproduct{productNumber}%2Fwinner.json?alt=media";
+            int maxAttempts = 10; // Max antal försök innan den slutar fråga
+            int attempt = 0;
 
-            // Send a GET request to Firebase
-            var response = await _httpClient.GetAsync(path);
-
-            if (response.IsSuccessStatusCode)
+            while (attempt < maxAttempts)
             {
-                // Deserialize the response content
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                var winnerData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonResponse);
+                var response = await _httpClient.GetAsync(path);
 
-                // Extract and return the winner email
-                if (winnerData.ContainsKey("Winner"))
+                if (response.IsSuccessStatusCode)
                 {
-                    return winnerData["Winner"].ToString();
+                    var jsonResponse = await response.Content.ReadAsStringAsync();
+                    var winnerData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonResponse);
+                    if (winnerData.ContainsKey("Winner"))
+                    {
+                        return winnerData["Winner"].ToString();
+                    }
+                    else
+                    {
+                        Console.WriteLine($"No winner data found for product {productNumber}");
+                        return null;
+                    }
+                }
+                else if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    Console.WriteLine($"Winner not found for product {productNumber}, attempt {attempt + 1}");
+                    await Task.Delay(5000); // Vänta 5 sekunder innan nästa förfrågan
+                    attempt++;
                 }
                 else
                 {
-                    Console.WriteLine($"No winner data found for product {productNumber}");
+                    Console.WriteLine($"Failed to fetch winner for product {productNumber}. Status code: {response.StatusCode}");
                     return null;
                 }
             }
-            else
-            {
-                Console.WriteLine($"Failed to fetch winner for product {productNumber}. Status code: {response.StatusCode}");
-                return null;
-            }
+
+            Console.WriteLine("Max attempts reached, stopping further requests.");
+            return null;
         }
 
         // Fetches all users' lock-in data from Firebase for a specific product

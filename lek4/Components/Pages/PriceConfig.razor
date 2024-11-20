@@ -1,0 +1,253 @@
+﻿@page "/priceconfig"
+@inject HttpClient Http
+@inject lek4.Components.Service.JackpotService JackpotService
+@using System.Text
+@using System.Net.Http.Headers
+@using System.Text.Json
+
+@code {
+    private List<OutcomeConfiguration> OutcomeConfigurations = new List<OutcomeConfiguration>();
+    private OutcomeConfiguration NewOutcomeConfig = new OutcomeConfiguration();
+    private double jackpotAmount;
+    private int correctAnswersToDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load existing configurations
+        var response = await Http.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2Foutcomeconfigurations.json?alt=media");
+
+        if (response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync();
+            OutcomeConfigurations = JsonSerializer.Deserialize<List<OutcomeConfiguration>>(responseBody) ?? new List<OutcomeConfiguration>();
+        }
+        else
+        {
+            Console.WriteLine($"Failed to load configurations. Status: {response.StatusCode}");
+        }
+
+        // Load current jackpot amount
+        jackpotAmount = await JackpotService.GetJackpotAmount();
+    }
+
+    private async Task SaveConfigurationsToFirebase()
+    {
+        OutcomeConfigurations.Add(NewOutcomeConfig);
+
+        var json = JsonSerializer.Serialize(OutcomeConfigurations);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await Http.PostAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2Foutcomeconfigurations.json?alt=media", content);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Outcome configurations saved successfully.");
+            NewOutcomeConfig = new OutcomeConfiguration(); // Reset form fields
+        }
+        else
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Failed to save configurations: {response.StatusCode}. Error: {errorContent}");
+        }
+    }
+
+    private async Task DeleteOutcomeConfiguration()
+    {
+        // Find and remove the configuration with the specified CorrectAnswersRequired
+        var configToDelete = OutcomeConfigurations.FirstOrDefault(c => c.CorrectAnswersRequired == correctAnswersToDelete);
+        if (configToDelete != null)
+        {
+            OutcomeConfigurations.Remove(configToDelete);
+
+            // Save the updated list to Firebase
+            var json = JsonSerializer.Serialize(OutcomeConfigurations);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await Http.PostAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2Foutcomeconfigurations.json?alt=media", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Outcome configuration deleted successfully.");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Failed to delete configuration: {response.StatusCode}. Error: {errorContent}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("No configuration found with the specified CorrectAnswersRequired.");
+        }
+    }
+
+    public class OutcomeConfiguration
+    {
+        public int CorrectAnswersRequired { get; set; }
+        public string Message { get; set; }
+        public string IconClass { get; set; }
+        public string BackgroundColor { get; set; }
+        public string AnimationClass { get; set; }
+        public string PrizeType { get; set; }
+        public double PrizeValue { get; set; }
+        public string CompanyName { get; set; } // For GiftCard
+        public string ProductName { get; set; } // For Product
+    }
+}
+
+<h3>Configure Outcome Prizes</h3>
+
+<div class="config-container">
+    <h2 class="config-title">Configure Outcome Prizes</h2>
+    <form class="config-form">
+        <!-- Form for adding new configurations (as before) -->
+        <label for="correct-answers">Correct Answers Required:</label>
+        <input id="correct-answers" type="number" @bind="NewOutcomeConfig.CorrectAnswersRequired" placeholder="0" />
+
+        <label for="message">Message:</label>
+        <input id="message" type="text" @bind="NewOutcomeConfig.Message" placeholder="Enter outcome message" />
+
+        <label for="icon-class">Icon Class:</label>
+        <select id="icon-class" @bind="NewOutcomeConfig.IconClass">
+            <option value="fas fa-trophy">Trophy</option>
+            <option value="fas fa-thumbs-up">Thumbs Up</option>
+            <option value="fas fa-sad-tear">Sad Tear</option>
+            <option value="fas fa-smile">Smile</option>
+            <option value="fas fa-meh">Meh</option>
+            <option value="fas fa-grin-stars">Grin Stars</option>
+        </select>
+
+        <label for="background-color">Background Color:</label>
+        <select id="background-color" @bind="NewOutcomeConfig.BackgroundColor">
+            <option value="#ff6666">Red</option>
+            <option value="#ff9999">Light Red</option>
+            <option value="#ffcc99">Peach</option>
+            <option value="#ffd700">Gold</option>
+            <option value="#b3e6b3">Light Green</option>
+            <option value="#66ff66">Green</option>
+            <option value="#4caf50">Dark Green</option>
+        </select>
+
+        <label for="animation-class">Animation Class:</label>
+        <select id="animation-class" @bind="NewOutcomeConfig.AnimationClass">
+            <option value="shake">Shake</option>
+            <option value="pulse">Pulse</option>
+            <option value="bounce">Bounce</option>
+            <option value="flash">Flash</option>
+        </select>
+
+        <label for="prize-type">Prize Type:</label>
+        <select id="prize-type" @bind="NewOutcomeConfig.PrizeType">
+            <option value="Credits">Credits</option>
+            <option value="GiftCard">Gift Card</option>
+            <option value="Product">Product</option>
+            <option value="Jackpot">Jackpot</option>
+        </select>
+
+        @if (NewOutcomeConfig.PrizeType == "Credits")
+        {
+            <label for="prize-value">Prize Value (Credits):</label>
+            <input id="prize-value" type="number" @bind="NewOutcomeConfig.PrizeValue" placeholder="0" />
+        }
+        else if (NewOutcomeConfig.PrizeType == "GiftCard")
+        {
+            <label for="company-name">Company Name:</label>
+            <input id="company-name" type="text" @bind="NewOutcomeConfig.CompanyName" placeholder="Company Name" />
+
+            <label for="prize-value">Gift Card Value:</label>
+            <input id="prize-value" type="number" @bind="NewOutcomeConfig.PrizeValue" placeholder="0" />
+        }
+        else if (NewOutcomeConfig.PrizeType == "Product")
+        {
+            <label for="product-name">Product Name:</label>
+            <input id="product-name" type="text" @bind="NewOutcomeConfig.ProductName" placeholder="Product Name" />
+
+            <label for="prize-value">Product Value:</label>
+            <input id="prize-value" type="number" @bind="NewOutcomeConfig.PrizeValue" placeholder="0" />
+        }
+        else if (NewOutcomeConfig.PrizeType == "Jackpot")
+        {
+            <label for="jackpot-amount">Jackpot Prize Amount:</label>
+            <input id="jackpot-amount" type="number" value="@jackpotAmount" readonly />
+        }
+
+        <div class="button-row">
+            <button type="button" class="save-config-btn" @onclick="SaveConfigurationsToFirebase">Save Configuration</button>
+        </div>
+    </form>
+
+    <!-- Section for deleting a configuration -->
+    <h2 class="config-title">Delete Outcome Configuration</h2>
+    <form class="config-form">
+        <label for="delete-correct-answers">Correct Answers Required (for Deletion):</label>
+        <input id="delete-correct-answers" type="number" @bind="correctAnswersToDelete" placeholder="Enter number" />
+
+        <button type="button" class="delete-config-btn" @onclick="DeleteOutcomeConfiguration">Delete Outcome</button>
+    </form>
+</div>
+
+<style>
+    /* Existing styles (no changes needed) */
+    .config-container {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        background-color: #f9f9f9;
+    }
+
+    .config-title {
+        font-size: 1.5em;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 15px;
+        color: #333;
+    }
+
+    .config-form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+        .config-form label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .config-form select,
+        .config-form input[type="number"],
+        .config-form input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .config-form .button-row {
+            display: flex;
+            justify-content: center;
+        }
+
+    .save-config-btn, .delete-config-btn {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        margin-top: 10px;
+    }
+
+    .delete-config-btn {
+        background-color: #dc3545;
+    }
+
+        .delete-config-btn:hover {
+            background-color: #c82333;
+        }
+</style>

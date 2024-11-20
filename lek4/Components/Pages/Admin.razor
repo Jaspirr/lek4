@@ -14,6 +14,7 @@
         <button class="action-button" @onclick="ChangeProducts">Change Products</button>
         <button class="action-button" @onclick="BreakAndTime">Break and Time</button>
         <button class="action-button" @onclick="Notifications">Notifications</button>
+        <button class="action-button" @onclick="PriceConfig">PriceConfig</button>
     </div>
 </div>
 
@@ -36,6 +37,10 @@
     private void Notifications()
     {
         NavigationManager.NavigateTo("/notifications");
+    }
+    private void PriceConfig()
+    {
+        NavigationManager.NavigateTo("/PriceConfig");
     }
 }
 

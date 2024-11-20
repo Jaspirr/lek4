@@ -55,10 +55,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Folder Include="Components\Models\" />
-	</ItemGroup>
-
-	<ItemGroup>
 	  <Reference Include="Microsoft.Windows.SDK.NET">
 	    <HintPath>..\..\..\..\..\..\Nuget\microsoft.windows.sdk.net.ref\10.0.19041.34\lib\net6.0\Microsoft.Windows.SDK.NET.dll</HintPath>
 	  </Reference>
