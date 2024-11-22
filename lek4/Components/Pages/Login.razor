@@ -3,13 +3,12 @@
 @using System.Text.Json
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
-@inject UserService userService
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
-
+@inject HttpClient HttpClient
 
 <div class="login-container">
     <div class="login-form">
-        <h3 class="login-title">Login</h3>
+        <h3>Login</h3>
         <EditForm Model="loginModel" OnValidSubmit="LoginUser">
             <DataAnnotationsValidator />
             <ValidationSummary />
@@ -19,12 +18,20 @@
             <div class="form-group">
                 <InputText id="password" @bind-Value="loginModel.Password" type="password" placeholder="Password" />
             </div>
+            <div class="stay-logged-in">
+                <label>
+                    <InputCheckbox @bind-Value="stayLoggedIn" />
+                    <span>Stay Logged In</span>
+                </label>
+            </div>
             <button type="submit" class="login-button">Login</button>
             <div class="error-message">
                 @errorMessage
             </div>
-            <p>Don't have an account? <NavLink href="/signup">Sign up here</NavLink></p>
-            <p>Are you an Admin? <NavLink href="/admin-login">Log in as Admin here</NavLink></p>
+            <div class="login-footer">
+                <p>Don't have an account? <NavLink href="/signup">Sign up here</NavLink></p>
+                <p>Are you an Admin? <NavLink href="/admin-login">Log in as Admin here</NavLink></p>
+            </div>
         </EditForm>
     </div>
 </div>
@@ -32,20 +39,74 @@
 @code {
     private LoginModel loginModel = new LoginModel();
     private string errorMessage;
+    private bool stayLoggedIn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Kontrollera om UID finns i LocalStorage
+            var userUid = await localStorage.GetItemAsync<string>("userUid");
+
+            if (!string.IsNullOrEmpty(userUid))
+            {
+                // Bygg URL till användarens data i Firebase
+                var getUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userUid}.json?alt=media";
+
+                // Skicka GET-förfrågan för att hämta användardata
+                var response = await HttpClient.GetAsync(getUrl);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonData = await response.Content.ReadAsStringAsync();
+                    var userData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonData);
+
+                    // Kontrollera om stayLoggedIn är true
+                    if (userData != null && userData.ContainsKey("stayLoggedIn") && userData["stayLoggedIn"] is bool isLoggedIn && isLoggedIn)
+                    {
+                        // Omdirigera användaren till hemsidan
+                        NavigationManager.NavigateTo("/");
+                        return;
+                    }
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // Om filen inte finns, fortsätt till inloggningsformuläret
+                    Console.WriteLine($"No data file found for UID: {userUid}. Proceeding to login...");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during initialization: {ex.Message}");
+        }
+    }
 
     private async Task LoginUser()
     {
         try
         {
+            // Logga in användaren via Firebase
             var userCredential = await AuthClient.SignInWithEmailAndPasswordAsync(loginModel.Email, loginModel.Password);
             var firebaseUser = userCredential.User;
 
             if (firebaseUser != null)
             {
-                var userEmail = firebaseUser.Info.Email; // Use .Info.Email to get the email of the authenticated user
-                await localStorage.SetItemAsync("userEmail", userEmail); // Store email locally
+                // Spara användarens UID och e-post till LocalStorage
+                var userEmail = firebaseUser.Info.Email;
+                var userUid = firebaseUser.Uid;
+
+                await localStorage.SetItemAsync("userEmail", userEmail);
+                await localStorage.SetItemAsync("userUid", userUid);
+
+                if (stayLoggedIn)
+                {
+                    // Spara statusen "stanna inloggad" i Firebase Storage
+                    await SaveStayLoggedInStatus(userUid, true);
+                }
+
                 await Application.Current.MainPage.DisplayAlert("Success", "Successfully logged in!", "Ok");
-                NavigationManager.NavigateTo("/"); // Redirect after successful login
+                NavigationManager.NavigateTo("/"); // Omdirigera efter lyckad inloggning
             }
         }
         catch (Exception ex)
@@ -55,6 +116,50 @@
         }
     }
 
+   private async Task SaveStayLoggedInStatus(string userId, bool stayLoggedInStatus)
+{
+    try
+    {
+        // URL till användarens JSON-data i Firebase
+        var getUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userId}.json?alt=media";
+
+        // Hämta existerande data
+        var getResponse = await HttpClient.GetAsync(getUrl);
+        var existingDataJson = "{}"; // Default tom JSON
+
+        if (getResponse.IsSuccessStatusCode)
+        {
+            existingDataJson = await getResponse.Content.ReadAsStringAsync();
+        }
+        else if (getResponse.StatusCode != System.Net.HttpStatusCode.NotFound)
+        {
+            throw new Exception($"Failed to fetch existing data: {await getResponse.Content.ReadAsStringAsync()}");
+        }
+
+        // Parse den existerande datan
+        var existingData = JsonSerializer.Deserialize<Dictionary<string, object>>(existingDataJson) ?? new Dictionary<string, object>();
+
+        // Uppdatera nyckeln "stayLoggedIn"
+        existingData["stayLoggedIn"] = stayLoggedInStatus;
+
+        // Konvertera tillbaka till JSON
+        var updatedJson = JsonSerializer.Serialize(existingData);
+        var content = new StringContent(updatedJson, System.Text.Encoding.UTF8, "application/json");
+
+        // Skicka PUT-förfrågan till Firebase för att uppdatera datan
+        var putUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userId}.json";
+        var putResponse = await HttpClient.PostAsync(putUrl, content);
+
+        if (!putResponse.IsSuccessStatusCode)
+        {
+            throw new Exception($"Failed to save updated data: {await putResponse.Content.ReadAsStringAsync()}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error saving stay logged in status: {ex.Message}");
+    }
+}
 
     private string GetErrorMessage(string responseBody)
     {
@@ -88,56 +193,124 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
+        height: 100vh; /* Full höjd */
         background-color: #f5f5f5;
     }
 
     .login-form {
+        margin: 0 auto;
+        width: 80%;
+        max-width: 400px; /* Sätt en maxbredd */
         background-color: white;
-        padding: 20px;
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         text-align: center;
+        font-family: 'Arial', sans-serif;
+    }
+
+    .login-form h3 {
+        margin-bottom: 20px;
+        font-size: 1.8em;
+        color: #4a4a4a;
+        font-weight: 600;
     }
 
     .form-group {
+        margin: 0 auto;
+        width: 80%;
         margin-bottom: 15px;
         text-align: left;
     }
 
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-        }
-
-    .login-title {
-        margin-bottom: 20px;
-        font-size: 24px;
-        color: mediumpurple;
-    }
-
-    .login-button {
+    .form-group input {
         width: 100%;
         padding: 10px;
-        background-color: mediumpurple;
-        color: white;
-        border: none;
+        font-size: 1rem;
+        border: 1px solid #ddd;
         border-radius: 5px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group input:focus {
+        border-color: #F0FFF0;
+        outline: none;
+        box-shadow: 0 0 5px rgba(168, 130, 214, 0.5);
+    }
+
+    .stay-logged-in {
+        display: flex;
+        margin-bottom: 10px;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+        color: #4a4a4a;
+        justify-content: center; /* Centrerar checkbox och text */
+    }
+
+    .stay-logged-in label {
+        display: flex;
+        align-items: center;
         cursor: pointer;
     }
 
-        .login-button:hover {
-            background-color: rebeccapurple;
-        }
+    .stay-logged-in input[type="checkbox"] {
+        margin-right: 5px;
+        transform: scale(1.2); /* Gör checkboxen lite större */
+        accent-color: #556B2F; /* Snyggare färg för checkbox */
+    }
+
+    .login-button {
+        width: 60%;
+        padding: 12px 20px;
+        background-color: #556B2F;
+        color: #F0FFF0;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .login-button:hover {
+        background-color: #8b5fc1;
+        color: white;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .login-footer {
+        margin-top: 20px;
+        font-size: 0.9rem;
+        color: #4a4a4a;
+    }
+
+    .login-footer a {
+        color: #556B2F;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .login-footer a:hover {
+        text-decoration: underline;
+    }
 
     .error-message {
         color: red;
         margin-top: 10px;
+    }
+
+    @@media (max-width: 480px) {
+        .login-form {
+            padding: 15px;
+        }
+
+        .form-group input {
+            font-size: 0.9rem;
+        }
+
+        .login-button {
+            font-size: 0.9rem;
+            padding: 10px 15px;
+        }
     }
 </style>

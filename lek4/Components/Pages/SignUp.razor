@@ -6,17 +6,19 @@
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
 
-<div class="login-container">
-    <div class="login-form">
-        <h3 class="login-title">Sign Up</h3>
+<div class="signup-container">
+    <div class="signup-form">
+        <h3 class="signup-title">Sign Up</h3>
         <EditForm Model="signupModel" OnValidSubmit="RegisterUser">
             <DataAnnotationsValidator />
             <ValidationSummary />
             <div class="form-group">
-                <InputText id="firstName" @bind-Value="signupModel.FirstName" placeholder="First Name" />
+                <label for="firstName">First Name:</label>
+                <InputText id="firstName" @bind-Value="signupModel.FirstName" />
             </div>
             <div class="form-group">
-                <InputText id="lastName" @bind-Value="signupModel.LastName" placeholder="Last Name" />
+                <label for="lastName">Last Name:</label>
+                <InputText id="lastName" @bind-Value="signupModel.LastName" />
             </div>
             <div class="form-group">
                 <label for="birthDate">Birth Date:</label>
@@ -36,7 +38,7 @@
                     <select @bind="selectedDay">
                         @foreach (var day in days)
                         {
-                            <option value="@day"></option>
+                            <option value="@day">@day</option>
                         }
                     </select>
                 </div>
@@ -60,28 +62,46 @@
                 </InputSelect>
             </div>
             <div class="form-group">
-                <InputText id="email" @bind-Value="signupModel.Email" placeholder="Email" />
+                <label for="email">Email:</label>
+                <InputText id="email" @bind-Value="signupModel.Email" />
             </div>
             <div class="form-group">
-                <InputText id="password" @bind-Value="signupModel.Password" type="password" placeholder="Password" />
+                <label for="password">Password:</label>
+                <InputText id="password" @bind-Value="signupModel.Password" type="password" />
             </div>
             <div class="form-group">
-                <InputText id="confirmPassword" @bind-Value="signupModel.ConfirmPassword" type="password" placeholder="Confirm Password" />
+                <label for="confirmPassword">Confirm Password:</label>
+                <InputText id="confirmPassword" @bind-Value="signupModel.ConfirmPassword" type="password" />
             </div>
-            <button class="login-button" type="submit">Sign Up</button>
-            <div class="error-message">
-                <!-- You can display error messages here if needed -->
+            <button class="signup-button" type="submit">Sign Up</button>
+            <div class="signup-footer">
+                Already have an account? <NavLink href="/login">Login here</NavLink>
             </div>
-            <p>Already have an account? <NavLink href="/login">Login here</NavLink></p>
         </EditForm>
     </div>
 </div>
 
 @code {
-    private SignupModel signupModel = new SignupModel();
+    private SignupModel signupModel = new SignupModel
+        {
+            City = "Stockholm", // Standardvärde för City
+            Gender = "Male"     // Standardvärde för Gender
+        };
     private int selectedYear;
     private int selectedMonth;
-    private int selectedDay;
+    private int _selectedDay;
+    private int selectedDay
+    {
+        get => _selectedDay;
+        set
+        {
+            if (_selectedDay != value)
+            {
+                _selectedDay = value;
+            }
+        }
+    }
+    private List<int> days = Enumerable.Range(1, 31).ToList();
     private List<int> years = new List<int>();
     private Dictionary<string, int> months = new Dictionary<string, int>
     {
@@ -98,7 +118,6 @@
         {"November", 11},
         {"December", 12}
     };
-    private List<int> days = Enumerable.Range(1, 31).ToList();
     private List<string> cities = new List<string>
     {
         "Stockholm", "Göteborg", "Malmö", "Uppsala", "Västerås", "Örebro", "Linköping", "Helsingborg",
@@ -110,13 +129,32 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
+
+        // Generera lista med år
         for (int i = 1900; i <= DateTime.Now.Year; i++)
         {
             years.Add(i);
         }
+
+        // Sätt initiala värden
         selectedYear = DateTime.Now.Year;
         selectedMonth = DateTime.Now.Month;
         selectedDay = DateTime.Now.Day;
+
+        // Uppdatera dagarna baserat på initial månad och år
+        UpdateDays();
+    }
+    private void UpdateDays()
+    {
+        // Hämta antalet dagar i den valda månaden och året
+        int daysInMonth = DateTime.DaysInMonth(selectedYear, selectedMonth);
+        days = Enumerable.Range(1, daysInMonth).ToList();
+
+        // Se till att vald dag inte överskrider det nya antalet dagar
+        if (selectedDay > daysInMonth)
+        {
+            selectedDay = daysInMonth;
+        }
     }
 
     private async Task RegisterUser()
@@ -134,7 +172,7 @@
         if (signupModel.Password != signupModel.ConfirmPassword)
         {
             await Application.Current.MainPage.DisplayAlert("Error", "Passwords do not match.", "Ok");
-            return; // Lägg till en return här för att avsluta metoden om lösenorden inte stämmer
+            return;
         }
 
         try
@@ -143,16 +181,12 @@
             var userCredential = await AuthClient.CreateUserWithEmailAndPasswordAsync(signupModel.Email, signupModel.Password);
             Console.WriteLine($"User created with UID: {userCredential.User.Uid}");
 
-            // Skicka e-postverifiering till användaren
-            await SendEmailVerificationAsync(userCredential.User);
-            Console.WriteLine("Email verification sent.");
-
             // Spara användarprofilen i Firebase Storage
             await SaveUserProfileToStorage(userCredential.User);
             Console.WriteLine("User profile saved to storage.");
 
             // Bekräfta registrering
-            await Application.Current.MainPage.DisplayAlert("Success", "Registration successful! Please verify your email before logging in.", "Ok");
+            await Application.Current.MainPage.DisplayAlert("Success", "Registration successful!", "Ok");
             NavigationManager.NavigateTo("/login");
         }
         catch (Exception ex)
@@ -212,28 +246,6 @@
         }
     }
 
-    private async Task SendEmailVerificationAsync(User user)
-    {
-        var idToken = await user.GetIdTokenAsync();
-        var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // Replace with your Firebase API key
-        var requestUri = $"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={apiKey}";
-        var payload = new
-        {
-            requestType = "VERIFY_EMAIL",
-            idToken = idToken
-        };
-
-        var json = JsonSerializer.Serialize(payload);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await new HttpClient().PostAsync(requestUri, content);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var responseBody = await response.Content.ReadAsStringAsync();
-            throw new Exception($"Failed to send verification email: {responseBody}");
-        }
-    }
-
     private string GetErrorMessage(string responseBody)
     {
         try
@@ -277,64 +289,122 @@
 }
 
 <style>
-    .login-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        background-color: #f5f5f5;
+    .signup-container {
+        max-width: 400px;
+        margin: 50px auto;
+        padding: 25px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        font-family: 'Arial', sans-serif;
     }
 
-    .login-form {
-        background-color: white;
-        padding: 20px;
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    .signup-container h3 {
         text-align: center;
+        color: #4a4a4a;
+        font-size: 1.8em;
+        margin-bottom: 20px;
+        font-weight: 600;
     }
 
     .form-group {
+        display: flex;
+        flex-direction: column;
         margin-bottom: 15px;
-        text-align: left;
     }
 
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-        }
+    .form-group label {
+        font-weight: bold;
+        color: #555;
+        margin-bottom: 5px;
+    }
 
-        .form-group input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-        }
+    .form-group input,
+    .form-group select {
+        padding: 10px;
+        font-size: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        width: 100%;
+    }
+
+    .form-group select {
+        cursor: pointer;
+        background-color: #f9f9f9;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        border-color: #a882d6;
+        outline: none;
+        box-shadow: 0 0 5px rgba(168, 130, 214, 0.5);
+    }
+
+    .date-picker {
+        display: flex;
+        gap: 10px;
+    }
 
     .date-picker select {
-        margin-right: 10px;
+        flex: 1;
     }
 
-    .login-title {
-        margin-bottom: 20px;
-        font-size: 24px;
-        color: mediumpurple;
-    }
-
-    .login-button {
-        width: 100%;
-        padding: 10px;
-        background-color: mediumpurple;
-        color: white;
+    .signup-button {
+        background-color: #556B2F; /* Ljuslila färg */
+        color: #F0FFF0;
         border: none;
-        border-radius: 5px;
+        padding: 12px 20px;
+        font-size: 1rem;
         cursor: pointer;
+        border-radius: 5px;
+        transition: all 0.3s ease;
+        width: 100%;
     }
 
-        .login-button:hover {
-            background-color: rebeccapurple;
+    .signup-button:hover {
+        background-color: #8b5fc1; /* Mörkare lila för hover */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        color: white;
+    }
+
+    .signup-button:disabled {
+        background-color: #e3d7f1;
+        cursor: not-allowed;
+    }
+
+    .signup-footer {
+        text-align: center;
+        margin-top: 15px;
+        font-size: 0.9rem;
+        color: #4a4a4a;
+    }
+
+    .signup-footer a {
+        color: #8b5fc1;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .signup-footer a:hover {
+        text-decoration: underline;
+    }
+
+    @@media (max-width: 480px) {
+        .signup-container {
+            padding: 15px;
+            margin: 20px;
         }
 
-    .error-message {
-        color: red;
-        margin-top: 10px;
+        .form-group input,
+        .form-group select {
+            font-size: 0.9rem;
+        }
+
+        .signup-button {
+            font-size: 0.9rem;
+            padding: 10px 15px;
+        }
     }
 </style>

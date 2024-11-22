@@ -96,6 +96,24 @@
         const db = firebase.firestore();
     </script>
     <script>
+        function sendPasswordReset(email) {
+            if (!email) {
+                alert("Please provide an email address.");
+                return;
+            }
+
+            firebase.auth().sendPasswordResetEmail(email)
+                .then(() => {
+                    alert("Password reset email sent successfully.");
+                })
+                .catch((error) => {
+                    console.error("Error sending password reset email:", error);
+                    alert("Failed to send password reset email. Please try again.");
+                });
+        }
+    </script>
+
+    <script>
         function launchConfetti() {
             confetti({
                 particleCount: 150,

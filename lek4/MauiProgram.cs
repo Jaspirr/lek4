@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using System.Net.Http;
 using System;
 using Blazored.LocalStorage;
+using Plugin.Maui.Audio;
 
 namespace lek4
 {
@@ -59,6 +60,8 @@ namespace lek4
             builder.Services.AddScoped<StatsService>();
             builder.Services.AddSingleton<Components.Service.NumberService>();
 
+            builder.Services.AddSingleton(AudioManager.Current);
+            builder.Services.AddTransient<MainPage>();
             // Konfigurera Firebase Authentication med din API-nyckel
             builder.Services.AddFirebaseAuth("AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA");
 

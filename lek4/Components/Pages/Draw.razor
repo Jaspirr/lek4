@@ -1,4 +1,5 @@
 ﻿@page "/draw"
+@using System.Text.Json
 @using lek4.Components.Service
 
 @inject DrawService DrawService
@@ -94,7 +95,7 @@
     // Draw a winner for a jackpot product
     private async Task DrawJackpotWinner(int productNumber)
     {
-        // Fetch tickets from JackpotConfirmedTickets.json
+        // Hämta alla biljetter
         var tickets = await DrawJackpotService.GetJackpotTickets();
 
         if (tickets == null || tickets.Count == 0)
@@ -103,20 +104,31 @@
             return;
         }
 
-        // Perform the draw and get the winning ticket
-        var winnerTicket = DrawJackpotService.DrawRandomWinner(tickets);
+        // Generera en slumpmässig biljett
+        var randomTicket = DrawJackpotService.GenerateRandomTicket();
+        Console.WriteLine($"Generated random ticket: {JsonSerializer.Serialize(randomTicket)}");
 
-        // In DrawJackpotWinner method
-        if (winnerTicket != null)
+        // Leta efter en matchande biljett
+        var matchingTicket = tickets.FirstOrDefault(t => DrawJackpotService.IsMatchingTicket(t, randomTicket));
+
+        // Om en matchande biljett hittas
+        if (matchingTicket != null)
         {
-            // Save the winning ticket to Firebase with the current date
-            await DrawJackpotService.SaveWinnerToFirebase(productNumber, winnerTicket.UserEmail, DateTime.Now, winnerTicket);
+            Console.WriteLine($"Matching ticket found: {JsonSerializer.Serialize(matchingTicket)}");
+            await DrawJackpotService.SaveWinnerToFirebase(productNumber, matchingTicket.UserEmail, DateTime.Now, matchingTicket);
 
-            // Update UI with the new winner
-            winners[productNumber] = $"Winner: {winnerTicket.UserEmail} - Ticket: {winnerTicket.Number}, {winnerTicket.Color}, {winnerTicket.Symbol}, {winnerTicket.Planet}, {winnerTicket.Element}";
+            winners[productNumber] = $"Winner: {matchingTicket.UserEmail} - Ticket: {matchingTicket.Number}, {matchingTicket.Color}, {matchingTicket.Symbol}, {matchingTicket.Planet}, {matchingTicket.Element}";
             StateHasChanged();
         }
+        else
+        {
+            // Ingen matchande biljett hittades, spara den slumpmässiga biljetten som "No winner"
+            Console.WriteLine("No matching ticket found. Saving random ticket as 'No winner'.");
+            await DrawJackpotService.SaveWinnerToFirebase(productNumber, null, DateTime.Now, randomTicket);
 
+            winners[productNumber] = "No winner";
+            StateHasChanged();
+        }
     }
 
     // Draw a winner for a regular product
