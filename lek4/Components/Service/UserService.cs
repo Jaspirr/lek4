@@ -85,28 +85,44 @@ public class UserService
         }
     }
 
-    public async Task AddCreditToUser(string userEmail, int creditsToAdd = 1)
+    public async Task AddCreditToUser(string userEmail, double creditAmount)
     {
-        userEmail = userEmail.Trim().Trim('"');
-        if (string.IsNullOrEmpty(userEmail) || userEmail == "Anonymous")
+        try
         {
-            Console.WriteLine("Invalid email. Cannot add credits for Anonymous user.");
-            return;
+            // Trimma e-post för säkerhets skull
+            userEmail = userEmail.Trim().Trim('"');
+
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                Console.WriteLine("Invalid email. Cannot add credits.");
+                return;
+            }
+
+            // Hämta användarens befintliga data från Firebase
+            var userStats = await GetUserFromFirebase(userEmail);
+
+            if (userStats == null)
+            {
+                Console.WriteLine($"User {userEmail} not found in Firebase.");
+                return;
+            }
+
+            // Uppdatera användarens krediter
+            userStats.Credits += (int)creditAmount; // Explicit konvertering från double till int
+
+            // Uppdatera användarens data i Firebase
+            await UpdateUserStatsInFirebase(userEmail, userStats);
+            Console.WriteLine($"Added {creditAmount} credits to user {userEmail}. New credits: {userStats.Credits}");
+
+            // Lägg till krediten till totalCredits
+            await AddToTotalCredits(creditAmount);
         }
-
-        // Fetch the existing user data from Firebase (if available)
-        var existingUser = await GetUserFromFirebase(userEmail);
-        int currentCredits = (int)(existingUser?.Credits ?? 0);
-
-        // Increment user's credits
-        currentCredits += creditsToAdd;
-
-        // Update user's stats in Firebase
-        await UpdateUserCredits(userEmail, currentCredits);
-
-        // Update total credits in Firebase
-        await UpdateTotalCredits(creditsToAdd);
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding credits to user {userEmail}: {ex.Message}");
+        }
     }
+
     public async Task AddToTotalCredits(double creditAmount)
     {
         // GET-förfrågan med ?alt=media för att hämta nuvarande total credits
@@ -291,7 +307,35 @@ public class UserService
         if (response.IsSuccessStatusCode)
         {
             var responseBody = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<UserStats>(responseBody);
+            var userStats = JsonSerializer.Deserialize<UserStats>(responseBody);
+
+            if (userStats != null)
+            {
+                // Kontrollera och initiera DailyStreak om den saknas
+                if (userStats.DailyStreak == null)
+                {
+                    userStats.DailyStreak = new DailyStreak
+                    {
+                        CurrentStreak = 0,
+                        LongestStreak = 0,
+                        LastLoginDate = DateTime.MinValue
+                    };
+                }
+
+                // Kontrollera och initiera TotalOdds om den saknas
+                if (userStats.TotalOdds == 0)
+                {
+                    userStats.TotalOdds = 0.0;
+                }
+
+                // Kontrollera och initiera WeeklyOdds om den saknas
+                if (userStats.WeeklyOdds == 0)
+                {
+                    userStats.WeeklyOdds = 0.0;
+                }
+            }
+
+            return userStats;
         }
 
         Console.WriteLine($"Failed to retrieve user data for {userEmail}. Status code: {response.StatusCode}");
@@ -304,8 +348,11 @@ public class UserService
         public string UserEmail { get; set; }
         public double LockInAmount { get; set; }
         public int Credits { get; set; }
+        public int StarShards { get; set; }
+        public double TotalOdds { get; set; }
+        public double WeeklyOdds { get; set; }
+        public DailyStreak DailyStreak { get; set; } // Lägg till denna egenskap
     }
-
 
     // Method to get the current user's email
     public string GetCurrentUserEmail()
@@ -483,6 +530,506 @@ public class UserService
             Console.WriteLine("No credits awarded, as the prize type is not 'Credits' or the value is zero.");
         }
     }
+    public async Task UpdateDailyStreakInUserStats(string userEmail)
+    {
+        try
+        {
+            var userStats = await GetUserFromFirebase(userEmail);
+
+            if (userStats != null)
+            {
+                var today = DateTime.UtcNow.Date;
+                var dailyStreak = userStats.DailyStreak ?? new DailyStreak
+                {
+                    CurrentStreak = 0,
+                    LongestStreak = 0,
+                    Stars = 0,
+                    LastLoginDate = DateTime.MinValue
+                };
+
+                if (dailyStreak.LastLoginDate == today)
+                {
+                    // Redan loggat in idag, gör inget
+                    return;
+                }
+                else if (dailyStreak.LastLoginDate.AddDays(1) == today)
+                {
+                    // Fortsätt streak
+                    dailyStreak.CurrentStreak++;
+                    dailyStreak.Stars++; // Synkronisera Stars med CurrentStreak
+
+                    // Uppdatera LongestStreak om CurrentStreak är högre
+                    if (dailyStreak.CurrentStreak > dailyStreak.LongestStreak)
+                    {
+                        dailyStreak.LongestStreak = dailyStreak.CurrentStreak;
+                    }
+                }
+                else
+                {
+                    // Streak bruten
+                    dailyStreak.CurrentStreak = 1;
+                    dailyStreak.Stars = 1; // Börja om med en stjärna
+                }
+
+                dailyStreak.LastLoginDate = today;
+                userStats.DailyStreak = dailyStreak;
+
+                // Uppdatera användarens stats i Firebase
+                await UpdateUserStatsInFirebase(userEmail, userStats);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating daily streak for {userEmail}: {ex.Message}");
+        }
+    }
+
+    public async Task AddStarshardToUser(string userEmail, int starShards)
+    {
+        var userStats = await GetUserFromFirebase(userEmail);
+
+        if (userStats != null)
+        {
+            // Uppdatera Starshards
+            userStats.StarShards = starShards;
+
+            // Uppdatera Firebase med nya stats
+            await UpdateUserStatsInFirebase(userEmail, userStats);
+        }
+    }
+    public async Task SetWeeklyOddsResetDay(string resetDay)
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FweeklyOddsResetDay.json";
+        var jsonData = JsonSerializer.Serialize(new { resetDay });
+        var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await _httpClient.PostAsync(path, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to set Weekly Odds Reset Day. Status code: {response.StatusCode}");
+            }
+            else
+            {
+                Console.WriteLine("Weekly Odds Reset Day set successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error setting Weekly Odds Reset Day: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<string> GetWeeklyOddsResetDay()
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FweeklyOddsResetDay.json?alt=media";
+
+        try
+        {
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Firebase response: {responseBody}");
+
+                var data = JsonSerializer.Deserialize<Dictionary<string, string>>(responseBody);
+                if (data != null && data.ContainsKey("resetDay"))
+                {
+                    return data["resetDay"];
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch Weekly Odds Reset Day. Status code: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching Weekly Odds Reset Day: {ex.Message}");
+        }
+
+        return "Sunday"; // Default to Sunday if not set
+    }
+
+    public async Task CheckAndResetWeeklyOddsAsync()
+    {
+        try
+        {
+            Console.WriteLine("Starting CheckAndResetWeeklyOddsAsync...");
+
+            // 1. Hämta reset-dagen från Firebase
+            var resetDay = await GetWeeklyOddsResetDay();
+            var today = DateTime.UtcNow.DayOfWeek.ToString();
+
+            Console.WriteLine($"Weekly Odds Reset Day: {resetDay}, Today: {today}");
+
+            // 2. Hämta senaste reset-datum från Firebase
+            var lastResetDate = await GetLastResetDateAsync();
+
+            if (lastResetDate == DateTime.UtcNow.Date)
+            {
+                Console.WriteLine("Weekly Odds reset has already been performed today. Skipping...");
+                return;
+            }
+
+            // 3. Kontrollera om idag är reset-dagen
+            if (resetDay == today)
+            {
+                Console.WriteLine("Resetting Weekly Odds for all users...");
+
+                // 4. Hämta alla användare från TotalUsersOdds.json
+                var allUsers = await GetAllUsers();
+
+                foreach (var user in allUsers)
+                {
+                    try
+                    {
+                        var userStats = await GetUserFromFirebase(user.UserEmail);
+                        if (userStats != null)
+                        {
+                            userStats.WeeklyOdds = 0.0; // Reset
+                            await UpdateUserStatsInFirebase(user.UserEmail, userStats);
+                            Console.WriteLine($"Weekly Odds reset for {user.UserEmail}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"User data for {user.UserEmail} not found. Skipping...");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error resetting Weekly Odds for {user.UserEmail}: {ex.Message}");
+                    }
+                }
+
+                // 8. Uppdatera senaste reset-datum i Firebase
+                await UpdateLastResetDateAsync(DateTime.UtcNow.Date);
+
+                Console.WriteLine("Weekly Odds reset successfully for all users.");
+            }
+            else
+            {
+                Console.WriteLine("Today is not the reset day. Skipping reset process.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error resetting Weekly Odds: {ex.Message}");
+        }
+    }
+    private async Task<DateTime> GetLastResetDateAsync()
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FlastWeeklyResetDate.json?alt=media";
+
+        try
+        {
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<Dictionary<string, string>>(responseBody);
+
+                if (data != null && data.ContainsKey("lastResetDate"))
+                {
+                    return DateTime.Parse(data["lastResetDate"]);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching last reset date: {ex.Message}");
+        }
+
+        // Returnera ett datum långt bak i tiden om det inte hittas
+        return DateTime.MinValue;
+    }
+    private async Task UpdateLastResetDateAsync(DateTime resetDate)
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FlastWeeklyResetDate.json";
+
+        var jsonData = JsonSerializer.Serialize(new { lastResetDate = resetDate.ToString("yyyy-MM-dd") });
+        var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await _httpClient.PostAsync(path, content);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Last reset date updated successfully.");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to update last reset date. Status code: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating last reset date: {ex.Message}");
+        }
+    }
+
+    private async Task<Dictionary<string, string>> GetResetConfigFromFirebase()
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FweeklyOddsResetDay.json?alt=media";
+
+        var response = await _httpClient.GetAsync(path);
+        if (response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(responseBody) ?? new Dictionary<string, string>();
+        }
+
+        return new Dictionary<string, string> { { "resetDay", "Sunday" } }; // Default värden
+    }
+
+    private async Task UpdateResetConfigInFirebase(string resetDay, DateTime lastResetDate)
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FweeklyOddsResetDay.json";
+
+        var jsonData = JsonSerializer.Serialize(new
+        {
+            resetDay,
+            lastResetDate = lastResetDate.ToString("yyyy-MM-dd")
+        });
+
+        var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+        await _httpClient.PostAsync(path, content);
+    }
+
+    public async Task<List<UserStats>> GetAllUsers()
+    {
+        var users = new List<UserStats>();
+        var totalUsersOddsPath = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2FTotalUsersOdds.json?alt=media";
+
+        try
+        {
+            // Hämta TotalUsersOdds.json
+            var response = await _httpClient.GetAsync(totalUsersOddsPath);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                // Tolka JSON som en dictionary där nyckeln är email och värdet är TotalOdds
+                var totalUsersOdds = JsonSerializer.Deserialize<Dictionary<string, double>>(responseBody);
+
+                if (totalUsersOdds != null)
+                {
+                    foreach (var entry in totalUsersOdds)
+                    {
+                        // Skapa ett UserStats-objekt med TotalOdds för varje användare
+                        var userStats = new UserStats
+                        {
+                            UserEmail = entry.Key,
+                            TotalOdds = entry.Value,
+                            WeeklyOdds = 0, // Standardvärde, då vi inte har denna information här
+                            Credits = 0,    // Standardvärde
+                            StarShards = 0, // Standardvärde
+                            LockInAmount = 0 // Standardvärde
+                        };
+
+                        users.Add(userStats);
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch TotalUsersOdds.json. Status code: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching TotalUsersOdds.json: {ex.Message}");
+        }
+
+        return users;
+    }
+
+    public async Task UpdateUserStatsInFirebase(string userEmail, UserStats userStats)
+    {
+        // 1. Uppdatera användarens individuella fil
+        var filePath = $"users/UserStats/{userEmail}.json";
+        var userUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/{Uri.EscapeDataString(filePath)}";
+
+        var userJsonData = JsonSerializer.Serialize(userStats);
+        var userContent = new StringContent(userJsonData, Encoding.UTF8, "application/json");
+
+        var userResponse = await _httpClient.PostAsync($"{userUrl}?alt=media", userContent);
+        if (!userResponse.IsSuccessStatusCode)
+        {
+            Console.WriteLine($"Failed to update user stats for {userEmail}. Status code: {userResponse.StatusCode}");
+            return;
+        }
+
+        Console.WriteLine($"Successfully updated user stats for {userEmail}");
+
+        // 2. Uppdatera TotalUsersOdds.json
+        await UpdateTotalUsersOdds(userEmail, userStats.TotalOdds);
+
+        // 3. Uppdatera TotalUsersWeeklyOdds.json
+        await UpdateTotalUsersWeeklyOdds(userEmail, userStats.WeeklyOdds);
+    }
+    public async Task UpdateTotalUsersWeeklyOdds(string userEmail, double newWeeklyOdds)
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2FTotalUsersWeeklyOdds.json";
+
+        try
+        {
+            // Hämta nuvarande TotalUsersWeeklyOdds från Firebase
+            var response = await _httpClient.GetAsync(path + "?alt=media");
+            var weeklyOddsData = new Dictionary<string, double>();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                weeklyOddsData = JsonSerializer.Deserialize<Dictionary<string, double>>(responseBody) ?? new Dictionary<string, double>();
+            }
+
+            // Avrunda WeeklyOdds till 1 decimal
+            newWeeklyOdds = Math.Round(newWeeklyOdds, 1);
+
+            // Uppdatera WeeklyOdds för den aktuella användaren
+            if (weeklyOddsData.ContainsKey(userEmail))
+            {
+                weeklyOddsData[userEmail] = newWeeklyOdds;
+            }
+            else
+            {
+                weeklyOddsData.Add(userEmail, newWeeklyOdds);
+            }
+
+            // Serialisera och skicka tillbaka till Firebase
+            var updatedJson = JsonSerializer.Serialize(weeklyOddsData);
+            var content = new StringContent(updatedJson, Encoding.UTF8, "application/json");
+
+            var putResponse = await _httpClient.PostAsync(path, content);
+            if (!putResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to update TotalUsersWeeklyOdds for {userEmail}. Status Code: {putResponse.StatusCode}");
+            }
+            else
+            {
+                Console.WriteLine($"TotalUsersWeeklyOdds updated successfully for {userEmail}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating TotalUsersWeeklyOdds: {ex.Message}");
+        }
+    }
+
+
+    // Uppdaterad metod för att uppdatera TotalUsersOdds.json
+    public async Task UpdateTotalUsersOdds(string userEmail, double newTotalOdds)
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2FTotalUsersOdds.json";
+
+        try
+        {
+            // Hämta nuvarande TotalUsersOdds från Firebase
+            var response = await _httpClient.GetAsync(path + "?alt=media");
+            var totalOddsData = new Dictionary<string, double>();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                totalOddsData = JsonSerializer.Deserialize<Dictionary<string, double>>(responseBody) ?? new Dictionary<string, double>();
+            }
+
+            // Avrunda TotalOdds till 1 decimal
+            newTotalOdds = Math.Round(newTotalOdds, 1);
+
+            // Uppdatera TotalOdds för den aktuella användaren
+            if (totalOddsData.ContainsKey(userEmail))
+            {
+                totalOddsData[userEmail] = newTotalOdds;
+            }
+            else
+            {
+                totalOddsData.Add(userEmail, newTotalOdds);
+            }
+
+            // Serialisera och skicka tillbaka till Firebase
+            var updatedJson = JsonSerializer.Serialize(totalOddsData);
+            var content = new StringContent(updatedJson, Encoding.UTF8, "application/json");
+
+            var putResponse = await _httpClient.PostAsync(path, content);
+            if (!putResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to update TotalUsersOdds for {userEmail}. Status Code: {putResponse.StatusCode}");
+            }
+            else
+            {
+                Console.WriteLine($"TotalUsersOdds updated successfully for {userEmail}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating TotalUsersOdds: {ex.Message}");
+        }
+    }
+    public async Task<Dictionary<string, double>> GetAllUsersOdds()
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2FTotalUsersOdds.json?alt=media";
+
+        try
+        {
+            var response = await _httpClient.GetAsync(path);
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<Dictionary<string, double>>(responseBody) ?? new Dictionary<string, double>();
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch TotalUsersOdds. Status code: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching TotalUsersOdds: {ex.Message}");
+        }
+
+        return new Dictionary<string, double>();
+    }
+    public async Task<Dictionary<string, double>> GetAllUsersWeeklyOdds()
+    {
+        var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2FTotalUsersWeeklyOdds.json?alt=media";
+
+        try
+        {
+            var response = await _httpClient.GetAsync(path);
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<Dictionary<string, double>>(responseBody) ?? new Dictionary<string, double>();
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch TotalUsersWeeklyOdds. Status code: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching TotalUsersWeeklyOdds: {ex.Message}");
+        }
+
+        return new Dictionary<string, double>();
+    }
+
+
+    public class DailyStreak
+    {
+        public int CurrentStreak { get; set; }
+        public int LongestStreak { get; set; }
+        public int Stars { get; set; }
+        public DateTime LastLoginDate { get; set; }
+    }
+
     public class OutcomeConfiguration
     {
         public int CorrectAnswersRequired { get; set; }

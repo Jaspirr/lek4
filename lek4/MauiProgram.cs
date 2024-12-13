@@ -15,6 +15,9 @@ namespace lek4
 {
     public static class MauiProgram
     {
+        public static FirebaseAuthProvider FirebaseClient { get; private set; }
+        public static FirebaseAuthConfig FirebaseConfig { get; private set; }
+
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
@@ -50,6 +53,7 @@ namespace lek4
 
             // Registrera andra tjänster
             builder.Services.AddSingleton<GoogleFitService>();
+            builder.Services.AddSingleton<AutoDrawService>();
             builder.Services.AddSingleton<AdService>();
             builder.Services.AddSingleton<UserService>();
             builder.Services.AddSingleton<ProductDrawDateService>();
@@ -62,6 +66,7 @@ namespace lek4
 
             builder.Services.AddSingleton(AudioManager.Current);
             builder.Services.AddTransient<MainPage>();
+
             // Konfigurera Firebase Authentication med din API-nyckel
             builder.Services.AddFirebaseAuth("AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA");
 
@@ -75,6 +80,7 @@ namespace lek4
                     new EmailProvider()
                 }
             }));
+
 
             return builder.Build();
         }

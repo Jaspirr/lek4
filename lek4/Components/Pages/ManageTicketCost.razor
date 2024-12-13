@@ -1,0 +1,164 @@
+﻿@page "/manage-ticket-cost"
+@using System.Text.Json
+@using System.Text
+@inject HttpClient HttpClient
+
+<div class="ticket-cost-management">
+    <h3>Manage Ticket Cost</h3>
+    <p>Set the cost for joining the jackpot below:</p>
+
+    <div class="ticket-cost-form">
+        <label for="ticketCost">Ticket Cost:</label>
+        <input type="number" id="ticketCost" @bind="ticketCost" min="1" />
+        <button class="update-button" @onclick="UpdateTicketCost">Update Cost</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <p>@message</p>
+    }
+</div>
+
+@code {
+    private int ticketCost = 100; // Default value
+    private string message;
+
+    private readonly string storageUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FticketCost.json?alt=media";
+    private readonly string uploadUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FticketCost.json";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTicketCost();
+    }
+
+    private async Task LoadTicketCost()
+    {
+        try
+        {
+            // Hämta data från Firebase
+            var response = await HttpClient.GetStringAsync(storageUrl);
+            Console.WriteLine($"Fetched ticket cost data: {response}"); // För debugging
+
+            // Deserialisera objektet från JSON
+            var data = JsonSerializer.Deserialize<TicketCostModel>(response);
+            if (data != null)
+            {
+                ticketCost = data.ticketCost;
+            }
+            else
+            {
+                ticketCost = 100; // Standardvärde om ingen data finns
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching ticket cost: {ex.Message}");
+            ticketCost = 100; // Standardvärde vid fel
+        }
+    }
+
+    // Modell för att representera JSON-strukturen
+    private class TicketCostModel
+    {
+        public int ticketCost { get; set; }
+    }
+
+    private async Task UpdateTicketCost()
+    {
+        try
+        {
+            // Skapa ett objekt med egenskapen "ticketCost"
+            var data = new { ticketCost = ticketCost };
+
+            // Serialisera objektet till JSON
+            var json = JsonSerializer.Serialize(data);
+            Console.WriteLine($"JSON being sent: {json}"); // För debugging
+
+            // Skapa HTTP-innehåll
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            // Skicka PUT-begäran till Firebase
+            var response = await HttpClient.PostAsync(uploadUrl, content);
+
+            // Logga svaret från servern
+            var responseBody = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Response body: {responseBody}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                message = "Ticket cost updated successfully.";
+                Console.WriteLine("Ticket cost updated successfully.");
+            }
+            else
+            {
+                message = $"Error: Unable to update ticket cost. StatusCode: {response.StatusCode}";
+                Console.WriteLine(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating ticket cost: {ex.Message}");
+            message = $"Error updating ticket cost: {ex.Message}";
+        }
+    }
+}
+<style>
+    .ticket-cost-management {
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    h3 {
+        font-size: 24px;
+        color: #2c3e50;
+        margin-bottom: 15px;
+    }
+
+    .ticket-cost-form {
+        margin-top: 20px;
+    }
+
+    label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 10px;
+        font-size: 18px;
+    }
+
+    input[type="number"] {
+        padding: 10px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        width: 100px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+
+    .update-button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .update-button:hover {
+            background-color: #45a049;
+        }
+
+    p {
+        font-size: 14px;
+        color: #333;
+        margin-top: 15px;
+    }
+</style>

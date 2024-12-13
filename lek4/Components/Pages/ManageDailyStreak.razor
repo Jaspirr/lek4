@@ -1,0 +1,198 @@
+﻿@page "/manage-streak"
+@using Microsoft.AspNetCore.Authorization
+
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+
+
+<div class="streak-management-page">
+    <h3>Manage User Streak</h3>
+    <p>Search for a user and update their streak.</p>
+
+    <div class="form-group">
+        <label for="userEmail">User Email:</label>
+        <input type="text" id="userEmail" @bind="userEmail" />
+    </div>
+    <div class="form-group">
+        <button class="action-button" @onclick="IncreaseStreak">Increase Streak</button>
+        <button class="action-button decrease-button" @onclick="DecreaseStreak">Decrease Streak</button>
+    </div>
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <p class="success-message">@successMessage</p>
+    }
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <p class="error-message">@errorMessage</p>
+    }
+
+    <button class="back-button" @onclick="GoBack">Back to Admin Panel</button>
+</div>
+
+@code {
+    private string userEmail;
+    private string successMessage;
+    private string errorMessage;
+
+    private async Task IncreaseStreak()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                errorMessage = "Please enter a valid user email.";
+                successMessage = string.Empty;
+                return;
+            }
+
+            var userStats = await UserService.GetUserFromFirebase(userEmail);
+
+            if (userStats != null)
+            {
+                // Increase the user's streak
+                userStats.DailyStreak.CurrentStreak++;
+                userStats.DailyStreak.Stars++; // Lägg till en stjärna
+
+                // Update longest streak if necessary
+                if (userStats.DailyStreak.CurrentStreak > userStats.DailyStreak.LongestStreak)
+                {
+                    userStats.DailyStreak.LongestStreak = userStats.DailyStreak.CurrentStreak;
+                }
+
+
+                // Save updated stats to Firebase
+                await UserService.UpdateUserStatsInFirebase(userEmail, userStats);
+
+                successMessage = $"Successfully increased streak for {userEmail}. Current streak: {userStats.DailyStreak.CurrentStreak}. Stars: {userStats.DailyStreak.Stars}.";
+                errorMessage = string.Empty;
+            }
+            else
+            {
+                errorMessage = $"User with email {userEmail} not found.";
+                successMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred while updating the streak: {ex.Message}";
+            successMessage = string.Empty;
+        }
+    }
+    private async Task DecreaseStreak()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                errorMessage = "Please enter a valid user email.";
+                successMessage = string.Empty;
+                return;
+            }
+
+            var userStats = await UserService.GetUserFromFirebase(userEmail);
+
+            if (userStats != null)
+            {
+                // Decrease the user's streak
+                if (userStats.DailyStreak.CurrentStreak > 0)
+                {
+                    userStats.DailyStreak.CurrentStreak--;
+                }
+
+                // Decrease stars if greater than 0
+                if (userStats.DailyStreak.Stars > 0)
+                {
+                    userStats.DailyStreak.Stars--;
+                }
+
+                // Save updated stats to Firebase
+                await UserService.UpdateUserStatsInFirebase(userEmail, userStats);
+
+                successMessage = $"Successfully decreased streak for {userEmail}. Current streak: {userStats.DailyStreak.CurrentStreak}. Stars: {userStats.DailyStreak.Stars}.";
+                errorMessage = string.Empty;
+            }
+            else
+            {
+                errorMessage = $"User with email {userEmail} not found.";
+                successMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred while updating the streak: {ex.Message}";
+            successMessage = string.Empty;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+}
+<style>
+    .streak-management-page {
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        max-width: 600px;
+        margin: 20px auto;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        font-size: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+
+    .action-button {
+        padding: 10px 20px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    .action-button:hover {
+        background-color: #45a049;
+    }
+
+    .back-button {
+        margin-top: 20px;
+        padding: 10px 20px;
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .back-button:hover {
+        background-color: #0b7dda;
+    }
+
+    .success-message {
+        color: green;
+        margin-top: 10px;
+    }
+
+    .error-message {
+        color: red;
+        margin-top: 10px;
+    }
+
+</style>

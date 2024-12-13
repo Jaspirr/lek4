@@ -13,6 +13,7 @@
 @inject StatsService StatsService;
 @inject JackpotService JackpotService;
 @inject UserService UserService;
+@inject HttpClient HttpClient;
 
 
 @using System.Security.Claims
@@ -20,6 +21,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
+@using System.Text.Json
 @using lek4.Components.Service
 
 @code {
@@ -53,11 +55,15 @@
     private List<string> jackpotParticipants;
     private int credits = 0;
     private bool canJoinJackpot = false;
-    private const int joinCost = 100;
+    private int joinCost = 0;
+    private int ticketCostToDisplay = 0;
     private int userCredits;
     private string starAnimationClass = "";
+    private string currencySymbol = "kr";
 
-   
+    private double startValue = 0.0;
+    private double endValue = 100000000000.0;
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -83,6 +89,7 @@
                 timeRemaining = "Draw date not set";
             }
 
+            await DisplayTicketCost();
             // Check if the product is a jackpot
             if (isJackpotSelected)
             {
@@ -99,8 +106,8 @@
             }
 
             // Fetch lock-in amount
-            await FetchLockInAmount();
-
+            await FetchTicketCost();
+            currencySymbol = await JackpotService.GetCurrencySymbol();
             // Initialize totalOdds and lockInAmount based on the "number" from the Home page
             totalOdds = NumberService.Number;
             lockInAmount = NumberService.Number;
@@ -124,6 +131,7 @@
         await UpdateWinningChance();
     }
 
+
     private string FormatRemainingTime(TimeSpan timeSpan)
     {
         return $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
@@ -135,8 +143,38 @@
             await LoadJackpotData(); // Kör jackpot-laddningen efter första rendering
         }
     }
+    private async Task<int> FetchTicketCost()
+    {
+        try
+        {
+            var response = await HttpClient.GetStringAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Jackpot%2ticketCost.json?alt=media");
+            return int.Parse(response); // Förutsätter att kostnaden är lagrad som en siffra
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching ticket cost: {ex.Message}");
+            return 100; // Standardvärde om hämtningen misslyckas
+        }
+    }
+    private async Task DisplayTicketCost()
+    {
+        try
+        {
+            Console.WriteLine("Fetching ticket cost...");
+            var response = await HttpClient.GetStringAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FticketCost.json?alt=media");
+            var ticketCostData = JsonSerializer.Deserialize<Dictionary<string, int>>(response);
+            ticketCostToDisplay = ticketCostData["ticketCost"];
 
+            Console.WriteLine($"Ticket cost fetched successfully: {ticketCostToDisplay}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching ticket cost: {ex.Message}");
+            ticketCostToDisplay = 100; // Default om något går fel
+        }
 
+        StateHasChanged(); // Uppdatera UI med det nya värdet
+    }
     private async Task FetchUserCredits()
     {
         userEmail = await localStorage.GetItemAsync<string>("userEmail");
@@ -176,19 +214,31 @@
 
     private async Task LoadJackpotData()
     {
-        // Hämta det beräknade jackpot-beloppet
-        double newJackpotAmount = await JackpotService.GetCalculatedJackpotAmount();
-
-        // Använd JSRuntime för att animera övergången om värdet har ändrats
-        if (Math.Abs(newJackpotAmount - jackpotAmount) > 0.01)
+        try
         {
-            await JSRuntime.InvokeVoidAsync("animateValue", "jackpotAmount", jackpotAmount, newJackpotAmount, 2000);
-            jackpotAmount = newJackpotAmount; // Uppdatera jackpotAmount för att hålla det aktuellt
-        }
+            // Fetch the calculated jackpot amount
+            double newJackpotAmount = await JackpotService.GetCalculatedJackpotAmount();
 
-        // Hämta deltagarlistan (om du behöver detta)
-        jackpotParticipants = await JackpotService.GetJackpotParticipants();
-        StateHasChanged();
+            // Fetch the currency symbol dynamically
+            string newCurrencySymbol = await JackpotService.GetCurrencySymbol();
+
+            // Use JSRuntime to animate the value transition if the jackpot amount has changed
+            if (Math.Abs(newJackpotAmount - jackpotAmount) > 0.01)
+            {
+                await JSRuntime.InvokeVoidAsync("animateValue", "jackpotAmount", jackpotAmount, newJackpotAmount, 2000);
+                jackpotAmount = newJackpotAmount; // Update the jackpotAmount with the fetched value
+            }
+
+            // Update the currency symbol
+            currencySymbol = newCurrencySymbol;
+
+            // Update the UI
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading jackpot data: {ex.Message}");
+        }
     }
 
     private void NavigateToJackpot()
@@ -473,7 +523,6 @@
                 credits -= joinCost;
                 canJoinJackpot = credits >= joinCost;
 
-                // Bekräftelsemeddelande eller omdirigering till biljettvalssidan
                 Console.WriteLine("Lyckades gå med i jackpot, omdirigerar till biljettvalssidan.");
                 NavigationManager.NavigateTo($"/jackpot/{productNumber}/select-ticket");
             }
@@ -493,35 +542,85 @@
     private async Task LockInJackpot()
     {
         Console.WriteLine("LockInJackpot method was called.");
-        Console.WriteLine($"Current user credits: {userCredits}");
 
-        if (userCredits >= 100)
+        // Hämta ticketCost dynamiskt från Firebase
+        int ticketCost = await JackpotService.GetTicketCost();
+        Console.WriteLine($"Fetched ticket cost: {ticketCost}");
+
+        // Hämta det senaste värdet av userCredits från Firebase
+        userCredits = await FetchUserCreditsFromFirebase(userEmail);
+        Console.WriteLine($"Current user credits after fetch: {userCredits}");
+
+        if (userCredits >= ticketCost) // Kontrollera om användaren har tillräckligt med credits
         {
-            // Dra av 100 credits och uppdatera användarens data
-            userCredits -= 100;
+            // Dra av ticketCost och uppdatera användarens saldo
+            userCredits -= ticketCost;
+
             bool creditsUpdated = await UserService.UpdateUserCredits(userEmail, userCredits);
+            Console.WriteLine($"Credits updated in Firebase: {creditsUpdated}");
 
-            // Uppdatera jackpot med användarens e-post och låsta credits
-            bool jackpotUpdated = await JackpotService.UpdateJackpotTotalLockin(userEmail, 100);
-
-            if (creditsUpdated && jackpotUpdated)
+            if (creditsUpdated)
             {
-                Console.WriteLine("Successfully locked in jackpot and updated credits.");
-                NavigationManager.NavigateTo($"/jackpot/{productNumber}/SelectTicket");
+                // Uppdatera jackpot med användarens e-post och låsta credits
+                bool jackpotUpdated = await JackpotService.UpdateJackpotTotalLockin(userEmail, ticketCost);
+                Console.WriteLine($"Jackpot lock-in updated: {jackpotUpdated}");
+
+                if (jackpotUpdated)
+                {
+                    Console.WriteLine("Successfully locked in jackpot and updated credits.");
+                    NavigationManager.NavigateTo($"/jackpot/{productNumber}/SelectTicket");
+                }
+                else
+                {
+                    Console.WriteLine("Failed to update jackpot lock-in.");
+                    errorMessage = "Ett fel uppstod vid uppdatering av jackpot-låset.";
+                }
             }
             else
             {
-                Console.WriteLine("Failed to update either credits or jackpot lock-in.");
-                errorMessage = "Ett fel uppstod vid uppdatering av dina krediter eller jackpot-låset.";
+                Console.WriteLine("Failed to update user credits.");
+                errorMessage = "Ett fel uppstod vid uppdatering av dina krediter.";
             }
         }
         else
         {
-            errorMessage = "Du har inte tillräckligt med credits för att delta i jackpotten.";
+            errorMessage = $"Du har inte tillräckligt med credits ({userCredits}) för att betala ticket cost ({ticketCost}).";
             Console.WriteLine(errorMessage);
         }
 
-        StateHasChanged();  // Uppdatera UI för att visa eventuella ändringar
+        StateHasChanged(); // Uppdatera UI för att reflektera eventuella ändringar
+    }
+
+    private async Task<int> FetchUserCreditsFromFirebase(string userEmail)
+    {
+        try
+        {
+            Console.WriteLine($"Fetching user credits for {userEmail} from Firebase...");
+
+            var user = await UserService.GetUserFromFirebase(userEmail);
+            int credits = user?.Credits ?? 0; // Returnera 0 om användaren inte hittas
+
+            Console.WriteLine($"Fetched credits: {credits}");
+            return credits;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching user credits: {ex.Message}");
+            return 0; // Returnera 0 vid fel
+        }
+    }
+    private string FormattedJackpotAmount
+    {
+        get
+        {
+            if (jackpotAmount > 999.99)
+            {
+                return Math.Floor(jackpotAmount).ToString("F0"); // No decimals for values greater than 999.99
+            }
+            return jackpotAmount % 1 == 0
+                ? jackpotAmount.ToString("F0") // Remove .00 for whole numbers
+                : jackpotAmount.ToString("0.00"); // Keep two decimals for non-whole numbers
+        }
     }
 }
 
@@ -550,26 +649,34 @@
             @if (isJackpotSelected)
             {
                 <div class="jackpot-details">
-                    <p id="jackpotAmount" class="jackpotamount">@jackpotAmount.ToString("0.0")kr</p>
-
+                    <p id="jackpotAmount" class="jackpotamount">
+                        @FormattedJackpotAmount
+                        <span class="currency-symbol">@currencySymbol</span>
+                    </p>
                     <!-- Lock In Button with Credits Box Above -->
                     <div class="jackpot-credits-wrapper">
                         <div class="jackpot-credits-box">
                             <div class="jackpot-star-wrapper @starAnimationClass">
                                 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-                                <i class="fa-solid fa-carrot"></i>
+                                <img src="images/Voidglas2.webp" alt="Starshard Icon" class="voidglas-icon" />
                             </div>
                             <span class="jackpot-credits-count">@userCredits</span>
                         </div>
 
-                        <button @onclick="LockInJackpot" class="jackpot-lock-in-button" disabled="@(userCredits < 100)">
-                            @(userCredits < 100 ? "Not enough" : "LOCK IN")
+                        <!-- Uppdaterad Lock-In-knapp med dynamisk biljettkostnad -->
+                        <button @onclick="LockInJackpot" class="jackpot-lock-in-button" disabled="@(userCredits < ticketCostToDisplay)">
+                            @(userCredits < ticketCostToDisplay ? "Not enough" : "LOCK IN")
 
-                            @if (userCredits < 100)
+                            @if (userCredits < ticketCostToDisplay)
                             {
-                                <div class="insufficient-credits-box">100:-</div> <!-- Red box indicating insufficient credits -->
+                                <div class="insufficient-credits-box">@ticketCostToDisplay:-</div> <!-- Red box indicating insufficient credits -->
                             }
                         </button>
+                    </div>
+
+                    <!-- Visa biljettkostnad -->
+                    <div class="ticket-cost">
+                        <p>To participate: @ticketCostToDisplay</p>
                     </div>
                 </div>
             }
@@ -666,6 +773,13 @@
 </div>
 
 <style>
+    .ticket-cost {
+        margin-top: 0px; /* Litet mellanrum från knappen */
+        font-size: 0.6em; /* Gör texten mindre */
+        color: #000; /* Svart text */
+        text-align: center; /* Centrerar texten under knappen */
+    }
+
     .jackpot-details {
         display: flex;
         flex-direction: column;
@@ -1061,6 +1175,22 @@
         color: #228B22; /* ForestGreen */
         content: "V-High";
     }
+
+    .roller-digit {
+        display: inline-block;
+        font-weight: bold;
+        font-size: 2em;
+        transition: transform 0.2s ease-in-out; /* Smooth rolling effect */
+    }
+
+    .voidglas-icon {
+        width: 38px; /* Öka bredden för att göra den större */
+        height: 38px; /* Anpassa höjden så att den matchar bredden */
+        margin-right: 10px; /* Ge lite extra utrymme mellan ikonen och texten */
+        border-radius: 50%; /* Gör bilden rund om den är fyrkantig */
+        object-fit: cover; /* Behåll proportionerna för bilden */
+        box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2); /* Förbättra skuggan något */
+    }
 </style>
 
 <script>
@@ -1084,28 +1214,50 @@
             event.target.style.display = "none";
         }
     }
+    function animateValue(id, start, end, duration, currencySymbol) {
+        const valueSpan = document.getElementById("jackpotValue");
+        const symbolSpan = document.getElementById("currencySymbol");
 
-    function animateValue(id, start, end, duration) {
-        const obj = document.getElementById(id);
-        if (!obj) {
-            console.warn(`Element with ID "${id}" not found.`);
+        if (!valueSpan || !symbolSpan) {
+            console.warn("Required elements not found.");
             return;
         }
 
-        if (start === end) return;
+        // Early exit if start and end are the same
+        if (start === end) {
+            valueSpan.innerText = formatNumber(end);
+            symbolSpan.innerText = currencySymbol; // Update currency symbol
+            return;
+        }
 
         const range = end - start;
         let current = start;
-        const increment = end > start ? 0.01 : -0.01;
-        const stepTime = Math.abs(Math.floor(duration / (range / increment)));
+        const increment = range / (duration / 10); // Increment value for smooth animation
+        const stepTime = 10; // Update every 10ms for smoother animation
 
-        const timer = setInterval(function () {
-            current = Math.round((current + increment) * 100) / 100;
-            obj.innerText = current.toFixed(2);
+        const timer = setInterval(() => {
+            current += increment;
+
+            // Apply rolling effect by animating transform
+            valueSpan.style.transform = "translateY(-10px)";
+            setTimeout(() => {
+                valueSpan.style.transform = "translateY(0)";
+            }, 100);
+
+            valueSpan.innerText = formatNumber(current);
+            symbolSpan.innerText = currencySymbol; // Keep updating the currency symbol
+
             if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
                 clearInterval(timer);
-                obj.innerText = end.toFixed(2);
+                valueSpan.innerText = formatNumber(end); // Ensure final value is accurate
+                symbolSpan.innerText = currencySymbol; // Ensure the final currency symbol is accurate
             }
         }, stepTime);
+    }
+
+    function formatNumber(value) {
+        return value > 999.99
+            ? Math.floor(value).toLocaleString() // Remove decimals and add thousands separator
+            : value.toFixed(2); // Show two decimals for smaller values
     }
 </script>

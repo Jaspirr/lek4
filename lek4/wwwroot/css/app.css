@@ -229,7 +229,7 @@ h1:focus {
     margin: 5px;
     padding: 10px 20px;
 }
-.oval-background {
+.oval-background { 
     position: absolute;
     top: 50%;
     left: 50%;

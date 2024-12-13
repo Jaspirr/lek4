@@ -38,12 +38,13 @@
 	<ItemGroup>
 		<PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
 		<PackageReference Include="Firebase.Auth" Version="1.0.0" />
-		<PackageReference Include="FirebaseAdmin" Version="3.0.1" />
+		<PackageReference Include="FirebaseAdmin" Version="3.1.0" />
 		<PackageReference Include="FirebaseAuthentication.net" Version="4.1.0" />
 		<PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
 		<PackageReference Include="Google.Apis.Fitness.v1" Version="1.68.0.3232" />
 		<PackageReference Include="Google.Cloud.Datastore.V1" Version="4.13.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.71" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.71" />

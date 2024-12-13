@@ -226,21 +226,21 @@
 
     private List<PlanetOption> planets = new List<PlanetOption>
     {
-        new PlanetOption { Name = "Mercury", ImageUrl = "images/mercurus.webp" },
-        new PlanetOption { Name = "Venus", ImageUrl = "images/Venus.webp" },
-        new PlanetOption { Name = "Earth", ImageUrl = "images/earth.webp" },
-        new PlanetOption { Name = "Mars", ImageUrl = "images/Mars.webp" },
-        new PlanetOption { Name = "Jupiter", ImageUrl = "images/jupiter.webp" },
-        new PlanetOption { Name = "Saturn", ImageUrl = "images/Saturnus.webp" },
-        new PlanetOption { Name = "Uranus", ImageUrl = "images/uranus.webp" },
-        new PlanetOption { Name = "Neptune", ImageUrl = "images/Neptunus.webp" }
+        new PlanetOption { Name = "Mercury", ImageUrl = "images/mercurus2.webp" },
+        new PlanetOption { Name = "Venus", ImageUrl = "images/Venus2.webp" },
+        new PlanetOption { Name = "Earth", ImageUrl = "images/earth2.webp" },
+        new PlanetOption { Name = "Mars", ImageUrl = "images/Mars2.webp" },
+        new PlanetOption { Name = "Jupiter", ImageUrl = "images/jupiter2.webp" },
+        new PlanetOption { Name = "Saturn", ImageUrl = "images/Saturnus2.webp" },
+        new PlanetOption { Name = "Uranus", ImageUrl = "images/uranus2.webp" },
+        new PlanetOption { Name = "Neptune", ImageUrl = "images/Neptunus2.webp" }
     };
     private List<ElementOption> elements = new List<ElementOption>
     {
-        new ElementOption { Name = "Earth", ImageUrl = "/images/elements/Jord.webp" },
-        new ElementOption { Name = "Fire", ImageUrl = "/images/elements/Fire.webp" },
-        new ElementOption { Name = "Water", ImageUrl = "/images/elements/Water.webp" },
-        new ElementOption { Name = "Air", ImageUrl = "/images/elements/Air.webp" },
+        new ElementOption { Name = "Earth", ImageUrl = "/images/elements/Jord2.webp" },
+        new ElementOption { Name = "Fire", ImageUrl = "/images/elements/Fire2.webp" },
+        new ElementOption { Name = "Water", ImageUrl = "/images/elements/Water2.webp" },
+        new ElementOption { Name = "Air", ImageUrl = "/images/elements/Air2.webp" },
     };
     public class ColorOption
     {
@@ -1263,6 +1263,8 @@
         max-width: 400px;
         text-align: center;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        max-height: 500px; /* Sätt en maxhöjd för popupen */
+        overflow-y: auto;
     }
 
     .close-btn {
@@ -1273,6 +1275,9 @@
         cursor: pointer;
     }
 
+    #popup-content {
+        overflow-y: auto; /* Gör innehållet rullbart */
+    }
     #popup-content h2 {
         font-size: 1.5em;
         margin-bottom: 10px;

@@ -15,6 +15,12 @@
         <button class="action-button" @onclick="BreakAndTime">Break and Time</button>
         <button class="action-button" @onclick="Notifications">Notifications</button>
         <button class="action-button" @onclick="PriceConfig">PriceConfig</button>
+        <button class="action-button" @onclick="ManageAdmins">Manage Admins</button>
+        <button class="action-button" @onclick="ManageTicketCost">Manage Ticket Cost</button>
+        <button class="action-button" @onclick="AdSpan">Manage Ads Span</button>
+        <button class="action-button" @onclick="JackpotConversion">Manage Jackpot Conversion</button>
+        <button class="action-button" @onclick="NavigateToManageStreak">Manage User Daily Streak</button>
+        <button class="action-button" @onclick="NavigateToResetWeeklyOdds">Reset Weekly Odds Day</button>
     </div>
 </div>
 
@@ -42,8 +48,31 @@
     {
         NavigationManager.NavigateTo("/PriceConfig");
     }
+    private void ManageAdmins()
+    {
+        NavigationManager.NavigateTo("/manage-admins");
+    }
+    private void ManageTicketCost()
+    {
+        NavigationManager.NavigateTo("/manage-ticket-cost");
+    }
+    private void AdSpan()
+    {
+        NavigationManager.NavigateTo("/admin-ads-span");
+    }
+    private void JackpotConversion()
+    {
+        NavigationManager.NavigateTo("/jackpot-conversion");
+    }
+    private void NavigateToManageStreak()
+    {
+        NavigationManager.NavigateTo("/manage-streak");
+    }
+    private void NavigateToResetWeeklyOdds()
+    {
+            NavigationManager.NavigateTo("/reset-weekly-odds");
+    }
 }
-
 <style>
     .admin-container {
         padding: 20px;

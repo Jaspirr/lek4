@@ -17,6 +17,7 @@ namespace lek4.Components.Service
         private readonly NavigationManager _navigationManager;
         private readonly ILocalStorageService _localStorage;
         public string CurrentUserEmail { get; set; }
+        private double _conversionFactor = 0.1;
 
         public JackpotService(HttpClient httpClient, UserService userService, NavigationManager navigationManager, ILocalStorageService localStorage)
         {
@@ -103,10 +104,108 @@ namespace lek4.Components.Service
         }
         public async Task<double> GetCalculatedJackpotAmount()
         {
-            // Hämta total credits från Firebase via UserService
-            double totalCredits = await _userService.GetTotalCredits();
-            // Multiplicera med 0.1 för att få jackpot-beloppet
-            return totalCredits * 0.1;
+            try
+            {
+                // Fetch totalCredits
+                var totalCreditsResponse = await _httpClient.GetStringAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2Ftotalcredits.json?alt=media");
+                var totalCredits = JsonSerializer.Deserialize<Dictionary<string, double>>(totalCreditsResponse)?["totalCredits"] ?? 0.0;
+
+                // Fetch jackpotconversion
+                var jackpotConversionResponse = await _httpClient.GetStringAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FconversionFactor.json?alt=media");
+                var jackpotConversion = JsonSerializer.Deserialize<Dictionary<string, double>>(jackpotConversionResponse)?["jackpotconversion"] ?? 0.1;
+
+                // Calculate jackpot amount
+                return totalCredits * jackpotConversion;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calculating jackpot amount: {ex.Message}");
+                return 0.0; // Fallback value
+            }
+        }
+        public async Task UpdateCurrencySymbol(string newCurrencySymbol)
+        {
+            var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2Fcurrency.json";
+            var jsonContent = JsonSerializer.Serialize(new { currencySymbol = newCurrencySymbol });
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await _httpClient.PostAsync(path, content);
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Failed to update currency symbol. Status Code: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating currency symbol: {ex.Message}");
+            }
+        }
+        public async Task<string> GetCurrencySymbol()
+        {
+            var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2Fcurrency.json?alt=media";
+
+            try
+            {
+                var response = await _httpClient.GetStringAsync(path);
+                var currencyData = JsonSerializer.Deserialize<Dictionary<string, string>>(response);
+
+                return currencyData.ContainsKey("currencySymbol") ? currencyData["currencySymbol"] : "kr"; // Default to "kr"
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching currency symbol: {ex.Message}");
+                return "kr"; // Default to "kr" if there's an error
+            }
+        }
+
+        public async Task<double> GetConversionFactor()
+        {
+            try
+            {
+                var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FconversionFactor.json?alt=media";
+                var response = await _httpClient.GetStringAsync(path);
+                return JsonSerializer.Deserialize<double>(response);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching conversion factor: {ex.Message}");
+                return 0.1; // Default to 0.1 if fetching fails
+            }
+        }
+
+
+        public async Task UpdateConversionFactor(double newFactor)
+        {
+            var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FconversionFactor.json";
+
+            // Skapa en JSON-struktur med rätt nyckel
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals
+            };
+
+            var jsonContent = JsonSerializer.Serialize(new { jackpotconversion = newFactor }, options);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await _httpClient.PostAsync(path, content);
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Failed to update conversion factor. Status Code: {response.StatusCode}");
+                }
+                else
+                {
+                    Console.WriteLine("Conversion factor updated successfully.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating conversion factor: {ex.Message}");
+            }
         }
 
 
@@ -127,28 +226,83 @@ namespace lek4.Components.Service
 
         public async Task JoinJackpot(string userEmail, int productNumber = 0)
         {
-            // Hämta användarens credits
-            double userCredits = await GetUserCredits(userEmail);
-
-            if (userCredits < 100)
+            try
             {
-                Console.WriteLine("Insufficient credits to join the jackpot.");
-                return;
+                // Hämta ticketCost dynamiskt
+                int ticketCost = await GetTicketCost();
+
+                // Dra av credits från användarens `UserStats`-fil
+                bool isDeducted = await DeductCreditsFromUserStats(userEmail, ticketCost);
+
+                if (!isDeducted)
+                {
+                    Console.WriteLine("Insufficient credits or failed to update user stats. User cannot join the jackpot.");
+                    return;
+                }
+
+                // Uppdatera jackpot-beloppet
+                double jackpotAmount = await GetJackpotAmount();
+                jackpotAmount += ticketCost * 0.1; // Dynamisk ökning baserad på ticketCost
+                await UpdateJackpotAmount(jackpotAmount);
+
+                // Lägg till användaren i deltagarlistan
+                await AddParticipantToJackpot(userEmail);
+
+                Console.WriteLine("User successfully joined the jackpot.");
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error joining jackpot: {ex.Message}");
+            }
+        }
+        private async Task<bool> DeductCreditsFromUserStats(string userEmail, int ticketCost)
+        {
+            try
+            {
+                // Firebase path för användarens stats
+                var userStatsPath = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{Uri.EscapeDataString(userEmail)}.json?alt=media";
 
-            // Dra av credits och uppdatera användarens saldo
-            userCredits -= 100;
-            await _userService.UpdateUserCredits(userEmail, (int)userCredits);
+                // Hämta användarens aktuella stats
+                var response = await _httpClient.GetAsync(userStatsPath);
 
-            // Uppdatera jackpot-beloppet
-            double jackpotAmount = await GetJackpotAmount();
-            jackpotAmount += 10.0;
-            await UpdateJackpotAmount(jackpotAmount);
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Failed to fetch user stats for {userEmail}. Status Code: {response.StatusCode}");
+                    return false;
+                }
 
-            // Lägg till användaren i deltagarlistan
-            await AddParticipantToJackpot(userEmail);
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var userStats = JsonSerializer.Deserialize<UserCreditData>(jsonResponse);
 
-            Console.WriteLine("Användare har lagts till i jackpotten.");
+                if (userStats == null || userStats.Credits < ticketCost)
+                {
+                    Console.WriteLine("User does not have enough credits.");
+                    return false;
+                }
+
+                // Subtrahera biljettkostnaden från credits
+                userStats.Credits -= ticketCost;
+
+                // Spara tillbaka uppdaterade credits till UserStats-filen
+                var updatedJson = JsonSerializer.Serialize(userStats);
+                var content = new StringContent(updatedJson, Encoding.UTF8, "application/json");
+
+                var updateResponse = await _httpClient.PostAsync(userStatsPath.Replace("?alt=media", ""), content);
+
+                if (!updateResponse.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Failed to update user stats for {userEmail}. Status Code: {updateResponse.StatusCode}");
+                    return false;
+                }
+
+                Console.WriteLine($"Successfully deducted {ticketCost} credits from {userEmail}. New balance: {userStats.Credits}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deducting credits for {userEmail}: {ex.Message}");
+                return false;
+            }
         }
 
         // Uppdatera jackpot-belopp i Firebase Storage
@@ -205,7 +359,22 @@ namespace lek4.Components.Service
             // Steg 4: Spara resultatet till Firebase, oavsett om det finns en vinnare eller inte
             await SaveDrawResult(productNumber, winnerEmail, winningTicket);
         }
+        public async Task<int> GetTicketCost()
+        {
+            var path = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FticketCost.json?alt=media";
 
+            try
+            {
+                var response = await _httpClient.GetStringAsync(path);
+                var data = JsonSerializer.Deserialize<Dictionary<string, int>>(response);
+                return data != null && data.ContainsKey("ticketCost") ? data["ticketCost"] : 10; // Standardvärde
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching ticket cost: {ex.Message}");
+                return 10; // Standardvärde vid fel
+            }
+        }
 
         private async Task<List<JackpotTicket>> GetAllTickets(int productNumber)
         {
@@ -411,7 +580,7 @@ namespace lek4.Components.Service
         }
         public async Task<string> GetWinnerTicketFromFirebase(int productNumber, string winnerEmail)
         {
-            var path = $"https://firebasestorage.googleapis.com/v0/b/your-project-id.appspot.com/o/users%2Fjackpot%2F{productNumber}%2F{winnerEmail}.json?alt=media";
+            var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2F{productNumber}%2F{winnerEmail}.json?alt=media";
 
             var response = await _httpClient.GetAsync(path);
 

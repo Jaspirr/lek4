@@ -1,0 +1,211 @@
+﻿@page "/manage-admins"
+@attribute [Authorize(Roles = "Admin")]
+@using System.Text.Json
+@using System.Text
+@using Firebase.Auth
+@using Microsoft.AspNetCore.Authorization
+@inject FirebaseAuthClient AuthClient
+@inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
+
+<div class="admin-management">
+    <div class="admin-header">
+        <h3>Manage Admins</h3>
+        <p>Add or remove admin for your system.</p>
+    </div>
+
+    <div>
+        <h4>Current Admins</h4>
+        <ul>
+            @foreach (var email in adminEmails)
+            {
+                <li>
+                    @email
+                    <button class="remove-button" @onclick="(() => RemoveAdmin(email))">Remove</button>
+                </li>
+            }
+        </ul>
+    </div>
+
+    <div class="add-new-admin">
+        <input type="email" @bind="newAdminEmail" placeholder="Enter admin email" />
+        <button class="add-button" @onclick="AddAdmin">Add Admin</button>
+    </div>
+</div>
+
+
+@code {
+    private List<string> adminEmails = new();
+    private string newAdminEmail = string.Empty;
+    private string storageUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/admins%2Falladmins.json?alt=media";
+    private string uploadUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/admins%2Falladmins.json";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAdminList();
+    }
+
+    private async Task LoadAdminList()
+    {
+        try
+        {
+            var response = await HttpClient.GetStringAsync(storageUrl);
+            adminEmails = JsonSerializer.Deserialize<List<string>>(response) ?? new List<string>();
+        }
+        catch (HttpRequestException)
+        {
+            Console.WriteLine("Error: Unable to load admin list.");
+            adminEmails = new List<string>();
+        }
+    }
+
+    private async Task AddAdmin()
+    {
+        if (!string.IsNullOrWhiteSpace(newAdminEmail) && !adminEmails.Contains(newAdminEmail))
+        {
+            adminEmails.Add(newAdminEmail);
+            await SaveAdminList();
+            newAdminEmail = string.Empty;
+        }
+    }
+
+    private async Task RemoveAdmin(string email)
+    {
+        if (adminEmails.Contains(email))
+        {
+            adminEmails.Remove(email);
+            await SaveAdminList();
+        }
+    }
+
+    private async Task SaveAdminList()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(adminEmails);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            // Ladda upp filen till Firebase Storage
+            var request = new HttpRequestMessage(HttpMethod.Post, uploadUrl)
+                {
+                    Content = content
+                };
+            var response = await HttpClient.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Admin list updated successfully.");
+            }
+            else
+            {
+                Console.WriteLine($"Error: Unable to save admin list. StatusCode: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving admin list: {ex.Message}");
+        }
+    }
+}
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f9;
+        color: #333;
+        margin: 0;
+        padding: 0;
+    }
+
+    h3, h4 {
+        color: #2c3e50;
+        margin-bottom: 15px;
+    }
+
+    .admin-management {
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+        li:last-child {
+            border-bottom: none;
+        }
+
+    .remove-button {
+        background-color: #27ae60;
+        color: #fff;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .remove-button:hover {
+            background-color: #219150;
+        }
+
+    input[type="email"] {
+        width: calc(100% - 140px);
+        padding: 10px;
+        margin-right: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-sizing: border-box;
+    }
+
+    .add-button {
+        background-color: #8e44ad;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .add-button:hover {
+            background-color: #7a379a;
+        }
+
+    .add-new-admin {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 20px;
+    }
+
+    .admin-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+        .admin-header h3 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .admin-header p {
+            font-size: 14px;
+            color: #777;
+        }
+
+</style>
+
