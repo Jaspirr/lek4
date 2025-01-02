@@ -3,8 +3,11 @@
 @using System.Text.Json
 @using System.Text
 @using System.Net.Http
+@using System.Net
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
+
 
 <div class="signup-container">
     <div class="signup-form">
@@ -78,6 +81,7 @@
                 Already have an account? <NavLink href="/login">Login here</NavLink>
             </div>
         </EditForm>
+
     </div>
 </div>
 
@@ -161,40 +165,90 @@
     {
         signupModel.BirthDate = new DateTime(selectedYear, selectedMonth, selectedDay);
 
-        // Kontrollera om användaren är minst 18 år
         if (CalculateAge(signupModel.BirthDate) < 18)
         {
-            await Application.Current.MainPage.DisplayAlert("Error", "You must be at least 18 years old to sign up.", "Ok");
+            await Application.Current.MainPage.DisplayAlert(
+                "Age Requirement",
+                "You must be at least 18 years old to create an account.",
+                "OK"
+            );
             return;
         }
 
-        // Kontrollera om lösenorden matchar
         if (signupModel.Password != signupModel.ConfirmPassword)
         {
-            await Application.Current.MainPage.DisplayAlert("Error", "Passwords do not match.", "Ok");
+            await Application.Current.MainPage.DisplayAlert(
+                "Password Mismatch",
+                "The passwords you entered do not match. Please make sure both fields contain the same password and try again.",
+                "OK"
+            );
             return;
         }
 
         try
         {
-            // Skapa användaren i Firebase Authentication
+            var emailExists = await CheckIfEmailExists(signupModel.Email);
+            if (emailExists)
+            {
+                await Application.Current.MainPage.DisplayAlert(
+                    "Email Already Registered",
+                    "The email address you entered is already associated with an existing account.",
+                    "OK"
+                );
+                return;
+            }
+
             var userCredential = await AuthClient.CreateUserWithEmailAndPasswordAsync(signupModel.Email, signupModel.Password);
             Console.WriteLine($"User created with UID: {userCredential.User.Uid}");
 
-            // Spara användarprofilen i Firebase Storage
             await SaveUserProfileToStorage(userCredential.User);
             Console.WriteLine("User profile saved to storage.");
 
-            // Bekräfta registrering
             await Application.Current.MainPage.DisplayAlert("Success", "Registration successful!", "Ok");
             NavigationManager.NavigateTo("/login");
         }
         catch (Exception ex)
         {
-            // Fånga eventuella fel och visa ett felmeddelande
-            Console.WriteLine($"Full Exception: {ex.ToString()}");
+            Console.WriteLine($"Full Exception: {ex}");
             var errorMessage = GetErrorMessage(ex.Message);
-            await Application.Current.MainPage.DisplayAlert("Error", errorMessage, "Ok");
+
+            await Application.Current.MainPage.DisplayAlert(
+                "An error occurred",
+                $"{errorMessage}\n\nIf the problem persists, please contact support.",
+                "OK"
+            );
+        }
+    }
+
+    private async Task<bool> CheckIfEmailExists(string userEmail)
+    {
+        try
+        {
+            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{userEmail}.json?alt=media";
+            var response = await HttpClient.GetAsync(url);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Firebase response: {responseBody}");
+                return responseBody != "null"; // E-posten finns om responsen inte är "null"
+            }
+            else if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Om resursen inte hittas, är e-posten inte registrerad
+                Console.WriteLine($"Email {userEmail} is not registered.");
+                return false;
+            }
+            else
+            {
+                Console.WriteLine($"Unexpected response checking email existence: {response.StatusCode}");
+                throw new Exception($"Unexpected error when checking email: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking email existence: {ex.Message}");
+            throw;
         }
     }
 
@@ -215,7 +269,7 @@
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         var client = new HttpClient();
 
-        // Skicka förfrågan till Firebase
+        // Skicka förfrågan till Firebase för att spara användarprofilen
         var response = await client.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content);
 
         var responseBody = await response.Content.ReadAsStringAsync();
@@ -232,7 +286,7 @@
         try
         {
             var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
-            // Hantera JSON-svaret här
+            // Hantera JSON-svaret här om det behövs
         }
         catch (JsonException ex)
         {
@@ -244,7 +298,50 @@
         {
             throw new Exception($"Failed to save user profile: {responseBody}");
         }
+
+        // Lägg till logiken för att skapa UserStats-filen
+        try
+        {
+            var userStats = new
+            {
+                UserEmail = signupModel.Email,
+                LockInAmount = 0,
+                Credits = 0,
+                StarShards = 0,
+                TotalOdds = 0.0,
+                WeeklyOdds = 0,
+                DailyStreak = new
+                {
+                    CurrentStreak = 1,
+                    LongestStreak = 1,
+                    Stars = 1,
+                    LastLoginDate = DateTime.UtcNow.ToString("o") // ISO 8601-format
+                }
+            };
+
+            var userStatsJson = JsonSerializer.Serialize(userStats);
+            var userStatsContent = new StringContent(userStatsJson, Encoding.UTF8, "application/json");
+
+            var userStatsPath = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{signupModel.Email}.json";
+
+            var userStatsResponse = await client.PostAsync(userStatsPath, userStatsContent);
+
+            if (userStatsResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"User stats saved successfully for {signupModel.Email}.");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to save user stats for {signupModel.Email}. Status code: {userStatsResponse.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving user stats for {signupModel.Email}: {ex.Message}");
+            throw;
+        }
     }
+
 
     private string GetErrorMessage(string responseBody)
     {

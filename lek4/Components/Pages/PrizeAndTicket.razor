@@ -1,0 +1,271 @@
+﻿@page "/admin-prize-management"
+@using System.Text.Json
+@using System.Text
+@inject HttpClient HttpClient
+
+<h3>Admin Prize Management</h3>
+
+<div class="admin-container">
+    <div class="section">
+        <h4>Claimed Prizes</h4>
+        @if (claimedPrizes == null)
+        {
+            <p>Loading claimed prizes...</p>
+        }
+        else if (!claimedPrizes.Any())
+        {
+            <p>No claimed prizes found.</p>
+        }
+        else
+        {
+            <p>@claimedPrizes.Count prize(s) found.</p>
+            <button @onclick="SaveClaimedPrizes" class="action-button">Save Claimed Prizes</button>
+        }
+    </div>
+
+    <div class="section">
+        <h4>Winning Tickets</h4>
+        @if (winningTickets == null)
+        {
+            <p>Loading winning tickets...</p>
+        }
+        else if (!winningTickets.Any())
+        {
+            <p>No winning tickets found.</p>
+        }
+        else
+        {
+            <p>@winningTickets.Count ticket(s) found.</p>
+            <button @onclick="SaveWinningTickets" class="action-button">Save Winning Tickets</button>
+        }
+    </div>
+</div>
+
+@code {
+    private Dictionary<string, Dictionary<string, bool>>? claimedPrizes;
+    private List<WinningTicket>? winningTickets;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClaimedPrizes();
+        await LoadWinningTickets();
+    }
+
+    private async Task LoadClaimedPrizes()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FClaimedPrizes.json?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                claimedPrizes = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, bool>>>(json);
+            }
+            else
+            {
+                Console.WriteLine("No claimed prizes found.");
+                claimedPrizes = new Dictionary<string, Dictionary<string, bool>>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading claimed prizes: {ex.Message}");
+        }
+    }
+
+    private async Task LoadWinningTickets()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FWinningTickets.json?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                winningTickets = JsonSerializer.Deserialize<List<WinningTicket>>(json);
+            }
+            else
+            {
+                Console.WriteLine("No winning tickets found.");
+                winningTickets = new List<WinningTicket>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading winning tickets: {ex.Message}");
+        }
+    }
+
+    private async Task SaveClaimedPrizes()
+    {
+        try
+        {
+            // Generate next file number
+            int nextFileNumber = await GetNextFileNumber();
+
+            // Save claimed prizes to the next file in SavedInfo
+            var json = JsonSerializer.Serialize(claimedPrizes);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await HttpClient.PostAsync(
+                $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2FClaimPrize_{nextFileNumber}.json",
+                content
+            );
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Claimed prizes saved successfully.");
+
+                // Clear the current claimed prizes file by replacing it with an empty JSON object
+                await ClearFirebaseFile("users/Jackpot/ClaimedPrizes.json");
+                claimedPrizes = null;
+                await LoadClaimedPrizes();
+            }
+            else
+            {
+                Console.WriteLine("Failed to save claimed prizes.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving claimed prizes: {ex.Message}");
+        }
+    }
+
+    private async Task SaveWinningTickets()
+    {
+        try
+        {
+            // Generate next file number
+            int nextFileNumber = await GetNextFileNumber();
+
+            // Save winning tickets to the next file in SavedInfo
+            var json = JsonSerializer.Serialize(winningTickets);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await HttpClient.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2F{nextFileNumber}.json", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Winning tickets saved successfully.");
+
+                // Clear the current winning tickets file
+                await ClearFirebaseFile("users/Jackpot/WinningTickets.json");
+                winningTickets = null;
+                await LoadWinningTickets();
+            }
+            else
+            {
+                Console.WriteLine("Failed to save winning tickets.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving winning tickets: {ex.Message}");
+        }
+    }
+
+    private async Task<int> GetNextFileNumber()
+    {
+        try
+        {
+            // Fetch counter file
+            var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2FCounter.json?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var counter = JsonSerializer.Deserialize<JsonElement>(json);
+                int nextFileNumber = counter.GetProperty("NextFileNumber").GetInt32();
+
+                // Update counter
+                await UpdateNextFileNumber(nextFileNumber + 1);
+                return nextFileNumber;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching next file number: {ex.Message}");
+        }
+
+        return 1; // Default to 1 if counter file doesn't exist
+    }
+
+    private async Task UpdateNextFileNumber(int nextFileNumber)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(new { NextFileNumber = nextFileNumber });
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await HttpClient.PutAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2FCounter.json", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Failed to update counter file.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating counter file: {ex.Message}");
+        }
+    }
+
+    private async Task ClearFirebaseFile(string filePath)
+    {
+        try
+        {
+            // Create an empty JSON object
+            var emptyJson = JsonSerializer.Serialize(new Dictionary<string, Dictionary<string, bool>>());
+            var content = new StringContent(emptyJson, Encoding.UTF8, "application/json");
+
+            // Update the file in Firebase with empty content
+            var response = await HttpClient.PostAsync(
+                $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/{Uri.EscapeDataString(filePath)}",
+                content
+            );
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to clear file: {filePath}");
+            }
+            else
+            {
+                Console.WriteLine($"File cleared successfully: {filePath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error clearing file {filePath}: {ex.Message}");
+        }
+    }
+
+
+    public class WinningTicket
+    {
+        public string UserEmail { get; set; }
+        public string TicketDetails { get; set; }
+    }
+}
+
+<style>
+    .admin-container {
+        margin: 20px;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .section {
+        margin-bottom: 20px;
+    }
+
+    .action-button {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+        .action-button:hover {
+            background-color: #0056b3;
+        }
+</style>

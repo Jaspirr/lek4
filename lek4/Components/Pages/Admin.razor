@@ -21,6 +21,8 @@
         <button class="action-button" @onclick="JackpotConversion">Manage Jackpot Conversion</button>
         <button class="action-button" @onclick="NavigateToManageStreak">Manage User Daily Streak</button>
         <button class="action-button" @onclick="NavigateToResetWeeklyOdds">Reset Weekly Odds Day</button>
+        <button class="action-button" @onclick="PrizeAndTicket">Save prizes and ticket data</button>
+        <button class="action-button" @onclick="ShowWinners">Show Winners</button>
     </div>
 </div>
 
@@ -71,6 +73,14 @@
     private void NavigateToResetWeeklyOdds()
     {
             NavigationManager.NavigateTo("/reset-weekly-odds");
+    }
+      private void PrizeAndTicket()
+    {
+        NavigationManager.NavigateTo("/admin-prize-management");
+    }
+    private void ShowWinners()
+    {
+        NavigationManager.NavigateTo("/admin-prizes");
     }
 }
 <style>

@@ -1,0 +1,384 @@
+﻿@page "/addvalue"
+
+@inject UserService UserService
+
+
+<section class="value-page">
+    <div class="content-wrapper">
+        <div class="actions">
+            <div class="action-btn daily-reward">
+                <div class="icon-box">
+                    <img src="images/Voidglas2.webp" alt="Starshard Icon" class="voidglas-icon" />
+                </div>
+                <span>Daily Reward</span>
+                <span class="badge">1+</span>
+            </div>
+            <div class="action-btn download-app">
+                <div class="icon-box">
+                    <i class="fas fa-download"></i>
+                </div>
+                <span>This Week App</span>
+                <span class="badge">2+</span>
+            </div>
+            <div class="action-btn boost-self">
+                <div class="icon-box">
+                    <i class="fas fa-user"></i>
+                </div>
+                <span>Boost Yourself</span>
+                <span class="badge">1+</span>
+            </div>
+            <div class="action-btn boost-friend">
+                <div class="icon-box">
+                    <i class="fas fa-hands-helping"></i>
+                </div>
+                <span>Boost a Friend</span>
+                <span class="badge">1+</span>
+            </div>
+            <div class="action-btn charity">
+                <div class="icon-box">
+                    <i class="fas fa-hand-holding-heart"></i>
+                </div>
+                <span>Charity</span>
+                <span class="badge">1+</span>
+            </div>
+            <div class="action-btn organizations">
+                <div class="icon-box">
+                    <i class="fas fa-seedling"></i>
+                </div>
+                <span>Organizations</span>
+                <span class="badge">1+</span>
+            </div>
+        </div>
+
+        <div class="info-container">
+            <div class="info-card">
+                <h3>This Week's Charity</h3>
+                <p><strong>Charity Name:</strong> Helping Hands</p>
+                <p><strong>Description:</strong> Helping Hands focuses on providing clean drinking water to communities in need through sustainable filtration solutions and community education.</p>
+            </div>
+            <div class="info-card">
+                <h3>About the Organization</h3>
+                <p><strong>Organization Name:</strong> Global Aid Network</p>
+                <p><strong>Mission:</strong> To empower communities by providing resources for clean water, education, and sustainable development.</p>
+                <p><strong>Focus:</strong> Supporting health, education, and basic needs in underserved regions.</p>
+            </div>
+        </div>
+      <div class="leaderboard">
+        <h2>Weekly Top 10</h2>
+        <ul>
+            @if (weeklyUsersOdds != null && weeklyUsersOdds.Any())
+            {
+                foreach (var user in weeklyUsersOdds.Take(10).Select((user, index) => (user, index)))
+                {
+                    <li class="rank-item rank-@(user.index + 1)">
+                        <span class="rank">#@(user.index + 1)</span>
+                        <span class="user-name">@GetDisplayName(user.user.Key)</span>
+                        <span class="odds">@user.user.Value.ToString("0.0")</span>
+                    </li>
+                }
+            }
+            else
+            {
+                <li>Loading...</li>
+            }
+        </ul>
+    </div>
+        <div class="streak-leaderboard">
+            <h2>Streak Leaderboard</h2>
+            <ul>
+                <li>1. Anna - 30 days streak</li>
+                <li>2. Erik - 28 days streak</li>
+                <li>3. Maria - 25 days streak</li>
+                <li>4. Johan - 22 days streak</li>
+                <li>5. Elsa - 20 days streak</li>
+                <li>6. Nina - 18 days streak</li>
+                <li>7. Oskar - 15 days streak</li>
+                <li>8. Sara - 12 days streak</li>
+                <li>9. David - 10 days streak</li>
+                <li>10. Emma - 8 days streak</li>
+            </ul>
+        </div>
+    </div>
+</section>
+@code {
+    private Dictionary<string, double> weeklyUsersOdds = new Dictionary<string, double>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Fetch all users' weekly odds
+            weeklyUsersOdds = await UserService.GetAllUsersWeeklyOdds();
+
+            // Order the odds descending for leaderboard ranking
+            weeklyUsersOdds = weeklyUsersOdds
+                .OrderByDescending(o => o.Value)
+                .ToDictionary(k => k.Key, v => v.Value);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching users' weekly odds: {ex.Message}");
+        }
+    }
+
+    // Function to format the display name
+    private string GetDisplayName(string emailOrName)
+    {
+        if (string.IsNullOrWhiteSpace(emailOrName))
+            return "Unknown";
+
+        // Split the string at '.', '-', or '@' and return the first part
+        var delimiters = new[] { '.', '-', '@', '_' };
+        var parts = emailOrName.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+
+        return parts.Length > 0 ? parts[0] : emailOrName;
+    }
+}
+
+<style>
+.value-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: linear-gradient(145deg, #ffffff, #e8e8e8);
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+.content-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 600px;
+    gap: 40px;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    width: 100%;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    width: 140px;
+    height: 140px;
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+    background: linear-gradient(145deg, #7BBF6A, #5E964D);
+    border-radius: 15px;
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    position: relative;
+}
+
+.icon-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.icon-box img {
+    width: 50px;
+    height: 50px;
+}
+
+.icon-box i {
+    font-size: 2rem;
+    color: #5E964D;
+}
+
+.badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: #ffffff;
+    background-image: linear-gradient(45deg, #FFD700, #FFEC8B, #FFD700);
+    color: #000;
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid #FFD700;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    animation: glitter 2s infinite linear;
+}
+@@keyframes glitter {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.info-container {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    background: linear-gradient(145deg, #f9f9f9, #f1f1f1);
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
+    max-width: 600px;
+    width: 100%;
+    gap: 20px;
+}
+
+.info-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.info-card h3 {
+    font-size: 1.5rem;
+    color: #5E964D;
+    margin-bottom: 10px;
+}
+
+.info-card p {
+    font-size: 1rem;
+    color: #333;
+    margin: 5px 0;
+}
+
+.action-btn span {
+    font-size: 1rem;
+    font-weight: bold;
+    text-align: center;
+    color: #333;
+    margin-top: 10px;
+}
+
+.action-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.3);
+}
+/* Base leaderboard styles */
+.leaderboard {
+    text-align: center;
+    background: linear-gradient(145deg, #f9fdf9, #e6f7e6);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    margin: 20px auto;
+    font-family: 'Arial', sans-serif;
+}
+
+.leaderboard h2 {
+    font-size: 1.5rem;
+    color: #2f5d2f;
+    margin-bottom: 20px;
+}
+
+.leaderboard ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.leaderboard li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1rem;
+    margin: 8px 0;
+    padding: 10px 15px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.leaderboard li:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Rank-specific styles */
+.rank-item.rank-1 .rank {
+    font-size: 1.8rem;
+    color: gold;
+}
+
+.rank-item.rank-2 .rank {
+    font-size: 1.6rem;
+    color: silver;
+}
+
+.rank-item.rank-3 .rank {
+    font-size: 1.4rem;
+    color: #cd7f32; /* Bronze */
+}
+
+/* General rank styles */
+.leaderboard .rank {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.leaderboard .user-name {
+    flex: 1;
+    text-align: left;
+    color: #2c3e50;
+    font-weight: bold;
+}
+
+.leaderboard .odds {
+    font-weight: bold;
+    color: #27ae60;
+}
+.streak-leaderboard {
+  text-align: center;
+    background: linear-gradient(145deg, #F8FFF8, #DDEEDD);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 600px;
+    margin: 20px auto;
+}
+
+.streak-leaderboard h2 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: #556B2F;
+}
+
+.streak-leaderboard ul {
+   list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.streak-leaderboard li {
+  font-size: 1.3rem;
+    margin: 10px 0;
+    color: #505050;
+    font-weight: bold;
+}
+</style>

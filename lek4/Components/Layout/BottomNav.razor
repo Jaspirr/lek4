@@ -4,6 +4,10 @@
             <i class="fas fa-home"></i>
             <span class="nav-text"></span>
         </NavLink>
+        <NavLink class="nav-link" href="/addvalue">
+            <i class="fas fa-hand-holding-heart"></i>
+            <span class="nav-text"></span>
+        </NavLink>
         <NavLink class="nav-link" href="/products">
             <i class="fas fa-boxes"></i>
             <span class="nav-text"></span>
@@ -15,79 +19,77 @@
     </nav>
 </div>
 
-
 <style>
-   /* Bottom Navigation Bar */
-.bottom-nav {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    background: linear-gradient(145deg, #F0FFF0, #556B2F); /* Gradient for a modern look */
-    color: #F0FFF0; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 0;
-    box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.2);
-    border-radius: 20px 20px 0 0;
-    z-index: 1000;
-}
-
-/* Navigation Links */
-.nav {
-    display: flex;
-    justify-content: space-around;
-    width: 100%;
-    max-width: 500px;
-}
-
-.nav-link {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
-    color: white;
-    text-decoration: none;
-    transition: transform 0.2s ease, color 0.3s ease;
-}
-
-.nav-link i {
-    font-size: 1.5rem;
-    margin-bottom: 5px;
-    color: white;
-    transition: color 0.3s ease;
-}
-
-/* Highlight active link */
-.nav-link.active i,
-.nav-link.active .nav-text {
-            color: #505050; /* Gold for active link */
-}
-
-.nav-link:hover i,
-.nav-link:hover .nav-text {
-            color: #686868; /* Orange on hover */
-}
-
-.nav-link:hover {
-    transform: scale(1.1); /* Subtle zoom effect */
-}
-
-.nav-text {
-    font-size: 0.8rem;
-    color: white;
-}
-
-/* Mobile-first responsive design */
-@@media (max-width: 768px) {
-    .nav-link i {
-        font-size: 1.2rem; /* Slightly smaller icons for smaller screens */
+    /* Bottom Navigation Bar */
+    .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        background: linear-gradient(145deg, #F0FFF0, #556B2F); /* Gradient for a modern look */
+        color: #F0FFF0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 0;
+        box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.2);
+        border-radius: 20px 20px 0 0;
+        z-index: 1000;
     }
+
+    /* Navigation Links */
+    .nav {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .nav-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        color: white;
+        text-decoration: none;
+        transition: transform 0.2s ease, color 0.3s ease;
+    }
+
+        .nav-link i {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            color: white;
+            transition: color 0.3s ease;
+        }
+
+        /* Highlight active link */
+        .nav-link.active i,
+        .nav-link.active .nav-text {
+            color: #505050; /* Gold for active link */
+        }
+
+        .nav-link:hover i,
+        .nav-link:hover .nav-text {
+            color: #686868; /* Orange on hover */
+        }
+
+        .nav-link:hover {
+            transform: scale(1.1); /* Subtle zoom effect */
+        }
 
     .nav-text {
-        font-size: 0.7rem;
+        font-size: 0.8rem;
+        color: white;
     }
-}
 
+    /* Mobile-first responsive design */
+    @@media (max-width: 768px) {
+        .nav-link i {
+            font-size: 1.2rem; /* Slightly smaller icons for smaller screens */
+        }
+
+        .nav-text {
+            font-size: 0.7rem;
+        }
+    }
 </style>

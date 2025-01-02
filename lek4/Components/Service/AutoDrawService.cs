@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -14,24 +15,35 @@ public class AutoDrawService
     private readonly DrawService _drawService;
     private readonly Dictionary<int, System.Timers.Timer> _timers = new Dictionary<int, System.Timers.Timer>();
     private readonly HttpClient _httpClient;
+    private readonly DrawJackpotService _drawJackpotService;
 
-    public AutoDrawService(ProductService productService, DrawService drawService, HttpClient httpClient)
+    public AutoDrawService(ProductService productService, DrawService drawService, HttpClient httpClient, DrawJackpotService drawJackpotService)
     {
         _productService = productService;
         _drawService = drawService;
         _httpClient = httpClient;
+        _drawJackpotService = drawJackpotService; // Lägg till detta
     }
 
     public async Task InitializeDrawTimersAsync()
     {
         Console.WriteLine("Initializing draw timers...");
 
+        // Hämta alla produkter
         var products = await _productService.FetchAllProductsFromFirebaseAsync();
 
         foreach (var product in products)
         {
             try
             {
+                // Kontrollera om produkten är en jackpot
+                if (product.IsJackpot)
+                {
+                    Console.WriteLine($"Product {product.ProductNumber} is a jackpot. Processing as jackpot.");
+                    await ProcessJackpotProductAsync(product);
+                    continue;
+                }
+
                 // Kontrollera om dragningen redan är utförd idag
                 if (await HasDrawBeenPerformedTodayAsync(product.ProductNumber))
                 {
@@ -47,13 +59,101 @@ public class AutoDrawService
                 }
                 else
                 {
-                    Console.WriteLine($"Product {product.ProductNumber}: Draw date {product.DrawDate.Date} does not match today. Skipping.");
+                    // Kontrollera om dragningens datum har passerat
+                    if (product.DrawDate.Date < DateTime.UtcNow.Date)
+                    {
+                        Console.WriteLine($"Product {product.ProductNumber}: Draw date {product.DrawDate.Date} has already passed.");
+
+                        if (!await HasDrawBeenPerformedTodayAsync(product.ProductNumber))
+                        {
+                            Console.WriteLine($"No winner has been drawn for product {product.ProductNumber}. Performing draw now.");
+                            await PerformDrawAsync(product);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Winner already drawn for product {product.ProductNumber}. Skipping.");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Product {product.ProductNumber}: Draw date {product.DrawDate.Date} does not match today. Skipping.");
+                    }
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error handling product {product.ProductNumber}: {ex.Message}");
             }
+        }
+    }
+
+    private async Task ProcessJackpotProductAsync(ProductService.ProductData product)
+    {
+        Console.WriteLine($"Processing jackpot for product {product.ProductNumber}...");
+
+        try
+        {
+            // Kontrollera om winner.json redan finns
+            if (await HasWinnerBeenDeclaredAsync(product.ProductNumber))
+            {
+                Console.WriteLine($"Winner already declared for jackpot product {product.ProductNumber}. Skipping draw.");
+                return;
+            }
+
+            // Hämta jackpotbiljetter
+            var tickets = await _drawJackpotService.GetJackpotTickets();
+            if (!tickets.Any())
+            {
+                Console.WriteLine($"No tickets found for jackpot product {product.ProductNumber}. Skipping.");
+                return;
+            }
+
+            // Generera en slumpmässig vinnande biljett
+            var winningTicket = _drawJackpotService.GenerateRandomTicket();
+
+            // Hitta vinnaren
+            string winnerEmail = tickets
+                .Where(ticket => _drawJackpotService.IsMatchingTicket(ticket, winningTicket))
+                .Select(ticket => ticket.UserEmail)
+                .FirstOrDefault() ?? "No winner";
+
+            // Spara resultatet i Firebase
+            await _drawJackpotService.SaveWinnerToFirebase(product.ProductNumber, winnerEmail, DateTime.UtcNow, winningTicket);
+
+            Console.WriteLine($"Jackpot draw completed for product {product.ProductNumber}. Winner: {winnerEmail}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing jackpot for product {product.ProductNumber}: {ex.Message}");
+        }
+    }
+    private async Task<bool> HasWinnerBeenDeclaredAsync(int productNumber)
+    {
+        var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner%2Fproduct{productNumber}%2Fwinner.json?alt=media";
+
+        try
+        {
+            var response = await _httpClient.GetAsync(path);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Winner already exists for product {productNumber}.");
+                return true;
+            }
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                Console.WriteLine($"No winner declared yet for product {productNumber}.");
+                return false;
+            }
+
+            Console.WriteLine($"Error checking winner file for product {productNumber}: {response.StatusCode}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception while checking winner file for product {productNumber}: {ex.Message}");
+            return false;
         }
     }
 

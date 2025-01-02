@@ -1,0 +1,145 @@
+﻿@page "/admin-prizes"
+@using System.Text.Json
+@using System.Text
+@inject HttpClient HttpClient
+
+<h3>Admin Prizes</h3>
+
+<div class="admin-container">
+    @if (allWinnersGroupedByFile == null)
+    {
+        <p>Loading winners...</p>
+    }
+    else if (!allWinnersGroupedByFile.Any())
+    {
+        <p>No winners found.</p>
+    }
+    else
+    {
+        @foreach (var group in allWinnersGroupedByFile)
+        {
+            <div class="section">
+                <h4>Draw: @GetDrawName(group.Key)</h4>
+                <ul>
+                    @if (group.Value.Any(w => w.Prize == "Credits"))
+                    {
+                        <li>
+                            <strong>Prize:</strong> Credits<br />
+                            <strong>Total:</strong> @group.Value.Count(w => w.Prize == "Credits")
+                        </li>
+                    }
+                    @foreach (var winner in group.Value.Where(w => w.Prize != "Credits"))
+                    {
+                        <li>
+                            <strong>Email:</strong> @winner.UserEmail<br />
+                            <strong>Prize:</strong> @winner.Prize
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private Dictionary<string, List<Winner>> allWinnersGroupedByFile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllWinners();
+    }
+
+    private async Task LoadAllWinners()
+    {
+        try
+        {
+            allWinnersGroupedByFile = new Dictionary<string, List<Winner>>();
+
+            // Firebase folder listing is not directly supported; manually list file names
+            var fileNames = new List<string> { "ClaimPrize_1.json", "ClaimPrize_2.json" }; // Add all known file names here
+
+            foreach (var fileName in fileNames)
+            {
+                await FetchWinnersFromFile(fileName);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading winners: {ex.Message}");
+        }
+    }
+
+    private async Task FetchWinnersFromFile(string fileName)
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2F{Uri.EscapeDataString(fileName)}?alt=media");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var winnersDict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, bool>>>(json);
+
+                    if (winnersDict != null)
+                    {
+                        var winnersFromFile = new List<Winner>();
+
+                        foreach (var entry in winnersDict)
+                        {
+                            foreach (var prize in entry.Value)
+                            {
+                                winnersFromFile.Add(new Winner
+                                    {
+                                        UserEmail = entry.Key,
+                                        Prize = prize.Key
+                                    });
+                            }
+                        }
+
+                        allWinnersGroupedByFile[fileName] = winnersFromFile;
+                    }
+                }
+                catch (JsonException jsonEx)
+                {
+                    Console.WriteLine($"JSON parsing error in file {fileName}: {jsonEx.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch data from file: {fileName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching data from file {fileName}: {ex.Message}");
+        }
+    }
+
+    private string GetDrawName(string fileName)
+    {
+        var drawNumber = fileName.Split('_').Last().Split('.').FirstOrDefault();
+        return string.IsNullOrEmpty(drawNumber) ? "Unknown Draw" : $"Draw {drawNumber}";
+    }
+
+    public class Winner
+    {
+        public string UserEmail { get; set; }
+        public string Prize { get; set; }
+    }
+}
+
+<style>
+    .admin-container {
+        margin: 20px;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .section {
+        margin-bottom: 20px;
+    }
+</style>
