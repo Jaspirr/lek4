@@ -115,7 +115,7 @@ public class UserService
             Console.WriteLine($"Added {creditAmount} credits to user {userEmail}. New credits: {userStats.Credits}");
 
             // Lägg till krediten till totalCredits
-            await AddToTotalCredits(creditAmount);
+            //await AddToTotalCredits(creditAmount);
         }
         catch (Exception ex)
         {

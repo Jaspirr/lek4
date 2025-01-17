@@ -351,8 +351,8 @@
                 Console.WriteLine($"Loaded {OutcomeConfigurations.Count} outcome configurations.");
             }
 
-            // Hämta jackpotbelopp från JackpotService
-            jackpotAmount = await JackpotService.GetCalculatedJackpotAmount();
+            // Hämta jackpotbelopp från filerna i "users/winner/"
+            jackpotAmount = await GetJackpotAmountFromWinnerFiles();
 
             // Skicka outcome-konfigurationer till JavaScript
             await JS.InvokeVoidAsync("initializeOutcomeConfigurations", JsonSerializer.Serialize(OutcomeConfigurations));
@@ -365,6 +365,55 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error during initialization: {ex.Message}");
+        }
+    }
+
+    private async Task<int> GetJackpotAmountFromWinnerFiles()
+    {
+        try
+        {
+            var baseUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner%2F";
+            var productFolders = Enumerable.Range(1, 9).Select(i => $"product{i}").ToList(); // Skapar "product1" till "product9"
+
+            foreach (var product in productFolders)
+            {
+                var url = $"{baseUrl}{product}%2Fwinner.json?alt=media";
+                try
+                {
+                    var response = await HttpClient.GetStringAsync(url);
+
+                    if (!string.IsNullOrEmpty(response))
+                    {
+                        var winnerData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(response);
+                        if (winnerData != null && winnerData.JackpotAmount != null)
+                        {
+                            return (int)winnerData.JackpotAmount; // Returnera det första giltiga beloppet
+                        }
+                    }
+                }
+                catch (HttpRequestException ex)
+                {
+                    if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        // Filen finns inte, fortsätt till nästa produkt
+                        Console.WriteLine($"No winner.json found for {product}, skipping.");
+                    }
+                    else
+                    {
+                        // Annan typ av fel, logga och kasta vidare
+                        Console.WriteLine($"Error retrieving data for {product}: {ex.Message}");
+                        throw;
+                    }
+                }
+            }
+
+            Console.WriteLine("No JackpotAmount found in any winner files.");
+            return 0; // Returnera 0 om inget belopp hittas
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error retrieving jackpot amount: {ex.Message}");
+            return 0; // Returnera 0 vid fel
         }
     }
 

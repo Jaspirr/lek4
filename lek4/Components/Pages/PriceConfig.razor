@@ -4,6 +4,8 @@
 @using System.Text
 @using System.Net.Http.Headers
 @using System.Text.Json
+@inject NavigationManager NavigationManager
+
 
 @code {
     private List<OutcomeConfiguration> OutcomeConfigurations = new List<OutcomeConfiguration>();
@@ -93,9 +95,15 @@
         public string CompanyName { get; set; } // For GiftCard
         public string ProductName { get; set; } // For Product
     }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
 }
 
 <h3>Configure Outcome Prizes</h3>
+<button class="back-button" @onclick="NavigateBack">← Back</button>
 
 <div class="config-container">
     <h2 class="config-title">Configure Outcome Prizes</h2>

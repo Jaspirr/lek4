@@ -1,140 +1,788 @@
 ﻿@page "/addvalue"
-
+@using System.Text.Json
+@using lek4.Components.Service
+@inject DailyRewardService DailyRewardService
 @inject UserService UserService
-
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject HttpClient HttpClient
+@inject InfoConfigService InfoConfigService
+@inject CharityService CharityService
+@inject BoostFriendService BoostFriendService
+@inject CommunityService CommunityService
+@inject SpecialService specialService
 
 <section class="value-page">
     <div class="content-wrapper">
         <div class="actions">
-            <div class="action-btn daily-reward">
-                <div class="icon-box">
-                    <img src="images/Voidglas2.webp" alt="Starshard Icon" class="voidglas-icon" />
-                </div>
-                <span>Daily Reward</span>
-                <span class="badge">1+</span>
-            </div>
-            <div class="action-btn download-app">
-                <div class="icon-box">
-                    <i class="fas fa-download"></i>
-                </div>
-                <span>This Week App</span>
-                <span class="badge">2+</span>
-            </div>
-            <div class="action-btn boost-self">
-                <div class="icon-box">
-                    <i class="fas fa-user"></i>
-                </div>
-                <span>Boost Yourself</span>
-                <span class="badge">1+</span>
-            </div>
-            <div class="action-btn boost-friend">
-                <div class="icon-box">
-                    <i class="fas fa-hands-helping"></i>
-                </div>
-                <span>Boost a Friend</span>
-                <span class="badge">1+</span>
-            </div>
-            <div class="action-btn charity">
-                <div class="icon-box">
-                    <i class="fas fa-hand-holding-heart"></i>
-                </div>
-                <span>Charity</span>
-                <span class="badge">1+</span>
-            </div>
-            <div class="action-btn organizations">
-                <div class="icon-box">
-                    <i class="fas fa-seedling"></i>
-                </div>
-                <span>Organizations</span>
-                <span class="badge">1+</span>
-            </div>
-        </div>
-
-        <div class="info-container">
-            <div class="info-card">
-                <h3>This Week's Charity</h3>
-                <p><strong>Charity Name:</strong> Helping Hands</p>
-                <p><strong>Description:</strong> Helping Hands focuses on providing clean drinking water to communities in need through sustainable filtration solutions and community education.</p>
-            </div>
-            <div class="info-card">
-                <h3>About the Organization</h3>
-                <p><strong>Organization Name:</strong> Global Aid Network</p>
-                <p><strong>Mission:</strong> To empower communities by providing resources for clean water, education, and sustainable development.</p>
-                <p><strong>Focus:</strong> Supporting health, education, and basic needs in underserved regions.</p>
-            </div>
-        </div>
-      <div class="leaderboard">
-        <h2>Weekly Top 10</h2>
-        <ul>
-            @if (weeklyUsersOdds != null && weeklyUsersOdds.Any())
+            @if (buttonVisibility.ContainsKey("DailyReward") && buttonVisibility["DailyReward"])
             {
-                foreach (var user in weeklyUsersOdds.Take(10).Select((user, index) => (user, index)))
+                <div class="action-btn daily-reward">
+                    <div class="icon-box" @onclick="ClaimDailyReward">
+                        <img src="images/Voidglas2.webp" alt="Starshard Icon" class="voidglas-icon" />
+                    </div>
+                    <span>Daily Reward</span>
+                    @if (isRewardAvailable)
+                    {
+                        <span class="badge">1+</span>
+                    }
+                </div>
+            }
+
+            @if (buttonVisibility.ContainsKey("DownloadApp") && buttonVisibility["DownloadApp"])
+            {
+                <div class="action-btn download-app">
+                    <div class="icon-box">
+                        <i class="fas fa-cloud-download-alt"></i>
+                    </div>
+                    <span>This Week App</span>
+                    <span class="badge">2+</span>
+                </div>
+            }
+
+            @if (buttonVisibility.ContainsKey("BoostSelf") && buttonVisibility["BoostSelf"])
+            {
+                <div class="action-btn boost-self">
+                    <div class="icon-box">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <span>Boost Yourself</span>
+                    <span class="badge">1+</span>
+                </div>
+            }
+            @if (buttonVisibility.ContainsKey("BoostFriend") && buttonVisibility["BoostFriend"])
+            {
+                <div class="action-btn boost-friend">
+                    <!-- Huvudknapp med klickfunktion -->
+                    <div class="icon-box" @onclick="ToggleBoostFriendInput">
+                        <i class="fas fa-hands-helping"></i>
+                    </div>
+                    <span>Help a Friend</span>
+
+                    @if (isBoostFriendAvailable)
+                    {
+                        <span class="badge">1+</span>
+                    }
+
+                    <!-- Dropdown-knapp för att visa sparade vänner -->
+                    <button class="dropdown-btn @(showBoostFriendInfo ? "open" : "")" @onclick="ToggleBoostFriendInfo">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M7 10l5 5 5-5z" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Visa fält för att ange e-post -->
+                @if (showBoostFriendInput)
                 {
-                    <li class="rank-item rank-@(user.index + 1)">
-                        <span class="rank">#@(user.index + 1)</span>
-                        <span class="user-name">@GetDisplayName(user.user.Key)</span>
-                        <span class="odds">@user.user.Value.ToString("0.0")</span>
-                    </li>
+                    <div class="boost-friend-input">
+                        <input type="email" placeholder="Enter friend's email" @bind="friendEmail" class="styled-input" />
+                        <div class="button-container">
+                            <button @onclick="GiveCreditToFriend" class="styled-button">
+                                <i class="fas fa-paper-plane"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                <!-- Visa sparade vänners e-post -->
+                @if (showBoostFriendInfo)
+                {
+                    <div class="boost-friend-list expand-down">
+                        <div class="info-card">
+                            <h3>Today's Supporters:</h3>
+                            @if (receivedFromEmails.Any())
+                            {
+                                <ul class="received-help-list">
+                                    @foreach (var email in receivedFromEmails)
+                                    {
+                                        <li class="received-help-item">
+                                            <div class="avatar">@email[0].ToString().ToUpper()</div>
+                                            <span class="received-email">@email</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <p>No support today... yet! 🌟 Give your friends a little reminder — together, you're unstoppable!</p>
+                            }
+                        </div>
+                    </div>
                 }
             }
-            else
+            @if (buttonVisibility.ContainsKey("Charity") && buttonVisibility["Charity"])
             {
-                <li>Loading...</li>
+                <div class="action-btn charity" >
+                    <div class="icon-box" @onclick="HandleCharityContribution">
+                        <i class="fas fa-hand-holding-heart"></i>
+                    </div>
+                    <span>Charity</span>
+
+                    <!-- Badge hantering för daglig bidragskontroll -->
+                    @if (isCharityAvailable)
+                    {
+                        <span class="badge">1+</span>
+                    }
+
+                    <button class="dropdown-btn @(showCharityInfo ? "open" : "")" @onclick="ToggleCharityInfo">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M7 10l5 5 5-5z" />
+                        </svg>
+                    </button>
+
+                    @if (showCharityInfo)
+                    {
+                        <div class="info-container">
+                            <div class="info-card">
+                                <h3>@(charityAndOrganizationInfo?.Charity?.CharityName ?? "No charity available.")</h3>
+                                <p style="font-size: 1rem;">@(charityAndOrganizationInfo?.Charity?.Description ?? "No description available.")</p>
+                            </div>
+                        </div>
+                    }
+                </div>
             }
-        </ul>
-    </div>
-        <div class="streak-leaderboard">
-            <h2>Streak Leaderboard</h2>
+
+            @if (buttonVisibility.ContainsKey("Organizations") && buttonVisibility["Organizations"])
+            {
+                <div class="action-btn organizations">
+                    <div class="icon-box" @onclick="@(() => HandleContribution("Organization"))">
+                        <i class="fas fa-seedling"></i>
+                    </div>
+                    <span>Organization</span>
+                    @if (isOrganizationAvailable)
+                    {
+                        <span class="badge">1+</span>
+                    }
+
+                    <button class="dropdown-btn @(showOrganizationInfo ? "open" : "")" @onclick="ToggleOrganizationInfo">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M7 10l5 5 5-5z" />
+                        </svg>
+                    </button>
+
+                    @if (showOrganizationInfo)
+                    {
+                        <div class="info-container">
+                            <div class="info-card">
+                                <h3>@(charityAndOrganizationInfo?.Organization?.OrganizationName ?? "No organization available.")</h3>
+                                <p style="font-size: 1rem;">@(charityAndOrganizationInfo?.Organization?.Mission ?? "No mission available.")</p>
+                                <p style="font-size: 1rem;">@(charityAndOrganizationInfo?.Organization?.Focus ?? "No focus available.")</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            @if (buttonVisibility.ContainsKey("Community") && buttonVisibility["Community"])
+            {
+                <div class="action-btn community">
+                    <div class="icon-box" @onclick="ToggleCommunityInfo">
+                        @if (!string.IsNullOrEmpty(communityInfo.ImageUrl))
+                        {
+                            <img src="@communityInfo.ImageUrl" alt="Community Image" class="community-image" />
+                        }
+                        else
+                        {
+                            <i class="fas fa-users"></i>
+                        }
+                    </div>
+
+                    <span>@communityInfo.Name</span>
+
+                    <!-- Visa endast badge om användaren INTE har claimat -->
+                    @if (communityInfo.Credits > 0 && !hasClaimedReward)
+                    {
+                        <span class="badge">@communityInfo.Credits+</span>
+                    }
+
+                    <button class="dropdown-btn @(showCommunityInfo ? "open" : "")" @onclick="ToggleCommunityInfo">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M7 10l5 5 5-5z" />
+                        </svg>
+                    </button>
+
+                    @if (showCommunityInfo)
+                    {
+                        <div class="info-container expand-down">
+                            <div class="info-card">
+                                <h3>@communityInfo.Name</h3>
+                                <p style="font-size: 1rem;">@communityInfo.Description</p>
+
+                                <!-- Days Left Section -->
+                                <div class="duration-container">
+                                    <p class="duration-label">Days Left:</p>
+                                    <div class="duration-value">@daysLeft</div>
+                                </div>
+
+                                <!-- Code Input -->
+                                <label for="communityCode">Enter Code:</label>
+                                <input type="text" @bind="userInputCode" class="styled-input" />
+                                <button class="styled-button" @onclick="ValidateCommunityCode">Submit</button>
+
+                                @if (showCodeError)
+                                {
+                                    <p class="error-message">⚠️ Oops! That code didn't work, check it on their site! Or you may have already claimed your reward.</p>
+                                }
+
+                                <!-- Link Section -->
+                                @if (!string.IsNullOrEmpty(communityInfo.Link))
+                                {
+                                    <a href="@communityInfo.Link" target="_blank" class="styled-button" @onclick="async () => await CommunityService.IncrementLinkClickCounter()">Site</a>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            @if (buttonVisibility.ContainsKey("Special") && buttonVisibility["Special"])
+            {
+                <div class="action-btn special">
+                    <div class="icon-box" @onclick="@(() => HandleSpecialContribution())">
+                        @if (!string.IsNullOrEmpty(specialInfo.ImageUrl))
+                        {
+                            <img src="@specialInfo.ImageUrl" alt="Special Image" class="special-image" />
+                        }
+                        else
+                        {
+                            <i class="fas fa-star"></i>
+                        }
+                    </div>
+
+                    <span>@specialInfo.Name</span>
+
+                    <!-- Show badge only if the reward hasn't been claimed -->
+                    @if (specialInfo.Credits > 0 && !hasClaimedSpecialReward)
+                    {
+                        <span class="badge">@specialInfo.Credits+</span>
+                    }
+
+                    <button class="dropdown-btn @(showSpecialInfo ? "open" : "")" @onclick="ToggleSpecialInfo">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M7 10l5 5 5-5z" />
+                        </svg>
+                    </button>
+                    @if (showSpecialInfo)
+                    {
+                        <div class="info-container expand-down">
+                            <div class="info-card">
+                                <!-- Special Info Name -->
+                                <h3>@specialInfo.Name</h3>
+
+                                <!-- Special Info Description -->
+                                <p class="special-description">@specialInfo.Description</p>
+
+                                <!-- Link Section -->
+                                @if (!string.IsNullOrEmpty(specialInfo.Link))
+                                {
+                                    <a href="@specialInfo.Link" target="_blank" class="styled-button link-button" @onclick="async () => await specialService.IncrementLinkClickCounter()">Site</a>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(boostFriendError))
+            {
+                <div class="error-message">@boostFriendError</div>
+            }
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <div class="alert">@message</div>
+            }
+        </div>
+        <div class="leaderboard">
+            <h2>Weekly Odds Top 10</h2>
             <ul>
-                <li>1. Anna - 30 days streak</li>
-                <li>2. Erik - 28 days streak</li>
-                <li>3. Maria - 25 days streak</li>
-                <li>4. Johan - 22 days streak</li>
-                <li>5. Elsa - 20 days streak</li>
-                <li>6. Nina - 18 days streak</li>
-                <li>7. Oskar - 15 days streak</li>
-                <li>8. Sara - 12 days streak</li>
-                <li>9. David - 10 days streak</li>
-                <li>10. Emma - 8 days streak</li>
+                @if (weeklyUsersOdds != null && weeklyUsersOdds.Any())
+                {
+                    foreach (var user in weeklyUsersOdds.Take(10).Select((user, index) => (user, index)))
+                    {
+                        <li class="rank-item rank-@(user.index + 1)">
+                            <span class="rank">#@(user.index + 1)</span>
+                            <span class="user-name">@GetDisplayName(user.user.Key)</span>
+                            <span class="odds">@user.user.Value.ToString("0.0")</span>
+                        </li>
+                    }
+                }
+                else
+                {
+                    <li>Loading...</li>
+                }
+            </ul>
+        </div>
+        <div class="leaderboard">
+            <h2>Top Charity Contributors</h2>
+            <ul>
+                @if (charityContributors != null && charityContributors.Any())
+                {
+                    foreach (var contributor in charityContributors.Take(10).Select((contributor, index) => (contributor, index)))
+                    {
+                        <li class="rank-item rank-@(contributor.index + 1)">
+                            <span class="rank">#@(contributor.index + 1)</span>
+                            <span class="user-name">@GetDisplayName(contributor.contributor.Key)</span>
+                            <span class="odds">@contributor.contributor.Value.ToString("0")</span>
+                        </li>
+                    }
+                }
+                else
+                {
+                    <li>Loading...</li>
+                }
+            </ul>
+
+            <h2>Top Organization Contributors</h2>
+            <ul>
+                @if (organizationContributors != null && organizationContributors.Any())
+                {
+                    foreach (var contributor in organizationContributors.Take(10).Select((contributor, index) => (contributor, index)))
+                    {
+                        <li class="rank-item rank-@(contributor.index + 1)">
+                            <span class="rank">#@(contributor.index + 1)</span>
+                            <span class="user-name">@GetDisplayName(contributor.contributor.Key)</span>
+                            <span class="odds">@contributor.contributor.Value.ToString("0")</span>
+                        </li>
+                    }
+                }
+                else
+                {
+                    <li>Loading...</li>
+                }
             </ul>
         </div>
     </div>
 </section>
+
 @code {
     private Dictionary<string, double> weeklyUsersOdds = new Dictionary<string, double>();
+    private bool isRewardAvailable = false;
+    private string userEmail;
+    private string message = "";
+    private Dictionary<string, bool> buttonVisibility = new Dictionary<string, bool>();
+    private bool showCharityInfo = false;
+    private bool showOrganizationInfo = false;
+    private InfoConfig charityAndOrganizationInfo = new InfoConfig();
+    private bool isCharityAvailable = false;
+    private bool isOrganizationAvailable = false;
+
+    private bool isBoostFriendAvailable = false;
+    private bool showBoostFriendInput = false;
+    private string friendEmail = "";
+    private string boostFriendError = "";
+    private BoostFriendService boostFriendService;
+    private Dictionary<string, double> charityContributors = new Dictionary<string, double>();
+    private Dictionary<string, double> organizationContributors = new Dictionary<string, double>();
+
+    private bool showBoostFriendInfo = false;
+    private List<string> savedFriendEmails = new List<string>();
+    private List<string> receivedFromEmails = new List<string>();
+
+    private bool showCommunityInfo = false;
+    private bool isCommunityAvailable = false;
+    private CommunityInfo communityInfo = new CommunityInfo(); // Du kan använda en tjänst för att styra denna variabel
+    private string userInputCode = "";
+    private bool showCodeError = false;
+    private bool hasClaimedReward;
+    private int daysLeft;
+
+    private SpecialInfo specialInfo = new SpecialInfo();
+    private bool showSpecialInfo = false;
+    private bool hasClaimedSpecialReward = false;
+
+    private void ToggleCommunityInfo()
+    {
+        showCommunityInfo = !showCommunityInfo;
+    }
+
+    private async Task ValidateCommunityCode()
+    {
+        var communityService = new CommunityService(new HttpClient());
+
+        if (userInputCode.Equals(communityInfo.Code, StringComparison.OrdinalIgnoreCase))
+        {
+            bool rewardClaimed = await communityService.ClaimCommunityReward(userEmail);
+
+            if (rewardClaimed)
+            {
+                showCodeError = false;
+                message = "You have successfully claimed this community reward!";
+                isCommunityAvailable = false;
+                communityInfo.Credits = 0; // Ta bort badgen genom att sätta credits till 0
+            }
+            else
+            {
+                message = "You have already claimed this reward or an error occurred.";
+                showCodeError = true;
+            }
+        }
+        else
+        {
+            showCodeError = true;
+            message = "Invalid code. Please try again.";
+        }
+
+        await InvokeAsync(StateHasChanged); 
+    }
+
+    private async Task<int> GetDaysLeft(DateTime? startDate, int duration)
+    {
+        if (!startDate.HasValue)
+            return duration; // If no StartDate, return the full duration
+
+        var endDate = startDate.Value.AddDays(duration);
+        var daysLeft = (endDate - DateTime.UtcNow).Days;
+
+        if (daysLeft <= 0)
+        {
+            daysLeft = 0; // Ensure no negative values
+
+            // Use the injected CommunityService instance
+            await CommunityService.UpdateButtonVisibilityAsync("Community", false);
+        }
+
+        return daysLeft;
+    }
+
+    private async Task ToggleBoostFriendInfo()
+    {
+        if (!showBoostFriendInfo)
+        {
+            // Ladda datan för den inloggade användaren
+            await LoadReceivedFromEmails(userEmail);
+        }
+        showBoostFriendInfo = !showBoostFriendInfo;
+    }
+
+    private void ToggleBoostFriendInput()
+    {
+        showBoostFriendInput = !showBoostFriendInput;
+        if (showBoostFriendInput)
+        {
+            showBoostFriendInfo = false; // Stäng andra dropdownen
+        }
+    }
+    private void ToggleSpecialInfo()
+    {
+        showSpecialInfo = !showSpecialInfo;
+    }
+    private async Task HandleSpecialContribution()
+    {
+        try
+        {
+            // Check if the user has already claimed the reward
+            hasClaimedSpecialReward = await specialService.HasClaimedSpecialReward(userEmail);
+
+            if (hasClaimedSpecialReward)
+            {
+                Console.WriteLine("User has already claimed the special reward.");
+                return;
+            }
+
+            // Award credits to the user
+            if (specialInfo.Credits > 0)
+            {
+                var success = await specialService.AwardCreditsToUser(userEmail, specialInfo.Credits);
+
+                if (success)
+                {
+                    Console.WriteLine($"Successfully awarded {specialInfo.Credits} credits to {userEmail}");
+
+                    // Mark the reward as claimed
+                    await specialService.MarkSpecialRewardAsClaimed(userEmail);
+
+                    // Update badge visibility
+                    hasClaimedSpecialReward = true;
+
+                    // Refresh UI
+                    await InvokeAsync(StateHasChanged);
+                }
+                else
+                {
+                    Console.WriteLine("Failed to award credits.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling special contribution: {ex.Message}");
+        }
+    }
+    private void ToggleCharityInfo() => showCharityInfo = !showCharityInfo;
+
+    private void ToggleOrganizationInfo() => showOrganizationInfo = !showOrganizationInfo;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // Fetch all users' weekly odds
             weeklyUsersOdds = await UserService.GetAllUsersWeeklyOdds();
+            userEmail = await localStorage.GetItemAsync<string>("userEmail");
+            charityAndOrganizationInfo = await InfoConfigService.GetInfoConfig();
+            await LoadButtonVisibility();
+            await CheckCharityBadge();
+            await CheckOrganizationBadge();
+            var charityData = await CharityService.GetTopContributors("Charity");
+            charityContributors = charityData.ToDictionary(kvp => kvp.Key, kvp => (double)kvp.Value);
+            // Initiera BoostFriendService
+            boostFriendService = new BoostFriendService(new HttpClient(), UserService);
+            userEmail = await localStorage.GetItemAsync<string>("userEmail");
+            isBoostFriendAvailable = !await boostFriendService.HasGivenCreditToday(userEmail);
+            friendEmail = await boostFriendService.GetSavedFriendEmail(userEmail);
 
-            // Order the odds descending for leaderboard ranking
+            var communityService = new CommunityService(new HttpClient());
+            communityInfo = await communityService.GetCommunityInfo();
+            isCommunityAvailable = communityInfo.Credits > 0;
+            hasClaimedReward = await communityService.HasClaimedCommunityReward(userEmail);
+            daysLeft = await GetDaysLeft(communityInfo.StartDate, communityInfo.Duration);
+  
+            specialInfo = await specialService.GetSpecialInfo();
+            hasClaimedSpecialReward = await specialService.HasClaimedSpecialReward(userEmail);
+ 
+            var organizationData = await CharityService.GetTopContributors("Organization");
+            organizationContributors = organizationData.ToDictionary(kvp => kvp.Key, kvp => (double)kvp.Value);
+
+            if (!string.IsNullOrEmpty(userEmail))
+            {
+                isRewardAvailable = !await DailyRewardService.HasClaimedDailyReward(userEmail);
+            }
+
             weeklyUsersOdds = weeklyUsersOdds
                 .OrderByDescending(o => o.Value)
                 .ToDictionary(k => k.Key, v => v.Value);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error fetching users' weekly odds: {ex.Message}");
+            Console.WriteLine($"Error initializing page: {ex.Message}");
         }
     }
 
-    // Function to format the display name
+    private async Task LoadButtonVisibility()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FButtonVisibilityConfig.json?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                buttonVisibility = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, bool>>(json) ?? new Dictionary<string, bool>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading button visibility: {ex.Message}");
+            buttonVisibility = new Dictionary<string, bool>
+            {
+                { "Charity", true },
+                { "Organizations", true },
+                { "DailyReward", true }
+            };
+        }
+    }
+
+    private async Task ClaimDailyReward()
+    {
+        if (string.IsNullOrEmpty(userEmail))
+        {
+            message = "User email not found. Please log in.";
+            return;
+        }
+
+        var success = await DailyRewardService.ClaimDailyReward(userEmail);
+        if (success)
+        {
+            isRewardAvailable = false;
+            message = "You have successfully claimed your daily reward!";
+        }
+        else
+        {
+            message = "You have already claimed your reward today.";
+        }
+    }
+
     private string GetDisplayName(string emailOrName)
     {
         if (string.IsNullOrWhiteSpace(emailOrName))
             return "Unknown";
 
-        // Split the string at '.', '-', or '@' and return the first part
         var delimiters = new[] { '.', '-', '@', '_' };
         var parts = emailOrName.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
 
         return parts.Length > 0 ? parts[0] : emailOrName;
     }
-}
 
+    private async Task HandleCharityContribution()
+    {
+        if (await CharityService.CanContributeToday(userEmail, "Charity"))
+        {
+            bool success = await CharityService.Contribute(userEmail, "Charity");
+            isCharityAvailable = !success;
+            message = success ? "Thank you for your contribution!" : "You've already contributed today.";
+        }
+        else
+        {
+            message = "You can only contribute once per day.";
+            isCharityAvailable = false;
+        }
+    }
+    private async Task HandleContribution(string contributionType)
+    {
+        if (await CharityService.CanContributeToday(userEmail, contributionType))
+        {
+            bool success = await CharityService.Contribute(userEmail, contributionType);
+            if (contributionType == "Charity")
+            {
+                isCharityAvailable = !success;
+            }
+            else if (contributionType == "Organization")
+            {
+                isOrganizationAvailable = !success;
+            }
+            message = success ? $"Thank you for your contribution to {contributionType}!" : $"You've already contributed to {contributionType} today.";
+        }
+        else
+        {
+            message = $"You can only contribute to {contributionType} once per day.";
+            if (contributionType == "Charity")
+                isCharityAvailable = false;
+            else if (contributionType == "Organization")
+                isOrganizationAvailable = false;
+        }
+    }
+    private async Task CheckCharityBadge()
+    {
+        isCharityAvailable = await CharityService.CanContributeToday(userEmail, "Charity");
+    }
+
+    private async Task HandleOrganizationContribution()
+    {
+        if (await CharityService.CanContributeToday(userEmail, "Organization"))
+        {
+            bool success = await CharityService.Contribute(userEmail, "Organization");
+            isOrganizationAvailable = !success;
+            message = success ? "Thank you for your contribution!" : "You've already contributed today.";
+        }
+        else
+        {
+            message = "You can only contribute once per day.";
+            isOrganizationAvailable = false;
+        }
+    }
+
+    private async Task CheckOrganizationBadge()
+    {
+        isOrganizationAvailable = await CharityService.CanContributeToday(userEmail, "Organization");
+    }
+  
+
+    private async Task LoadFriendEmail()
+    {
+        friendEmail = await boostFriendService.GetSavedFriendEmail(userEmail);
+    }
+
+
+    private async Task GiveCreditToFriend()
+    {
+        if (!string.IsNullOrEmpty(friendEmail))
+        {
+            var result = await boostFriendService.GiveCreditToFriend(userEmail, friendEmail);
+
+            if (result.Success)
+            {
+                boostFriendError = "";
+                message = "Credit successfully sent!";
+                // ✅ Uppdatera badge så att den försvinner
+                isBoostFriendAvailable = false;
+            }
+            else
+            {
+                boostFriendError = result.ErrorMessage;
+            }
+        }
+        else
+        {
+            boostFriendError = "Please enter a valid friend's email.";
+        }
+    }
+    private async Task LoadSavedFriendEmails()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FDailyRewards%2FBoostFriendReceived.json?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var receivedData = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(jsonResponse)
+                                   ?? new Dictionary<string, Dictionary<string, string>>();
+
+                savedFriendEmails = receivedData.Keys
+                    .Select(email => ExtractDisplayName(email))
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading saved friend emails: {ex.Message}");
+        }
+    }
+
+    private async Task LoadReceivedFromEmails(string currentUserEmail)
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FDailyRewards%2FBoostFriendReceived.json?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var receivedData = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(jsonResponse)
+                                   ?? new Dictionary<string, Dictionary<string, string>>();
+
+                if (receivedData.TryGetValue(currentUserEmail, out var userData))
+                {
+                    // Hämta dagens datum i rätt format
+                    var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+
+                    // Kontrollera om datumet stämmer med idag
+                    if (userData.TryGetValue("ReceiveDate", out var receiveDate) && receiveDate == today)
+                    {
+                        // Hämta och splitta receivedFrom om datumet stämmer
+                        if (userData.TryGetValue("ReceivedFrom", out var receivedFrom))
+                        {
+                            receivedFromEmails = receivedFrom
+                                .Split(new[] { ", " }, StringSplitOptions.RemoveEmptyEntries)
+                                .Select(email => ExtractDisplayName(email))
+                                .ToList();
+                        }
+                    }
+                    else
+                    {
+                        receivedFromEmails.Clear(); // Rensa listan om datumet inte matchar
+                    }
+                }
+                else
+                {
+                    receivedFromEmails.Clear(); // Rensa om användaren inte har data
+                }
+            }
+            else
+            {
+                Console.WriteLine("No data found.");
+                receivedFromEmails.Clear(); // Rensa listan om ingen data hittas
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading received from emails: {ex.Message}");
+        }
+    }
+
+    private string ExtractDisplayName(string email)
+    {
+        var delimiters = new[] { '@', '.', '-', '_' };
+        var parts = email.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 0 ? parts[0] : email;
+    }
+
+}
 <style>
 .value-page {
     display: flex;
@@ -190,6 +838,7 @@
     border-radius: 50%;
     width: 80px;
     height: 80px;
+        overflow: hidden;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
@@ -230,51 +879,118 @@
     }
 }
 
-.info-container {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    background: linear-gradient(145deg, #f9f9f9, #f1f1f1);
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    margin-top: 20px;
-    max-width: 600px;
-    width: 100%;
-    gap: 20px;
-}
+/* Förbättrad info-knapp */
+    .expand-down {
+        margin-top: 20px; /* Lägger till utrymme mellan sektionerna */
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease-in-out;
+        opacity: 1;
+        transform: translateY(0);
+    }
 
-.info-card {
-    background: white;
-    border-radius: 10px;
-    padding: 15px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
+        .expand-down.collapsed {
+            opacity: 0;
+            transform: translateY(-10px);
+            display: none;
+        }
 
-.info-card h3 {
-    font-size: 1.5rem;
-    color: #5E964D;
-    margin-bottom: 10px;
-}
+    .dropdown-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        position: absolute;
+        bottom: -25px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%; /* Gör knappen rundad */
+        width: 40px;
+        height: 40px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Lägger till en subtil skugga */
+        background: linear-gradient(145deg, #e0e0e0, #f5f5f5); /* Lätt gradient för modern look */
+        transition: all 0.3s ease;
+    }
 
-.info-card p {
-    font-size: 1rem;
-    color: #333;
-    margin: 5px 0;
-}
+        .dropdown-btn:hover {
+            background: linear-gradient(145deg, #d0d0d0, #ffffff);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
 
-.action-btn span {
-    font-size: 1rem;
-    font-weight: bold;
-    text-align: center;
-    color: #333;
-    margin-top: 10px;
-}
+        .dropdown-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: #4CAF50;
+            transition: transform 0.3s ease, fill 0.3s ease;
+        }
 
-.action-btn:hover {
-    transform: scale(1.1);
-    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.3);
+        .dropdown-btn.open svg {
+            transform: rotate(180deg);
+            fill: #2E7D32;
+        }
+
+
+    /* Justering av info-container för bättre läsbarhet */
+    .expand-down {
+        margin-top: 20px; /* Ger lite avstånd från ovanstående element */
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .info-container {
+        position: absolute;
+        top: 110%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        z-index: 100;
+        max-width: 320px;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-top: 15px;
+    }
+
+    .info-card {
+        padding: 10px;
+        border-radius: 10px;
+        background: #f5f5f5;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+        .info-card h3 {
+            font-size: 1.5rem;
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+
+        .info-card p {
+            font-size: 1.2rem;
+            color: #333;
+        }
+
+/* Animation för bättre övergång */
+@@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
 }
 /* Base leaderboard styles */
 .leaderboard {
@@ -381,4 +1097,173 @@
     color: #505050;
     font-weight: bold;
 }
+
+    /* Centrera knappen med flexbox */
+    .button-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 10px;
+    }
+
+    /* Förbättrad stil för inputfältet */
+    .styled-input {
+        padding: 10px;
+        border: 2px solid #ccc;
+        border-radius: 5px;
+        width: 100%;
+        font-size: 1rem;
+        margin-bottom: 10px;
+    }
+
+    /* Snygg Submit-knapp med hover-effekt */
+    .styled-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: linear-gradient(145deg, #7BBF6A, #5E964D);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+        transition: background 0.3s ease-in-out, transform 0.1s;
+        box-shadow: 0px 4px 8px rgba(0,0,0,0.2);
+    }
+
+        /* Ikon för submit-knappen */
+        .styled-button i {
+            font-size: 1.2rem;
+        }
+
+        /* Hover-effekt för knappen */
+        .styled-button:hover {
+            background: linear-gradient(145deg, #5E964D, #7BBF6A);
+            transform: scale(1.05);
+        }
+
+        /* Klick-effekt */
+        .styled-button:active {
+            transform: scale(0.95);
+        }
+
+    .community-image {
+        max-width: 100%;
+        border-radius: 10px;
+          object-fit: cover;
+    }
+    /* Förbättrad stil för etiketten (label) */
+    /* Stil specifikt för Community Code label */
+    label[for="communityCode"] {
+        font-size: 1rem;
+        color: #333; /* Mörkare textfärg för bättre kontrast */
+        font-weight: bold;
+    }
+    /* Container stil */
+    .received-help-container {
+        margin-top: 20px;
+        padding: 20px;
+        border-radius: 15px;
+        background: linear-gradient(145deg, #f9f9f9, #e6e6e6);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        text-align: center;
+        max-width: 400px;
+        margin: auto;
+    }
+
+    /* Liststil */
+    .received-help-list {
+        list-style: none;
+        padding: 0;
+        margin-top: 10px;
+    }
+
+    /* Listobjekt */
+    .received-help-item {
+        display: flex;
+        align-items: center;
+        background: white;
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease-in-out;
+    }
+
+    /* Avatar (Första bokstaven i e-posten) */
+    .avatar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #7BBF6A;
+        color: white;
+        font-weight: bold;
+        margin-right: 10px;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    /* Email text */
+    .received-email {
+        font-size: 1rem;
+        font-weight: bold;
+        color: #333;
+    }
+
+    /* Hover effekt för lite animation */
+    .received-help-item:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    /* Container för Days Left */
+    .duration-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(145deg, #e6e6e6, #ffffff);
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        text-align: center;
+        margin: 20px auto;
+        max-width: 250px;
+        border: 2px solid #7BBF6A;
+        animation: pulseAnimation 2s infinite ease-in-out;
+    }
+
+    /* Stil för rubriken */
+    .duration-label {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #4CAF50;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+
+    /* Stil för värdet */
+    .duration-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: white;
+        background: #7BBF6A;
+        padding: 15px 30px;
+        border-radius: 50%;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        text-align: center;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    /* Effekt när musen är över */
+    .duration-container:hover .duration-value {
+        transform: scale(1.1);
+        background: #5E964D;
+    }
+
 </style>

@@ -69,6 +69,21 @@
                 <InputText id="email" @bind-Value="signupModel.Email" />
             </div>
             <div class="form-group">
+                <label for="phoneNumber">Mobile Number:</label>
+                <div class="phone-input">
+                    <InputSelect @bind-Value="selectedCountryCode" class="country-select" @onchange="ValidatePhoneNumber">
+                        @foreach (var country in countryCodes)
+                        {
+                            <option value="@country.Code">
+                                @country.Flag @country.Code
+                            </option>
+                        }
+                    </InputSelect>
+                    <InputText id="phoneNumber" @bind-Value="signupModel.PhoneNumber" @oninput="ValidatePhoneNumber" placeholder="Enter number" required />
+                </div>
+                <p style="color: red;" hidden="@isPhoneNumberValid">Invalid phone number format.</p>
+            </div>
+            <div class="form-group">
                 <label for="password">Password:</label>
                 <InputText id="password" @bind-Value="signupModel.Password" type="password" />
             </div>
@@ -91,6 +106,7 @@
             City = "Stockholm", // Standardvärde för City
             Gender = "Male"     // Standardvärde för Gender
         };
+
     private int selectedYear;
     private int selectedMonth;
     private int _selectedDay;
@@ -105,6 +121,7 @@
             }
         }
     }
+
     private List<int> days = Enumerable.Range(1, 31).ToList();
     private List<int> years = new List<int>();
     private Dictionary<string, int> months = new Dictionary<string, int>
@@ -122,6 +139,7 @@
         {"November", 11},
         {"December", 12}
     };
+
     private List<string> cities = new List<string>
     {
         "Stockholm", "Göteborg", "Malmö", "Uppsala", "Västerås", "Örebro", "Linköping", "Helsingborg",
@@ -130,6 +148,17 @@
         "Kalmar", "Skövde", "Karlskrona", "Kristianstad"
     };
 
+    private bool isPhoneNumberValid = true;
+    private string selectedCountryCode = "+46";
+    private List<CountryCode> countryCodes = new List<CountryCode>
+    {
+        new CountryCode { Code = "+46", Name = "Sweden", Flag = "🇸🇪" },
+        new CountryCode { Code = "+47", Name = "Norway", Flag = "🇳🇴" },
+        new CountryCode { Code = "+45", Name = "Denmark", Flag = "🇩🇰" },
+        new CountryCode { Code = "+358", Name = "Finland", Flag = "🇫🇮" },
+        new CountryCode { Code = "+44", Name = "United Kingdom", Flag = "🇬🇧" },
+        new CountryCode { Code = "+1", Name = "United States", Flag = "🇺🇸" }
+    };
     protected override void OnInitialized()
     {
         base.OnInitialized();
@@ -148,6 +177,7 @@
         // Uppdatera dagarna baserat på initial månad och år
         UpdateDays();
     }
+
     private void UpdateDays()
     {
         // Hämta antalet dagar i den valda månaden och året
@@ -165,6 +195,7 @@
     {
         signupModel.BirthDate = new DateTime(selectedYear, selectedMonth, selectedDay);
 
+        // Ålderskontroll
         if (CalculateAge(signupModel.BirthDate) < 18)
         {
             await Application.Current.MainPage.DisplayAlert(
@@ -175,6 +206,19 @@
             return;
         }
 
+        // Kontrollera och validera telefonnummer med vald landskod
+        ValidatePhoneNumber();
+        if (!isPhoneNumberValid)
+        {
+            await Application.Current.MainPage.DisplayAlert(
+                "Invalid Phone Number",
+                $"Please enter a valid phone number for {selectedCountryCode}.",
+                "OK"
+            );
+            return;
+        }
+
+        // Kontrollera att lösenorden matchar
         if (signupModel.Password != signupModel.ConfirmPassword)
         {
             await Application.Current.MainPage.DisplayAlert(
@@ -187,6 +231,7 @@
 
         try
         {
+            // Kontrollera om e-posten redan finns registrerad
             var emailExists = await CheckIfEmailExists(signupModel.Email);
             if (emailExists)
             {
@@ -198,12 +243,16 @@
                 return;
             }
 
+            // Skapa användare med Firebase Authentication
             var userCredential = await AuthClient.CreateUserWithEmailAndPasswordAsync(signupModel.Email, signupModel.Password);
             Console.WriteLine($"User created with UID: {userCredential.User.Uid}");
 
+            // Spara användarprofil i Firebase
+            signupModel.PhoneNumber = $"{selectedCountryCode}{signupModel.PhoneNumber}"; // Slå ihop landskod och telefonnummer
             await SaveUserProfileToStorage(userCredential.User);
             Console.WriteLine("User profile saved to storage.");
 
+            // Framgångsmeddelande
             await Application.Current.MainPage.DisplayAlert("Success", "Registration successful!", "Ok");
             NavigationManager.NavigateTo("/login");
         }
@@ -220,39 +269,27 @@
         }
     }
 
+    private void ValidatePhoneNumber()
+    {
+        var fullPhoneNumber = $"{selectedCountryCode}{signupModel.PhoneNumber}";
+        isPhoneNumberValid = System.Text.RegularExpressions.Regex.IsMatch(fullPhoneNumber, @"^\+\d{7,15}$");
+    }
+
     private async Task<bool> CheckIfEmailExists(string userEmail)
     {
         try
         {
             var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{userEmail}.json?alt=media";
             var response = await HttpClient.GetAsync(url);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var responseBody = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"Firebase response: {responseBody}");
-                return responseBody != "null"; // E-posten finns om responsen inte är "null"
-            }
-            else if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                // Om resursen inte hittas, är e-posten inte registrerad
-                Console.WriteLine($"Email {userEmail} is not registered.");
-                return false;
-            }
-            else
-            {
-                Console.WriteLine($"Unexpected response checking email existence: {response.StatusCode}");
-                throw new Exception($"Unexpected error when checking email: {response.StatusCode}");
-            }
+            return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error checking email existence: {ex.Message}");
-            throw;
+            return false;
         }
     }
 
-    // Metod för att spara användarprofil i Firebase Storage
     private async Task SaveUserProfileToStorage(User user)
     {
         var profileData = new
@@ -262,87 +299,19 @@
             BirthDate = signupModel.BirthDate.ToString("yyyy-MM-dd"),
             City = signupModel.City,
             Gender = signupModel.Gender,
-            Email = signupModel.Email
+            Email = signupModel.Email,
+            PhoneNumber = signupModel.PhoneNumber
         };
 
         var json = JsonSerializer.Serialize(profileData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var client = new HttpClient();
-
-        // Skicka förfrågan till Firebase för att spara användarprofilen
-        var response = await client.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content);
-
-        var responseBody = await response.Content.ReadAsStringAsync();
-        Console.WriteLine($"Firebase response: {responseBody}");
-
-        // Kontrollera om responsen är JSON
-        if (!responseBody.StartsWith("{"))
-        {
-            Console.WriteLine("Non-JSON response received.");
-            throw new Exception($"Failed to save user profile: {responseBody}");
-        }
-
-        // Försök att deserialisera JSON om det är giltigt
-        try
-        {
-            var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
-            // Hantera JSON-svaret här om det behövs
-        }
-        catch (JsonException ex)
-        {
-            Console.WriteLine($"Failed to parse JSON: {ex.Message}");
-            throw new Exception($"Failed to parse Firebase response: {ex.Message}");
-        }
+        var response = await HttpClient.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content);
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new Exception($"Failed to save user profile: {responseBody}");
-        }
-
-        // Lägg till logiken för att skapa UserStats-filen
-        try
-        {
-            var userStats = new
-            {
-                UserEmail = signupModel.Email,
-                LockInAmount = 0,
-                Credits = 0,
-                StarShards = 0,
-                TotalOdds = 0.0,
-                WeeklyOdds = 0,
-                DailyStreak = new
-                {
-                    CurrentStreak = 1,
-                    LongestStreak = 1,
-                    Stars = 1,
-                    LastLoginDate = DateTime.UtcNow.ToString("o") // ISO 8601-format
-                }
-            };
-
-            var userStatsJson = JsonSerializer.Serialize(userStats);
-            var userStatsContent = new StringContent(userStatsJson, Encoding.UTF8, "application/json");
-
-            var userStatsPath = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2F{signupModel.Email}.json";
-
-            var userStatsResponse = await client.PostAsync(userStatsPath, userStatsContent);
-
-            if (userStatsResponse.IsSuccessStatusCode)
-            {
-                Console.WriteLine($"User stats saved successfully for {signupModel.Email}.");
-            }
-            else
-            {
-                Console.WriteLine($"Failed to save user stats for {signupModel.Email}. Status code: {userStatsResponse.StatusCode}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error saving user stats for {signupModel.Email}: {ex.Message}");
-            throw;
+            throw new Exception("Failed to save user profile.");
         }
     }
-
-
     private string GetErrorMessage(string responseBody)
     {
         try
@@ -363,7 +332,6 @@
             return "An unexpected error occurred.";
         }
     }
-
     private int CalculateAge(DateTime birthDate)
     {
         var today = DateTime.Today;
@@ -379,12 +347,18 @@
         public DateTime BirthDate { get; set; }
         public string City { get; set; }
         public string Gender { get; set; }
+        public string PhoneNumber { get; set; }
         public string Email { get; set; }
         public string Password { get; set; }
         public string ConfirmPassword { get; set; }
     }
+    public class CountryCode
+    {
+        public string Code { get; set; }
+        public string Name { get; set; }
+        public string Flag { get; set; }
+    }
 }
-
 <style>
     .signup-container {
         max-width: 400px;

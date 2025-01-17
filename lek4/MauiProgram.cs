@@ -63,6 +63,12 @@ namespace lek4
             builder.Services.AddScoped<JackpotService>();
             builder.Services.AddScoped<StatsService>();
             builder.Services.AddSingleton<Components.Service.NumberService>();
+            builder.Services.AddScoped<DailyRewardService>(); 
+            builder.Services.AddScoped<InfoConfigService>();
+            builder.Services.AddScoped<CharityService>();
+            builder.Services.AddScoped<BoostFriendService>();
+            builder.Services.AddScoped<CommunityService>();
+            builder.Services.AddScoped<SpecialService>();
 
             builder.Services.AddSingleton(AudioManager.Current);
             builder.Services.AddTransient<MainPage>();
@@ -81,7 +87,7 @@ namespace lek4
                 }
             }));
 
-
+            
             return builder.Build();
         }
     }

@@ -1,0 +1,184 @@
+﻿@page "/admin-user-lookup"
+@using System.Text.Json
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+
+
+<h3>Admin User Lookup</h3>
+<button class="back-button" @onclick="NavigateBack">← Back</button>
+
+<div class="admin-container">
+    <div class="form-group">
+        <label for="uid">Enter User UID:</label>
+        <input type="text" id="uid" @bind="uid" placeholder="Enter UID here" />
+    </div>
+
+    <button @onclick="SearchUserByUid" class="action-button search-button">Search</button>
+
+    @if (isLoading)
+    {
+        <p>Loading user data...</p>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <p class="error-message">@errorMessage</p>
+    }
+    else if (profileModel != null)
+    {
+        <div class="user-info">
+            <h4>User Information</h4>
+            <p><strong>UID:</strong> @profileModel.Uid</p>
+            <p><strong>First Name:</strong> @profileModel.FirstName</p>
+            <p><strong>Last Name:</strong> @profileModel.LastName</p>
+            <p><strong>Birth Date:</strong> @profileModel.BirthDate.ToString("yyyy-MM-dd")</p>
+            <p><strong>City:</strong> @profileModel.City</p>
+            <p><strong>Gender:</strong> @profileModel.Gender</p>
+            <p><strong>Email:</strong> @profileModel.Email</p>
+            <p><strong>Phone Number:</strong> @profileModel.PhoneNumber</p>
+        </div>
+    }
+</div>
+
+@code {
+    private string uid;
+    private bool isLoading;
+    private string errorMessage;
+    private ProfileModel profileModel;
+
+    /// <summary>
+    /// Metod för att söka efter användare baserat på UID från Firebase Storage
+    /// </summary>
+    private async Task SearchUserByUid()
+    {
+        if (string.IsNullOrWhiteSpace(uid))
+        {
+            errorMessage = "Please enter a valid UID.";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+        profileModel = null;
+
+        try
+        {
+            // Skapa URL för att hämta användarens profil från Firebase Storage
+            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{uid}.json?alt=media";
+
+            // Skicka GET-begäran till Firebase Storage
+            var response = await HttpClient.GetStringAsync(url);
+
+            // Deserialisera användarens profil från JSON
+            profileModel = JsonSerializer.Deserialize<ProfileModel>(response);
+            profileModel.Uid = uid;
+        }
+        catch (HttpRequestException httpEx)
+        {
+            errorMessage = $"Failed to load user data: {httpEx.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading user profile: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Klass för att lagra användarens information
+    /// </summary>
+    public class ProfileModel
+    {
+        public string Uid { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public DateTime BirthDate { get; set; }
+        public string City { get; set; }
+        public string Gender { get; set; }
+        public string Email { get; set; }
+        public string PhoneNumber { get; set; }
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
+}
+
+<style>
+    .admin-container {
+        margin: 20px;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            padding: 8px;
+            width: 100%;
+            max-width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+    .action-button {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+        .action-button:hover {
+            background-color: #0056b3;
+        }
+
+    .error-message {
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .user-info {
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #f5f5f5;
+    }
+</style>
+<script>
+    const functions = require("firebase-functions");
+    const admin = require("firebase-admin");
+
+    admin.initializeApp();
+
+    exports.getUid = functions.https.onRequest(async (req, res) => {
+        const email = req.query.email;
+
+        if (!email) {
+            return res.status(400).send("Email is required");
+        }
+
+        try {
+            const userRecord = await admin.auth().getUserByEmail(email);
+            return res.status(200).send(userRecord.uid);
+        } catch (error) {
+            console.error("Error fetching user data:", error);
+            return res.status(404).send("User not found");
+        }
+    });
+
+</script>

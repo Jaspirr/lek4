@@ -2,11 +2,12 @@
 @using System.Text.Json
 @using System.Text
 @inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
 
 <div class="ticket-cost-management">
     <h3>Manage Ticket Cost</h3>
     <p>Set the cost for joining the jackpot below:</p>
-
+    <button @onclick="NavigateBack">← Back</button>
     <div class="ticket-cost-form">
         <label for="ticketCost">Ticket Cost:</label>
         <input type="number" id="ticketCost" @bind="ticketCost" min="1" />
@@ -30,7 +31,10 @@
     {
         await LoadTicketCost();
     }
-
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
     private async Task LoadTicketCost()
     {
         try

@@ -2,8 +2,11 @@
 @using System.Text.Json
 @using System.Text
 @inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+
 
 <h3>Admin Prize Management</h3>
+<button class="back-button" @onclick="NavigateBack">← Back</button>
 
 <div class="admin-container">
     <div class="section">
@@ -99,24 +102,30 @@
     {
         try
         {
-            // Generate next file number
-            int nextFileNumber = await GetNextFileNumber();
+            // Skapa ett unikt filnamn med hjälp av tidsstämpel
+            string fileName = $"ClaimPrize_{DateTime.UtcNow:yyyyMMddHHmmss}.json";
 
-            // Save claimed prizes to the next file in SavedInfo
+            // Serialisera claimedPrizes till JSON
             var json = JsonSerializer.Serialize(claimedPrizes);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            // Ladda upp den nya filen till Firebase
             var response = await HttpClient.PostAsync(
-                $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2FClaimPrize_{nextFileNumber}.json",
+                $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2F{Uri.EscapeDataString(fileName)}",
                 content
             );
 
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine("Claimed prizes saved successfully.");
+                Console.WriteLine($"Claimed prizes saved successfully to {fileName}.");
 
-                // Clear the current claimed prizes file by replacing it with an empty JSON object
+                // Rensa innehållet i den aktuella ClaimedPrizes.json-filen
                 await ClearFirebaseFile("users/Jackpot/ClaimedPrizes.json");
+
+                // Återställ claimedPrizes till null (tömt)
                 claimedPrizes = null;
+
+                // Ladda om claimedPrizes från Firebase
                 await LoadClaimedPrizes();
             }
             else
@@ -130,26 +139,33 @@
         }
     }
 
+
+
     private async Task SaveWinningTickets()
     {
         try
         {
-            // Generate next file number
-            int nextFileNumber = await GetNextFileNumber();
+            // Generate a unique file name using a timestamp
+            string fileName = $"WinningTickets_{DateTime.UtcNow:yyyyMMddHHmmss}.json";
 
-            // Save winning tickets to the next file in SavedInfo
+            // Serialize the winning tickets to JSON
             var json = JsonSerializer.Serialize(winningTickets);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await HttpClient.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2F{nextFileNumber}.json", content);
+
+            // Upload to Firebase with the unique file name
+            var response = await HttpClient.PostAsync(
+                $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2F{Uri.EscapeDataString(fileName)}",
+                content
+            );
 
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine("Winning tickets saved successfully.");
+                Console.WriteLine($"Winning tickets saved successfully to {fileName}.");
 
-                // Clear the current winning tickets file
+                // Optionally clear the current file (resetting it)
                 await ClearFirebaseFile("users/Jackpot/WinningTickets.json");
-                winningTickets = null;
-                await LoadWinningTickets();
+                winningTickets = null; // Reset the local data
+                await LoadWinningTickets(); // Reload the data
             }
             else
             {
@@ -186,14 +202,17 @@
 
         return 1; // Default to 1 if counter file doesn't exist
     }
-
     private async Task UpdateNextFileNumber(int nextFileNumber)
     {
         try
         {
             var json = JsonSerializer.Serialize(new { NextFileNumber = nextFileNumber });
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await HttpClient.PutAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2FCounter.json", content);
+
+            var response = await HttpClient.PutAsync(
+                "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2FCounter.json?alt=media",
+                content
+            );
 
             if (!response.IsSuccessStatusCode)
             {
@@ -210,13 +229,13 @@
     {
         try
         {
-            // Create an empty JSON object
+            // Skapa ett tomt JSON-objekt
             var emptyJson = JsonSerializer.Serialize(new Dictionary<string, Dictionary<string, bool>>());
             var content = new StringContent(emptyJson, Encoding.UTF8, "application/json");
 
-            // Update the file in Firebase with empty content
+            // Uppdatera filen i Firebase med tomt innehåll
             var response = await HttpClient.PostAsync(
-                $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/{Uri.EscapeDataString(filePath)}",
+                $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/{Uri.EscapeDataString(filePath)}?alt=media",
                 content
             );
 
@@ -241,6 +260,11 @@
         public string UserEmail { get; set; }
         public string TicketDetails { get; set; }
     }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
 }
 
 <style>

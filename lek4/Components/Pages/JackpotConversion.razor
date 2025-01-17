@@ -1,8 +1,10 @@
 ﻿@page "/jackpot-conversion"
 @using lek4.Components.Service
 @inject JackpotService JackpotService
+@inject NavigationManager NavigationManager
 
 <h3>Update Conversion Factor and Currency</h3>
+<button @onclick="NavigateBack">← Back</button>
 
 <!-- Conversion Factor Input -->
 <div class="form-group">
@@ -39,7 +41,10 @@
         conversionFactor = await JackpotService.GetConversionFactor();
         currencySymbol = await JackpotService.GetCurrencySymbol();
     }
-
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
     private async Task UpdateSettings()
     {
         if (conversionFactor < 0.01 || conversionFactor > 10.0)

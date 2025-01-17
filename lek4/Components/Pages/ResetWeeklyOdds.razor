@@ -5,6 +5,7 @@
 @inject IJSRuntime JSRuntime
 
 <h3>Reset Weekly Odds</h3>
+<button class="back-button" @onclick="NavigateBack">← Back</button>
 
 <div class="reset-container">
     <label for="resetDay">Select a day to reset Weekly Odds:</label>
@@ -65,4 +66,9 @@
             statusMessage = "Failed to set reset day.";
         }
     }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
 }

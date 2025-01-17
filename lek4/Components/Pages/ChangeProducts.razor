@@ -5,9 +5,11 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime js
 @inject lek4.Components.Service.ProductService ProductService
+@inject NavigationManager NavigationManager
+
 
 <h2>Manage Products</h2>
-
+<button @onclick="NavigateBack">← Back</button>
 <div class="product-list">
     @if (products != null && products.Count > 0)
     {
@@ -95,7 +97,10 @@
         await LoadLockedInUsersForAllProducts();
         StateHasChanged();
     }
-
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
     private async Task LoadLockedInUsersForAllProducts()
     {
         foreach (var product in products)

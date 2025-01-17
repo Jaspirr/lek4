@@ -8,104 +8,141 @@
     <h3>Welcome to the Admin Panel</h3>
     <p>You have admin access. Here you can manage your application settings, users, and more.</p>
 
-    <!-- Admin functionality buttons -->
-    <div class="admin-actions">
-        <button class="action-button" @onclick="DrawPage">Draw</button>
-        <button class="action-button" @onclick="ChangeProducts">Change Products</button>
-        <button class="action-button" @onclick="BreakAndTime">Break and Time</button>
-        <button class="action-button" @onclick="Notifications">Notifications</button>
-        <button class="action-button" @onclick="PriceConfig">PriceConfig</button>
-        <button class="action-button" @onclick="ManageAdmins">Manage Admins</button>
-        <button class="action-button" @onclick="ManageTicketCost">Manage Ticket Cost</button>
-        <button class="action-button" @onclick="AdSpan">Manage Ads Span</button>
-        <button class="action-button" @onclick="JackpotConversion">Manage Jackpot Conversion</button>
-        <button class="action-button" @onclick="NavigateToManageStreak">Manage User Daily Streak</button>
-        <button class="action-button" @onclick="NavigateToResetWeeklyOdds">Reset Weekly Odds Day</button>
-        <button class="action-button" @onclick="PrizeAndTicket">Save prizes and ticket data</button>
-        <button class="action-button" @onclick="ShowWinners">Show Winners</button>
+    <!-- Grid Layout for buttons -->
+    <div class="admin-actions-grid">
+        <!-- Section 1: User Management -->
+        <div class="admin-section">
+            <h4>User Management</h4>
+            <button class="action-button" @onclick="ManageAdmins">Manage Admins</button>
+            <button class="action-button" @onclick="SearchUser">Search User</button>
+            <button class="action-button" @onclick="NavigateToManageStreak">Manage User Daily Streak</button>
+            <button class="action-button" @onclick="EditTotalCredits">Edit Total Credits</button>
+            <button class="action-button" @onclick="AddCredits">Add Credits and more to User</button>
+        </div>
+
+        <!-- Section 2: Draw and Tickets -->
+        <div class="admin-section">
+            <h4>Draw & Ticket Management</h4>
+            <button class="action-button" @onclick="DrawPage">Draw</button>
+            <button class="action-button" @onclick="GenerateTicket">Generate Ticket</button>
+            <button class="action-button" @onclick="ManageTicketCost">Manage Ticket Cost</button>
+            <button class="action-button" @onclick="PrizeAndTicket">Save Prizes and Tickets</button>
+        </div>
+        <div class="admin-section">
+            <h4>Button Page Management</h4>
+            <button class="action-button" @onclick="ButtonVisibility">Button Visibility</button>
+            <button class="action-button" @onclick="CharityInfo">Charity and Organisation info</button>
+            <button class="action-button" @onclick="CommunityInfo">Community info</button>
+            <button class="action-button" @onclick="CommunityCount">Community count</button>
+            <button class="action-button" @onclick="SpecialInfo">Special Info</button>
+            <button class="action-button" @onclick="SpecialCount">Special Count</button>
+        </div>
+        <!-- Section 3: Product & Config Management -->
+        <div class="admin-section">
+            <h4>Product & Config Management</h4>
+            <button class="action-button" @onclick="ChangeProducts">Change Products</button>
+            <button class="action-button" @onclick="JackpotConversion">Manage Jackpot Conversion</button>
+            <button class="action-button" @onclick="PriceConfig">Price Config</button>
+        </div>
+
+        <!-- Section 4: Time and Notifications -->
+        <div class="admin-section">
+            <h4>Time & Notifications</h4>
+            <button class="action-button" @onclick="BreakAndTime">Break and Time</button>
+            <button class="action-button" @onclick="Notifications">Notifications</button>
+            <button class="action-button" @onclick="NavigateToResetWeeklyOdds">Reset Weekly Odds</button>
+        </div>
+
+        <!-- Section 5: Results & Winners -->
+        <div class="admin-section">
+            <h4>Results & Winners</h4>
+            <button class="action-button" @onclick="ShowWinners">Show Winners</button>
+            <button class="action-button" @onclick="AdSpan">Manage Ads Span</button>
+        </div>
     </div>
 </div>
 
 @code {
-    private void DrawPage()
-    {
-        NavigationManager.NavigateTo("/draw");
-    }
-
-    private void ChangeProducts()
-    {
-        NavigationManager.NavigateTo("/change-products");
-    }
-
-    private void BreakAndTime()
-    {
-        NavigationManager.NavigateTo("/break-and-time");
-    }
-
-    private void Notifications()
-    {
-        NavigationManager.NavigateTo("/notifications");
-    }
-    private void PriceConfig()
-    {
-        NavigationManager.NavigateTo("/PriceConfig");
-    }
-    private void ManageAdmins()
-    {
-        NavigationManager.NavigateTo("/manage-admins");
-    }
-    private void ManageTicketCost()
-    {
-        NavigationManager.NavigateTo("/manage-ticket-cost");
-    }
-    private void AdSpan()
-    {
-        NavigationManager.NavigateTo("/admin-ads-span");
-    }
-    private void JackpotConversion()
-    {
-        NavigationManager.NavigateTo("/jackpot-conversion");
-    }
-    private void NavigateToManageStreak()
-    {
-        NavigationManager.NavigateTo("/manage-streak");
-    }
-    private void NavigateToResetWeeklyOdds()
-    {
-            NavigationManager.NavigateTo("/reset-weekly-odds");
-    }
-      private void PrizeAndTicket()
-    {
-        NavigationManager.NavigateTo("/admin-prize-management");
-    }
-    private void ShowWinners()
-    {
-        NavigationManager.NavigateTo("/admin-prizes");
-    }
+    private void DrawPage() => NavigationManager.NavigateTo("/draw");
+    private void ChangeProducts() => NavigationManager.NavigateTo("/change-products");
+    private void BreakAndTime() => NavigationManager.NavigateTo("/break-and-time");
+    private void Notifications() => NavigationManager.NavigateTo("/notifications");
+    private void PriceConfig() => NavigationManager.NavigateTo("/PriceConfig");
+    private void ManageAdmins() => NavigationManager.NavigateTo("/manage-admins");
+    private void ManageTicketCost() => NavigationManager.NavigateTo("/manage-ticket-cost");
+    private void AdSpan() => NavigationManager.NavigateTo("/admin-ads-span");
+    private void JackpotConversion() => NavigationManager.NavigateTo("/jackpot-conversion");
+    private void NavigateToManageStreak() => NavigationManager.NavigateTo("/manage-streak");
+    private void NavigateToResetWeeklyOdds() => NavigationManager.NavigateTo("/reset-weekly-odds");
+    private void PrizeAndTicket() => NavigationManager.NavigateTo("/admin-prize-management");
+    private void ShowWinners() => NavigationManager.NavigateTo("/admin-prizes");
+    private void GenerateTicket() => NavigationManager.NavigateTo("/admin-generate-ticket");
+    private void EditTotalCredits() => NavigationManager.NavigateTo("/admin-total-credits");
+    private void SearchUser() => NavigationManager.NavigateTo("/admin-user-lookup");
+    private void AddCredits() => NavigationManager.NavigateTo("/admin-credits");
+    private void ButtonVisibility() => NavigationManager.NavigateTo("/admin-button-visibility");
+    private void CharityInfo() => NavigationManager.NavigateTo("/admininfo");
+    private void CommunityInfo() => NavigationManager.NavigateTo("/admin-community");
+    private void CommunityCount() => NavigationManager.NavigateTo("/admin-communitycount");
+    private void SpecialInfo() => NavigationManager.NavigateTo("/admin-specialinfo");
+    private void SpecialCount() => NavigationManager.NavigateTo("/admin-specialcount");
 }
+}
+
 <style>
     .admin-container {
         padding: 20px;
         background-color: #f9f9f9;
-        border-radius: 5px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        max-width: 800px;
+        margin: auto;
+    }
+
+    .admin-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    .admin-section {
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background: #fff;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
 
-    .admin-actions {
-        margin-top: 20px;
-    }
+        .admin-section h4 {
+            margin-bottom: 15px;
+            color: #333;
+        }
 
     .action-button {
-        margin-right: 10px;
-        padding: 10px 20px;
-        background-color: #4CAF50;
+        display: block;
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        background-color: #007bff;
         color: white;
         border: none;
         border-radius: 5px;
+        text-align: center;
         cursor: pointer;
+        transition: background-color 0.3s ease;
     }
 
         .action-button:hover {
-            background-color: #45a049;
+            background-color: #0056b3;
         }
+
+        .action-button:focus {
+            outline: none;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+        }
+
+    /* För att säkerställa att alla sektioner har jämna höjder */
+    .admin-section button:last-child {
+        margin-bottom: 0;
+    }
 </style>

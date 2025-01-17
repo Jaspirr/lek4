@@ -7,7 +7,9 @@
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
 @inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
 
+<button @onclick="NavigateBack">← Back</button>
 <div class="admin-management">
     <div class="admin-header">
         <h3>Manage Admins</h3>
@@ -39,7 +41,10 @@
     private string newAdminEmail = string.Empty;
     private string storageUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/admins%2Falladmins.json?alt=media";
     private string uploadUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/admins%2Falladmins.json";
-
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
     protected override async Task OnInitializedAsync()
     {
         await LoadAdminList();

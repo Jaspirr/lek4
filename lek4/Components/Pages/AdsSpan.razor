@@ -3,9 +3,12 @@
 @inject HttpClient HttpClient
 @using System.Text.Json
 @using System.Text
+@inject NavigationManager NavigationManager
+
 
 <div class="config-container">
     <h2>Update Ad Trigger Points</h2>
+    <button @onclick="NavigateBack">← Back</button>
 
     <div class="preset-selector">
         <label for="presetDropdown">Choose a preset:</label>
@@ -45,7 +48,10 @@
 
         selectedTriggerPoints = triggerPresets[selectedPreset];
     }
-
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
     private async Task ApplyConfiguration()
     {
         // Create JSON structure

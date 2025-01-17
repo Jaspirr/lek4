@@ -1,0 +1,180 @@
+﻿@page "/admininfo"
+@using lek4.Components.Service
+@inject InfoConfigService InfoConfigService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject NavigationManager NavigationManager
+
+<button @onclick="NavigateBack">← Back</button>
+
+<div class="admin-container">
+    <h2>Admin - Update Information</h2>
+
+    <div class="form-section">
+        <h3>Charity Information</h3>
+        <form class="form">
+            <div class="form-group">
+                <label for="charityName">Charity Name:</label>
+                <input id="charityName" type="text" @bind="infoConfig.Charity.CharityName" />
+            </div>
+
+            <div class="form-group">
+                <label for="charityDescription">Description:</label>
+                <textarea id="charityDescription" @bind="infoConfig.Charity.Description"></textarea>
+            </div>
+        </form>
+    </div>
+
+    <div class="form-section">
+        <h3>Organization Information</h3>
+        <form class="form">
+            <div class="form-group">
+                <label for="organizationName">Organization Name:</label>
+                <input id="organizationName" type="text" @bind="infoConfig.Organization.OrganizationName" />
+            </div>
+
+            <div class="form-group">
+                <label for="mission">Mission:</label>
+                <textarea id="mission" @bind="infoConfig.Organization.Mission"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="focus">Focus:</label>
+                <textarea id="focus" @bind="infoConfig.Organization.Focus"></textarea>
+            </div>
+        </form>
+    </div>
+
+    <div class="button-container">
+        <button class="btn btn-save" @onclick="SaveInfoConfig">Save Information</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert">@message</div>
+    }
+</div>
+
+@code {
+    private InfoConfig infoConfig = new InfoConfig();
+    private string message = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        infoConfig = await InfoConfigService.GetInfoConfig();
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task SaveInfoConfig()
+    {
+        var success = await InfoConfigService.UpdateInfoConfig(infoConfig);
+        message = success ? "Information updated successfully!" : "Failed to update information.";
+    }
+}
+<style>
+    .admin-container {
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        background: #f9f9f9;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+        text-align: center;
+        font-size: 2rem;
+        color: #4CAF50;
+        margin-bottom: 20px;
+    }
+
+    .form-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+        .form-section h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+
+    .form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    label {
+        font-size: 1rem;
+        font-weight: bold;
+        color: #333;
+    }
+
+    input, textarea {
+        padding: 10px;
+        font-size: 1rem;
+        border: 2px solid #ccc;
+        border-radius: 5px;
+        background: #f9f9f9;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+        }
+
+    .button-container {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .btn {
+        display: inline-block;
+        padding: 12px 20px;
+        font-size: 1rem;
+        font-weight: bold;
+        color: #fff;
+        background: #4CAF50;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+        .btn:hover {
+            background: #45A049;
+        }
+
+    .alert {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 5px;
+        background: #dff0d8;
+        color: #3c763d;
+        border: 1px solid #d6e9c6;
+        text-align: center;
+    }
+</style>

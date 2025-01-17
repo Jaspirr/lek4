@@ -2,9 +2,11 @@
 @using System.Text.Json
 @using System.Text
 @inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
 
-<h3>Admin Prizes</h3>
-
+<h3>Admin Prizes Management</h3>
+<!-- Back Button -->
+<button class="back-button" @onclick="NavigateBack">← Back</button>
 <div class="admin-container">
     @if (allWinnersGroupedByFile == null)
     {
@@ -12,30 +14,28 @@
     }
     else if (!allWinnersGroupedByFile.Any())
     {
-        <p>No winners found.</p>
+        <p class="no-data-message">No winners found.</p>
     }
     else
     {
         @foreach (var group in allWinnersGroupedByFile)
         {
-            <div class="section">
-                <h4>Draw: @GetDrawName(group.Key)</h4>
-                <ul>
-                    @if (group.Value.Any(w => w.Prize == "Credits"))
+            <div class="winner-card">
+                <h4>@GetDrawName(group.Key)</h4>
+                <p class="total-credits">
+                    🎉 <strong>Total Credits Awarded:</strong> @group.Value.Count(w => w.Prize == "Credits")
+                </p>
+
+                <div class="winner-list">
+                    <h5>Individual Winners</h5>
+                    @foreach (var winner in group.Value)
                     {
-                        <li>
-                            <strong>Prize:</strong> Credits<br />
-                            <strong>Total:</strong> @group.Value.Count(w => w.Prize == "Credits")
-                        </li>
+                        <div class="winner-item">
+                            <p><strong>Email:</strong> @winner.UserEmail</p>
+                            <p><strong>Prize:</strong> @winner.Prize</p>
+                        </div>
                     }
-                    @foreach (var winner in group.Value.Where(w => w.Prize != "Credits"))
-                    {
-                        <li>
-                            <strong>Email:</strong> @winner.UserEmail<br />
-                            <strong>Prize:</strong> @winner.Prize
-                        </li>
-                    }
-                </ul>
+                </div>
             </div>
         }
     }
@@ -54,9 +54,7 @@
         try
         {
             allWinnersGroupedByFile = new Dictionary<string, List<Winner>>();
-
-            // Firebase folder listing is not directly supported; manually list file names
-            var fileNames = new List<string> { "ClaimPrize_1.json", "ClaimPrize_2.json" }; // Add all known file names here
+            var fileNames = await GetAllFileNames();
 
             foreach (var fileName in fileNames)
             {
@@ -69,6 +67,43 @@
         }
     }
 
+    private async Task<List<string>> GetAllFileNames()
+    {
+        var fileNames = new List<string>();
+
+        try
+        {
+            var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o?prefix=users%2FSavedInfo%2F&alt=media");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var filesData = JsonSerializer.Deserialize<JsonElement>(json);
+
+                if (filesData.TryGetProperty("items", out var items))
+                {
+                    foreach (var item in items.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("name", out var fileName))
+                        {
+                            var filePath = fileName.GetString();
+                            if (!string.IsNullOrEmpty(filePath) && filePath.Contains("ClaimPrize"))
+                            {
+                                fileNames.Add(filePath.Split('/').Last());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching file names: {ex.Message}");
+        }
+
+        return fileNames;
+    }
+
     private async Task FetchWinnersFromFile(string fileName)
     {
         try
@@ -78,37 +113,19 @@
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                try
+                var winnersDict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, bool>>>(json);
+
+                if (winnersDict != null)
                 {
-                    var winnersDict = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, bool>>>(json);
-
-                    if (winnersDict != null)
-                    {
-                        var winnersFromFile = new List<Winner>();
-
-                        foreach (var entry in winnersDict)
-                        {
-                            foreach (var prize in entry.Value)
+                    var winnersFromFile = winnersDict
+                        .SelectMany(entry => entry.Value.Select(prize => new Winner
                             {
-                                winnersFromFile.Add(new Winner
-                                    {
-                                        UserEmail = entry.Key,
-                                        Prize = prize.Key
-                                    });
-                            }
-                        }
+                                UserEmail = entry.Key,
+                                Prize = prize.Key
+                            })).ToList();
 
-                        allWinnersGroupedByFile[fileName] = winnersFromFile;
-                    }
+                    allWinnersGroupedByFile[fileName] = winnersFromFile;
                 }
-                catch (JsonException jsonEx)
-                {
-                    Console.WriteLine($"JSON parsing error in file {fileName}: {jsonEx.Message}");
-                }
-            }
-            else
-            {
-                Console.WriteLine($"Failed to fetch data from file: {fileName}");
             }
         }
         catch (Exception ex)
@@ -119,8 +136,14 @@
 
     private string GetDrawName(string fileName)
     {
-        var drawNumber = fileName.Split('_').Last().Split('.').FirstOrDefault();
-        return string.IsNullOrEmpty(drawNumber) ? "Unknown Draw" : $"Draw {drawNumber}";
+        var timestampPart = fileName.Split('_').Last().Split('.').FirstOrDefault();
+
+        if (!string.IsNullOrEmpty(timestampPart) && DateTime.TryParseExact(timestampPart, "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out var drawDate))
+        {
+            return $"{drawDate:yyyy-MM-dd HH:mm:ss}";
+        }
+
+        return "Unknown Draw";
     }
 
     public class Winner
@@ -128,18 +151,85 @@
         public string UserEmail { get; set; }
         public string Prize { get; set; }
     }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
 }
 
 <style>
+    /* Container and Layout */
     .admin-container {
         margin: 20px;
         padding: 20px;
-        background-color: #f9f9f9;
-        border-radius: 5px;
+        background: #f5f5f5;
+        border-radius: 10px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
 
-    .section {
-        margin-bottom: 20px;
+    .no-data-message {
+        text-align: center;
+        color: #dc3545;
+        font-size: 18px;
+        font-weight: bold;
     }
+
+    /* Winner Card Style */
+    .winner-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        border-left: 5px solid #4CAF50;
+    }
+
+        .winner-card h4 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+    .total-credits {
+        color: #28a745;
+        font-weight: bold;
+        font-size: 18px;
+    }
+
+    /* Winner List Styling */
+    .winner-list {
+        margin-top: 15px;
+        border-top: 1px solid #ddd;
+        padding-top: 15px;
+    }
+
+    .winner-item {
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+
+        .winner-item:last-child {
+            border-bottom: none;
+        }
+
+        .winner-item p {
+            margin: 5px 0;
+        }
+
+    /* Button Styling */
+    .action-button {
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+        .action-button:hover {
+            background: #0056b3;
+        }
 </style>

@@ -1,0 +1,193 @@
+﻿@page "/admin-community"
+@using lek4.Components.Service
+@inject CommunityService CommunityService
+@inject NavigationManager NavigationManager
+
+<div class="admin-container">
+    <div class="header-section">
+        <button class="back-button" @onclick="NavigateBack">← Back</button>
+        <h1>Community Admin</h1>
+    </div>
+
+    <div class="form-container">
+        <div class="form-group">
+            <label for="communityName">Community Name:</label>
+            <input id="communityName" type="text" @bind="communityInfo.Name" class="styled-input" />
+        </div>
+
+        <div class="form-group">
+            <label for="communityCredits">Credits:</label>
+            <input id="communityCredits" type="number" @bind="communityInfo.Credits" class="styled-input" />
+        </div>
+
+        <div class="form-group">
+            <label for="communityDescription">Description:</label>
+            <textarea id="communityDescription" @bind="communityInfo.Description" class="styled-textarea"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="communityDuration">Duration (days):</label>
+            <input id="communityDuration" type="number" @bind="communityInfo.Duration" class="styled-input" />
+        </div>
+
+        <div class="form-group">
+            <label for="communityCode">Code:</label>
+            <input id="communityCode" type="text" @bind="communityInfo.Code" class="styled-input" />
+        </div>
+
+        <div class="form-group">
+            <label for="communityLink">Link:</label>
+            <input id="communityLink" type="text" @bind="communityInfo.Link" class="styled-input" />
+        </div>
+
+        <div class="form-group">
+            <label for="communityImageUrl">Image URL:</label>
+            <input id="communityImageUrl" type="text" @bind="communityInfo.ImageUrl" class="styled-input" />
+        </div>
+
+        <button class="save-button" @onclick="SaveCommunityInfo">Save Changes</button>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert-message">@message</div>
+        }
+    </div>
+</div>
+
+@code {
+    private CommunityInfo communityInfo = new CommunityInfo();
+    private string message = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            communityInfo = await CommunityService.GetCommunityInfo();
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading data: {ex.Message}";
+        }
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
+    private async Task SaveCommunityInfo()
+    {
+        try
+        {
+            bool success = await CommunityService.SaveCommunityInfo(communityInfo);
+            message = success ? "Community info updated successfully!" : "Failed to update community info.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error saving data: {ex.Message}";
+        }
+    }
+}
+<style>
+    .admin-container {
+        max-width: 600px;
+        margin: 30px auto;
+        padding: 20px;
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        font-family: Arial, sans-serif;
+    }
+
+    .header-section {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+
+    h1 {
+        font-size: 1.8rem;
+        color: #4CAF50;
+    }
+
+    .back-button {
+        padding: 8px 15px;
+        font-size: 1rem;
+        background: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+        .back-button:hover {
+            background: #e0e0e0;
+        }
+
+    .form-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    label {
+        font-size: 1rem;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .styled-input,
+    .styled-textarea {
+        padding: 10px;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+        .styled-input:focus,
+        .styled-textarea:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+            outline: none;
+        }
+
+    .styled-textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .save-button {
+        padding: 12px 20px;
+        font-size: 1rem;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+        font-weight: bold;
+    }
+
+        .save-button:hover {
+            background: #45A049;
+        }
+
+    .alert-message {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 5px;
+        background: #f8d7da;
+        color: #721c24;
+        font-size: 0.9rem;
+        border: 1px solid #f5c6cb;
+        text-align: center;
+    }
+</style>

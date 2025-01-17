@@ -1,7 +1,16 @@
 ﻿@page "/break-and-time"
+@inject NavigationManager NavigationManager
 
 <h3>Break and Time Page</h3>
 <p>Here you can manage break and time tracking functionalities.</p>
+<button @onclick="NavigateBack">← Back</button>
+
+@code {
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+}
 
 <style>
     /* Lägg till relevant CSS för sidan här */
