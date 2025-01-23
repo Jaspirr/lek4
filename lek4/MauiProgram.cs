@@ -69,6 +69,7 @@ namespace lek4
             builder.Services.AddScoped<BoostFriendService>();
             builder.Services.AddScoped<CommunityService>();
             builder.Services.AddScoped<SpecialService>();
+            builder.Services.AddScoped<WinnerCleanupService>();
 
             builder.Services.AddSingleton(AudioManager.Current);
             builder.Services.AddTransient<MainPage>();
@@ -88,6 +89,7 @@ namespace lek4
             }));
 
             
+
             return builder.Build();
         }
     }

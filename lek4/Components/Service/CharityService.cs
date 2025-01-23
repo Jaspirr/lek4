@@ -118,5 +118,47 @@ namespace lek4.Components.Service
             }
             return false;
         }
+        public async Task ResetContributions(string contributionType)
+        {
+            string url = contributionType == "Charity" ? CharityFirebaseUrl : OrganizationFirebaseUrl;
+
+            try
+            {
+                // Fetch the current contributions
+                var response = await _httpClient.GetAsync($"{url}?alt=media");
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonResponse = await response.Content.ReadAsStringAsync();
+                    var contributions = JsonSerializer.Deserialize<Dictionary<string, ContributionData>>(jsonResponse)
+                                        ?? new Dictionary<string, ContributionData>();
+
+                    // Reset ContributionCount to 0 for all users
+                    foreach (var key in contributions.Keys.ToList())
+                    {
+                        contributions[key].ContributionCount = 0;
+                    }
+
+                    // Save the updated contributions back to Firebase
+                    var jsonData = JsonSerializer.Serialize(contributions, new JsonSerializerOptions { WriteIndented = true });
+                    var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+                    var saveResponse = await _httpClient.PostAsync(url, content);
+
+                    if (!saveResponse.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"Failed to reset {contributionType} contributions.");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"No existing data found for {contributionType}, initializing new structure.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error resetting {contributionType} contributions: {ex.Message}");
+                throw;
+            }
+        }
+
     }
 }

@@ -194,28 +194,30 @@ namespace lek4.Components.Service
         }
         public async Task RemoveProductFromFirebase(int productNumber)
         {
-            // Define the path to the product file
-            var productInfoPath = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users/products/product{productNumber}/productInfo.json";
-            // JSON content marking the product as removed
-            var removedContent = new StringContent("{\"removed\": true}", Encoding.UTF8, "application/json");
+            // Kodera filens väg korrekt
+            var filePath = $"users/products/product{productNumber}/productInfo.json";
+            var encodedFilePath = System.Web.HttpUtility.UrlEncode(filePath);
+
+            // Definiera Firebase API-vägen
+            var firebaseDeleteUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/{encodedFilePath}";
 
             try
             {
-                // Send PATCH request to update the file with removed metadata/content
-                var response = await _httpClient.PatchAsync(productInfoPath, removedContent);
+                // Skicka DELETE-förfrågan
+                var response = await _httpClient.DeleteAsync(firebaseDeleteUrl);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine($"Product {productNumber} marked as removed in Firebase.");
+                    Console.WriteLine($"Product {productNumber} removed successfully from Firebase.");
                 }
                 else
                 {
-                    Console.WriteLine($"Failed to mark product {productNumber} as removed. Status code: {response.StatusCode}");
+                    Console.WriteLine($"Failed to remove product {productNumber}. Status code: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception occurred while trying to mark product {productNumber} as removed: {ex.Message}");
+                Console.WriteLine($"Exception occurred while trying to remove product {productNumber}: {ex.Message}");
             }
         }
 

@@ -1,0 +1,472 @@
+﻿@page "/admin-winners"
+@using System.Text.Json
+@using System.Text
+@inject HttpClient HttpClient
+@inject IJSRuntime JSRuntime
+
+<h1 class="page-title">Admin - Winners Management</h1>
+
+<div class="admin-container">
+    <p>Manage and save all winners' information into the SavedInfo folder.</p>
+
+    <!-- Buttons Section -->
+    <div class="button-group">
+        <button class="action-button fetch-save-button" @onclick="FetchAndSaveWinners">Fetch and Save All Winners</button>
+        <button class="action-button delete-all-button" @onclick="DeleteAllProductFiles">Delete All Saved Files</button>
+    </div>
+
+    <!-- Jackpot Winners Section -->
+    <div class="info-section">
+        <h3 class="section-title">Saved Jackpot Winners</h3>
+        @if (savedJackpotWinners.Any())
+        {
+            <ul>
+                @foreach (var winner in savedJackpotWinners)
+                {
+                    <li>
+                        <div class="winner-info">
+                            <p><strong>Winner:</strong> @winner.Winner</p>
+                            <p><strong>Draw Date:</strong> @winner.DrawDate</p>
+                            <p><strong>Jackpot Amount:</strong> @winner.JackpotAmount</p>
+                            <p><strong>Email:</strong> @winner.WinningTicket.UserEmail</p>
+                            <p><strong>Number:</strong> @winner.WinningTicket.Number</p>
+                            <p><strong>Color:</strong> @winner.WinningTicket.Color</p>
+                            <p><strong>Symbol:</strong> @winner.WinningTicket.Symbol</p>
+                            <p><strong>Chinese Symbol:</strong> @winner.WinningTicket.ChineseSymbol</p>
+                            <p><strong>Planet:</strong> @winner.WinningTicket.Planet</p>
+                            <p><strong>Element:</strong> @winner.WinningTicket.Element</p>
+                        </div>
+                        <button class="delete-button" @onclick="() => DeleteJackpotFile(winner.FileName)">Delete</button>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p>No jackpot winners saved yet.</p>
+        }
+    </div>
+
+    <!-- Product Winners Section -->
+    <div class="info-section">
+        <h3 class="section-title">Saved Product Winners</h3>
+        @if (savedProductWinners.Any())
+        {
+            <ul>
+                @foreach (var winner in savedProductWinners)
+                {
+                    <li>
+                        <div class="winner-info">
+                            <p><strong>Winner:</strong> @winner.Winner</p>
+                            <p><strong>Timestamp:</strong> @winner.Timestamp</p>
+                            <p><strong>Price:</strong> @winner.Price</p>
+                        </div>
+                        <button class="delete-button" @onclick="() => DeleteProductFile(winner.FileName)">Delete</button>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p>No product winners saved yet.</p>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert">@message</div>
+    }
+</div>
+
+@code {
+    private List<JackpotWinnerInfo> savedJackpotWinners = new List<JackpotWinnerInfo>();
+    private List<ProductWinnerInfo> savedProductWinners = new List<ProductWinnerInfo>();
+    private string message = string.Empty;
+
+    private const string WinnerBaseUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner%2F";
+    private const string SavedInfoBaseUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2F";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSavedWinners();
+    }
+
+    private async Task LoadSavedWinners()
+    {
+        try
+        {
+            savedJackpotWinners.Clear();
+            savedProductWinners.Clear();
+
+            var indexResponse = await HttpClient.GetAsync($"{SavedInfoBaseUrl}SavedInfo_Index.json?alt=media");
+
+            if (indexResponse.IsSuccessStatusCode)
+            {
+                var jsonResponse = await indexResponse.Content.ReadAsStringAsync();
+                var fileNames = JsonSerializer.Deserialize<List<string>>(jsonResponse) ?? new List<string>();
+
+                foreach (var fileName in fileNames)
+                {
+                    var fileResponse = await HttpClient.GetAsync($"{SavedInfoBaseUrl}{fileName}?alt=media");
+                    if (fileResponse.IsSuccessStatusCode)
+                    {
+                        var fileContent = await fileResponse.Content.ReadAsStringAsync();
+
+                        if (fileName.Contains("Jackpot"))
+                        {
+                            var jackpotWinner = JsonSerializer.Deserialize<JackpotWinnerInfo>(fileContent);
+                            if (jackpotWinner != null)
+                            {
+                                jackpotWinner.FileName = fileName;
+                                savedJackpotWinners.Add(jackpotWinner);
+                            }
+                        }
+                        else if (fileName.Contains("Product"))
+                        {
+                            var productWinner = JsonSerializer.Deserialize<ProductWinnerInfo>(fileContent);
+                            if (productWinner != null)
+                            {
+                                productWinner.FileName = fileName;
+                                savedProductWinners.Add(productWinner);
+                            }
+                        }
+                    }
+                }
+
+                message = "Saved winners loaded successfully.";
+            }
+            else
+            {
+                message = "No saved winners found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading saved winners: {ex.Message}";
+        }
+    }
+
+    public async Task FetchAndSaveWinners()
+    {
+        try
+        {
+            var index = await GetExistingIndex();
+
+            for (int i = 1; i <= 10; i++)
+            {
+                var winnerFileUrl = $"{WinnerBaseUrl}product{i}%2Fwinner.json?alt=media";
+                var response = await HttpClient.GetAsync(winnerFileUrl);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                    if (jsonResponse.Contains("\"WinningTicket\""))
+                    {
+                        var jackpotWinner = JsonSerializer.Deserialize<JackpotWinnerInfo>(jsonResponse);
+                        if (jackpotWinner != null)
+                        {
+                            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                            jackpotWinner.FileName = $"Jackpot_Product{i}_{timestamp}.json";
+
+                            var content = new StringContent(JsonSerializer.Serialize(jackpotWinner), Encoding.UTF8, "application/json");
+                            await HttpClient.PostAsync($"{SavedInfoBaseUrl}{jackpotWinner.FileName}", content);
+
+                            savedJackpotWinners.Add(jackpotWinner);
+                            if (!index.Contains(jackpotWinner.FileName))
+                                index.Add(jackpotWinner.FileName);
+                        }
+                    }
+                    else
+                    {
+                        var productWinner = JsonSerializer.Deserialize<ProductWinnerInfo>(jsonResponse);
+                        if (productWinner != null)
+                        {
+                            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                            productWinner.FileName = $"Product_Product{i}_{timestamp}.json";
+
+                            var content = new StringContent(JsonSerializer.Serialize(productWinner), Encoding.UTF8, "application/json");
+                            await HttpClient.PostAsync($"{SavedInfoBaseUrl}{productWinner.FileName}", content);
+
+                            savedProductWinners.Add(productWinner);
+                            if (!index.Contains(productWinner.FileName))
+                                index.Add(productWinner.FileName);
+                        }
+                    }
+                }
+            }
+
+            await UpdateIndexFile(index);
+
+            message = "Winners have been fetched and saved successfully!";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error fetching winners: {ex.Message}";
+        }
+    }
+
+    private async Task<List<string>> GetExistingIndex()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync($"{SavedInfoBaseUrl}SavedInfo_Index.json?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<List<string>>(jsonResponse) ?? new List<string>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching existing index: {ex.Message}");
+        }
+        return new List<string>();
+    }
+
+    private async Task DeleteAllJackpotFiles()
+    {
+        if (await ConfirmDelete("Are you sure you want to delete all jackpot files?"))
+        {
+            try
+            {
+                var index = await GetExistingIndex();
+                var jackpotFiles = index.Where(file => file.Contains("Jackpot")).ToList();
+
+                foreach (var file in jackpotFiles)
+                {
+                    var deleteUrl = $"{SavedInfoBaseUrl}{file}";
+                    var response = await HttpClient.DeleteAsync(deleteUrl);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        savedJackpotWinners.RemoveAll(w => w.FileName == file);
+                        index.Remove(file);
+                    }
+                }
+
+                await UpdateIndexFile(index);
+                message = "All jackpot files have been deleted.";
+            }
+            catch (Exception ex)
+            {
+                message = $"Error deleting jackpot files: {ex.Message}";
+            }
+        }
+    }
+    private async Task DeleteJackpotFile(string fileName)
+    {
+        if (await ConfirmDelete($"Are you sure you want to delete {fileName}?"))
+        {
+            try
+            {
+                var deleteUrl = $"{SavedInfoBaseUrl}{fileName}";
+                var response = await HttpClient.DeleteAsync(deleteUrl);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    savedJackpotWinners.RemoveAll(w => w.FileName == fileName);
+
+                    var indexResponse = await HttpClient.GetAsync($"{SavedInfoBaseUrl}SavedInfo_Index.json?alt=media");
+                    if (indexResponse.IsSuccessStatusCode)
+                    {
+                        var indexJson = await indexResponse.Content.ReadAsStringAsync();
+                        var indexList = JsonSerializer.Deserialize<List<string>>(indexJson) ?? new List<string>();
+
+                        indexList.Remove(fileName);
+                        await UpdateIndexFile(indexList);
+                    }
+
+                    message = $"Successfully deleted {fileName}.";
+                }
+                else
+                {
+                    message = $"Failed to delete {fileName}.";
+                }
+            }
+            catch (Exception ex)
+            {
+                message = $"Error deleting file: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task DeleteProductFile(string fileName)
+    {
+        if (await ConfirmDelete($"Are you sure you want to delete {fileName}?"))
+        {
+            try
+            {
+                var deleteUrl = $"{SavedInfoBaseUrl}{fileName}";
+                var response = await HttpClient.DeleteAsync(deleteUrl);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    savedProductWinners.RemoveAll(w => w.FileName == fileName);
+
+                    var indexResponse = await HttpClient.GetAsync($"{SavedInfoBaseUrl}SavedInfo_Index.json?alt=media");
+                    if (indexResponse.IsSuccessStatusCode)
+                    {
+                        var indexJson = await indexResponse.Content.ReadAsStringAsync();
+                        var indexList = JsonSerializer.Deserialize<List<string>>(indexJson) ?? new List<string>();
+
+                        indexList.Remove(fileName);
+                        await UpdateIndexFile(indexList);
+                    }
+
+                    message = $"Successfully deleted {fileName}.";
+                }
+                else
+                {
+                    message = $"Failed to delete {fileName}.";
+                }
+            }
+            catch (Exception ex)
+            {
+                message = $"Error deleting file: {ex.Message}";
+            }
+        }
+    }
+    private async Task DeleteAllProductFiles()
+    {
+        if (await ConfirmDelete("Are you sure you want to delete all files?"))
+        {
+            try
+            {
+                var index = await GetExistingIndex();
+                var productFiles = index.Where(file => file.Contains("Product")).ToList();
+
+                foreach (var file in productFiles)
+                {
+                    var deleteUrl = $"{SavedInfoBaseUrl}{file}";
+                    var response = await HttpClient.DeleteAsync(deleteUrl);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        savedProductWinners.RemoveAll(w => w.FileName == file);
+                        index.Remove(file);
+                    }
+                }
+
+                await UpdateIndexFile(index);
+                message = "All product files have been deleted.";
+            }
+            catch (Exception ex)
+            {
+                message = $"Error deleting product files: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task UpdateIndexFile(List<string> updatedIndex)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(updatedIndex), Encoding.UTF8, "application/json");
+        await HttpClient.PostAsync($"{SavedInfoBaseUrl}SavedInfo_Index.json", content);
+    }
+
+    private async Task<bool> ConfirmDelete(string message)
+    {
+        return await JSRuntime.InvokeAsync<bool>("confirm", message);
+    }
+
+    public class JackpotWinnerInfo
+    {
+        public string Winner { get; set; }
+        public string DrawDate { get; set; }
+        public int JackpotAmount { get; set; }
+        public WinningTicketInfo WinningTicket { get; set; } = new WinningTicketInfo();
+        public string FileName { get; set; }
+
+        public class WinningTicketInfo
+        {
+            public string UserEmail { get; set; }
+            public string Number { get; set; }
+            public string Color { get; set; }
+            public string Symbol { get; set; }
+            public string ChineseSymbol { get; set; }
+            public string Planet { get; set; }
+            public string Element { get; set; }
+        }
+    }
+
+    public class ProductWinnerInfo
+    {
+        public string Winner { get; set; }
+        public string Timestamp { get; set; }
+        public int Price { get; set; }
+        public string FileName { get; set; }
+    }
+}
+
+<style>
+    .admin-container {
+        max-width: 800px;
+        margin: auto;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .button-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .action-button {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        color: white;
+    }
+
+    .fetch-save-button {
+        background-color: #4caf50;
+    }
+
+    .delete-all-button {
+        background-color: #f44336;
+    }
+
+    .delete-button {
+        background-color: #e53935;
+        color: white;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .info-section {
+        margin-top: 20px;
+    }
+
+    .section-title {
+        color: #333;
+    }
+
+    .info-section ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .info-section li {
+        background: #fff;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .alert {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f8d7da;
+        color: #721c24;
+        border-radius: 5px;
+    }
+</style>

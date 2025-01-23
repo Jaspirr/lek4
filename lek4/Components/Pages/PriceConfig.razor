@@ -4,8 +4,6 @@
 @using System.Text
 @using System.Net.Http.Headers
 @using System.Text.Json
-@inject NavigationManager NavigationManager
-
 
 @code {
     private List<OutcomeConfiguration> OutcomeConfigurations = new List<OutcomeConfiguration>();
@@ -95,15 +93,9 @@
         public string CompanyName { get; set; } // For GiftCard
         public string ProductName { get; set; } // For Product
     }
-    private void NavigateBack()
-    {
-        NavigationManager.NavigateTo("/admin");
-    }
-
 }
 
 <h3>Configure Outcome Prizes</h3>
-<button class="back-button" @onclick="NavigateBack">← Back</button>
 
 <div class="config-container">
     <h2 class="config-title">Configure Outcome Prizes</h2>
@@ -183,6 +175,50 @@
             <button type="button" class="save-config-btn" @onclick="SaveConfigurationsToFirebase">Save Configuration</button>
         </div>
     </form>
+    <h2 class="config-title">Saved Outcome Configurations</h2>
+    <div class="saved-configurations">
+        @if (OutcomeConfigurations.Any())
+        {
+            <table class="config-table">
+                <thead>
+                    <tr>
+                        <th>Correct Answers</th>
+                        <th>Message</th>
+                        <th>Prize Type</th>
+                        <th>Prize Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var config in OutcomeConfigurations)
+                    {
+                        <tr>
+                            <td>@config.CorrectAnswersRequired</td>
+                            <td>@config.Message</td>
+                            <td>@config.PrizeType</td>
+                            <td>
+                                @if (config.PrizeType == "GiftCard")
+                                {
+                                    @($"{config.CompanyName} - {config.PrizeValue} Credits")
+                                }
+                                else if (config.PrizeType == "Product")
+                                {
+                                    @($"{config.ProductName} - {config.PrizeValue}")
+                                }
+                                else
+                                {
+                                    @config.PrizeValue
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No configurations available.</p>
+        }
+    </div>
 
     <!-- Section for deleting a configuration -->
     <h2 class="config-title">Delete Outcome Configuration</h2>
@@ -258,4 +294,24 @@
         .delete-config-btn:hover {
             background-color: #c82333;
         }
+
+    .config-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+
+        .config-table th,
+        .config-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .config-table th {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+
 </style>

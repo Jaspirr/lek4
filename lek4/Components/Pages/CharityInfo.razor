@@ -1,10 +1,10 @@
 ﻿@page "/admininfo"
 @using lek4.Components.Service
 @inject InfoConfigService InfoConfigService
-@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject CharityService CharityService
 @inject NavigationManager NavigationManager
 
-<button @onclick="NavigateBack">← Back</button>
+<button class="back-button" @onclick="NavigateBack">← Back</button>
 
 <div class="admin-container">
     <h2>Admin - Update Information</h2>
@@ -46,6 +46,7 @@
 
     <div class="button-container">
         <button class="btn btn-save" @onclick="SaveInfoConfig">Save Information</button>
+        <button class="btn btn-delete" @onclick="ResetContributions">Reset Contributions</button>
     </div>
 
     @if (!string.IsNullOrEmpty(message))
@@ -62,16 +63,37 @@
     {
         infoConfig = await InfoConfigService.GetInfoConfig();
     }
+
     private void NavigateBack()
     {
         NavigationManager.NavigateTo("/admin");
     }
+
     private async Task SaveInfoConfig()
     {
         var success = await InfoConfigService.UpdateInfoConfig(infoConfig);
         message = success ? "Information updated successfully!" : "Failed to update information.";
     }
+
+    private async Task ResetContributions()
+    {
+        try
+        {
+            // Reset charity contributions
+            await CharityService.ResetContributions("Charity");
+
+            // Reset organization contributions
+            await CharityService.ResetContributions("Organization");
+
+            message = "Contributions have been reset successfully!";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error resetting contributions: {ex.Message}";
+        }
+    }
 }
+
 <style>
     .admin-container {
         max-width: 800px;

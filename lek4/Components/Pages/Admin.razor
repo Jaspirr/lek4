@@ -11,53 +11,59 @@
     <!-- Grid Layout for buttons -->
     <div class="admin-actions-grid">
         <!-- Section 1: User Management -->
-        <div class="admin-section">
+        <div class="admin-section user-management">
             <h4>User Management</h4>
-            <button class="action-button" @onclick="ManageAdmins">Manage Admins</button>
-            <button class="action-button" @onclick="SearchUser">Search User</button>
-            <button class="action-button" @onclick="NavigateToManageStreak">Manage User Daily Streak</button>
-            <button class="action-button" @onclick="EditTotalCredits">Edit Total Credits</button>
-            <button class="action-button" @onclick="AddCredits">Add Credits and more to User</button>
+            <button class="action-button user-management-btn" @onclick="ManageAdmins">Manage Admins</button>
+            <button class="action-button user-management-btn" @onclick="SearchUser">Search User</button>
+            <button class="action-button user-management-btn" @onclick="NavigateToManageStreak">Manage User Daily Streak</button>
+            <button class="action-button user-management-btn" @onclick="EditTotalCredits">Edit Total Credits(JackpotPrize)</button>
+            <button class="action-button user-management-btn" @onclick="AddCredits">Add Credits and more to User</button>
         </div>
 
         <!-- Section 2: Draw and Tickets -->
-        <div class="admin-section">
+        <div class="admin-section draw-management">
             <h4>Draw & Ticket Management</h4>
-            <button class="action-button" @onclick="DrawPage">Draw</button>
-            <button class="action-button" @onclick="GenerateTicket">Generate Ticket</button>
-            <button class="action-button" @onclick="ManageTicketCost">Manage Ticket Cost</button>
-            <button class="action-button" @onclick="PrizeAndTicket">Save Prizes and Tickets</button>
+            <button class="action-button draw-management-btn" @onclick="DrawPage">Draw</button>
+            <button class="action-button draw-management-btn" @onclick="GenerateTicket">Generate Ticket</button>
+            <button class="action-button draw-management-btn" @onclick="ManageTicketCost">Manage Ticket Cost</button>
+            
         </div>
-        <div class="admin-section">
+
+        <!-- Section 3: Button Page Management -->
+        <div class="admin-section button-management">
             <h4>Button Page Management</h4>
-            <button class="action-button" @onclick="ButtonVisibility">Button Visibility</button>
-            <button class="action-button" @onclick="CharityInfo">Charity and Organisation info</button>
-            <button class="action-button" @onclick="CommunityInfo">Community info</button>
-            <button class="action-button" @onclick="CommunityCount">Community count</button>
-            <button class="action-button" @onclick="SpecialInfo">Special Info</button>
-            <button class="action-button" @onclick="SpecialCount">Special Count</button>
+            <button class="action-button button-management-btn" @onclick="ButtonVisibility">Button Visibility</button>
+            <button class="action-button button-management-btn" @onclick="CharityInfo">Charity and Organisation info</button>
+            <button class="action-button button-management-btn" @onclick="CommunityInfo">Community info</button>
+            <button class="action-button button-management-btn" @onclick="CommunityCount">Community count</button>
+            <button class="action-button button-management-btn" @onclick="SpecialInfo">Special Info</button>
+            <button class="action-button button-management-btn" @onclick="SpecialCount">Special Count</button>
         </div>
-        <!-- Section 3: Product & Config Management -->
-        <div class="admin-section">
+
+        <!-- Section 4: Product & Config Management -->
+        <div class="admin-section product-management">
             <h4>Product & Config Management</h4>
-            <button class="action-button" @onclick="ChangeProducts">Change Products</button>
-            <button class="action-button" @onclick="JackpotConversion">Manage Jackpot Conversion</button>
-            <button class="action-button" @onclick="PriceConfig">Price Config</button>
+            <button class="action-button product-management-btn" @onclick="ChangeProducts">Change Products</button>
+            <button class="action-button product-management-btn" @onclick="JackpotConversion">Manage Jackpot Conversion(How much in to jackpotprize)</button>
+            <button class="action-button product-management-btn" @onclick="PriceConfig">Price Config(Prices to jackpot)</button>
+            <button class="action-button product-management-btn" @onclick="AdSpan">Manage Ads Span(How many ads?)</button>
         </div>
 
-        <!-- Section 4: Time and Notifications -->
-        <div class="admin-section">
+        <!-- Section 5: Time and Notifications -->
+        <div class="admin-section time-management">
             <h4>Time & Notifications</h4>
-            <button class="action-button" @onclick="BreakAndTime">Break and Time</button>
-            <button class="action-button" @onclick="Notifications">Notifications</button>
-            <button class="action-button" @onclick="NavigateToResetWeeklyOdds">Reset Weekly Odds</button>
+            <button class="action-button time-management-btn" @onclick="BreakAndTime">Break and Time</button>
+            <button class="action-button time-management-btn" @onclick="Notifications">Notifications</button>
+            <button class="action-button time-management-btn" @onclick="NavigateToResetWeeklyOdds">Reset Weekly Odds</button>
         </div>
 
-        <!-- Section 5: Results & Winners -->
-        <div class="admin-section">
+        <!-- Section 6: Results & Winners -->
+        <div class="admin-section results-management">
             <h4>Results & Winners</h4>
-            <button class="action-button" @onclick="ShowWinners">Show Winners</button>
-            <button class="action-button" @onclick="AdSpan">Manage Ads Span</button>
+            <button class="action-button results-management-btn" @onclick="PrizeAndTicket">Save Prizes and Tickets</button>
+            <button class="action-button results-management-btn" @onclick="ShowWinners">Show Winners(Jackpot)</button>
+            <button class="action-button results-management-btn" @onclick="ShowWinnersTickets">Show Winner Ticket Info(Products&Jackpot)</button>
+            <button class="action-button results-management-btn" @onclick="WinnersInfoClean">Winner Info Reset day</button>
         </div>
     </div>
 </div>
@@ -86,10 +92,13 @@
     private void CommunityCount() => NavigationManager.NavigateTo("/admin-communitycount");
     private void SpecialInfo() => NavigationManager.NavigateTo("/admin-specialinfo");
     private void SpecialCount() => NavigationManager.NavigateTo("/admin-specialcount");
+    private void ShowWinnersTickets() => NavigationManager.NavigateTo("/admin-winners");
+    private void WinnersInfoClean() => NavigationManager.NavigateTo("/admin-schedule-cleanup");
 }
 }
 
 <style>
+    /* General Styling */
     .admin-container {
         padding: 20px;
         background-color: #f9f9f9;
@@ -107,42 +116,76 @@
 
     .admin-section {
         padding: 15px;
-        border: 1px solid #ddd;
         border-radius: 10px;
-        background: #fff;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        color: white;
     }
 
-        .admin-section h4 {
-            margin-bottom: 15px;
-            color: #333;
-        }
+    /* Section Colors */
+    .user-management {
+        background: #000000; /* Teal color */
+    }
 
+    .draw-management {
+        background: #42a5f5;
+    }
+
+    .button-management {
+        background: #66bb6a;
+    }
+
+    .product-management {
+        background: #ffa726;
+    }
+
+    .time-management {
+        background: #ab47bc;
+    }
+
+    .results-management {
+        background: #ef5350;
+    }
+
+    /* Button Styling */
     .action-button {
         display: block;
         width: 100%;
         padding: 10px;
         margin-bottom: 10px;
-        background-color: #007bff;
-        color: white;
         border: none;
         border-radius: 5px;
         text-align: center;
         cursor: pointer;
-        transition: background-color 0.3s ease;
+        font-weight: bold;
+        color: white;
+        transition: transform 0.3s ease, background-color 0.3s ease;
     }
 
-        .action-button:hover {
-            background-color: #0056b3;
-        }
+    .user-management-btn {
+        background-color: #333333;
+    }
 
-        .action-button:focus {
-            outline: none;
-            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-        }
+    .draw-management-btn {
+        background-color: #64b5f6;
+    }
 
-    /* För att säkerställa att alla sektioner har jämna höjder */
-    .admin-section button:last-child {
-        margin-bottom: 0;
+    .button-management-btn {
+        background-color: #81c784;
+    }
+
+    .product-management-btn {
+        background-color: #ffb74d;
+    }
+
+    .time-management-btn {
+        background-color: #ce93d8;
+    }
+
+    .results-management-btn {
+        background-color: #ef9a9a;
+    }
+
+    /* Button Hover Effects */
+    .action-button:hover {
+        transform: scale(1.05);
     }
 </style>

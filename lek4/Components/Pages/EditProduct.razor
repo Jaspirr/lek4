@@ -5,6 +5,7 @@
 @inject lek4.Components.Service.ProductService ProductService
 @inject ProductDrawDateService ProductDrawDateService
 
+<button @onclick="NavigateBack">← Back</button>
 <h3>Edit Product @productNumber</h3>
 
 <div class="edit-product-form">
@@ -80,7 +81,10 @@
             NavigationManager.NavigateTo("/change-products");
         }
     }
-
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
     private async Task SaveChanges()
     {
         if (productData != null)
