@@ -26,7 +26,8 @@
             <button class="action-button draw-management-btn" @onclick="DrawPage">Draw</button>
             <button class="action-button draw-management-btn" @onclick="GenerateTicket">Generate Ticket</button>
             <button class="action-button draw-management-btn" @onclick="ManageTicketCost">Manage Ticket Cost</button>
-            
+            <button class="action-button draw-management-btn" @onclick="DrawdateUpdate">Jackpot Drawdate Update(days)</button>
+            <button class="action-button draw-management-btn" @onclick="ClearTickets">Clear & Save Tickets</button>
         </div>
 
         <!-- Section 3: Button Page Management -->
@@ -61,7 +62,7 @@
         <div class="admin-section results-management">
             <h4>Results & Winners</h4>
             <button class="action-button results-management-btn" @onclick="PrizeAndTicket">Save Prizes and Tickets</button>
-            <button class="action-button results-management-btn" @onclick="ShowWinners">Show Winners(Jackpot)</button>
+            <button class="action-button results-management-btn" @onclick="ShowWinners">Show User Winners(Jackpot)</button>
             <button class="action-button results-management-btn" @onclick="ShowWinnersTickets">Show Winner Ticket Info(Products&Jackpot)</button>
             <button class="action-button results-management-btn" @onclick="WinnersInfoClean">Winner Info Reset day</button>
         </div>
@@ -94,7 +95,9 @@
     private void SpecialCount() => NavigationManager.NavigateTo("/admin-specialcount");
     private void ShowWinnersTickets() => NavigationManager.NavigateTo("/admin-winners");
     private void WinnersInfoClean() => NavigationManager.NavigateTo("/admin-schedule-cleanup");
-}
+    private void DrawdateUpdate() => NavigationManager.NavigateTo("/admin-jackpot-config");
+    private void ClearTickets() => NavigationManager.NavigateTo("/admin-clear-tickets");
+
 }
 
 <style>

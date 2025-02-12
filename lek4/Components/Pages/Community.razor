@@ -46,7 +46,7 @@
         </div>
 
         <button class="save-button" @onclick="SaveCommunityInfo">Save Changes</button>
-
+        <button class="clear-button" @onclick="ClearCommunityData">Reset Community</button> <!-- Rensa-knapp -->
         @if (!string.IsNullOrEmpty(message))
         {
             <div class="alert-message">@message</div>
@@ -87,7 +87,23 @@
             message = $"Error saving data: {ex.Message}";
         }
     }
+
+    private async Task ClearCommunityData()
+    {
+        try
+        {
+            await CommunityService.ClearCommunityInfo();
+            await CommunityService.ClearCommunityClaims();
+            communityInfo = await CommunityService.GetCommunityInfo(); // Ladda om defaultvärden
+            message = "Community has been reset successfully!";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error resetting community: {ex.Message}";
+        }
+    }
 }
+
 <style>
     .admin-container {
         max-width: 600px;

@@ -3,7 +3,9 @@
 @using System.Text
 @inject HttpClient HttpClient
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
 
+<button @onclick="NavigateBack">← Back</button>
 <h1 class="page-title">Admin - Schedule Weekly Cleanup</h1>
 
 <div class="admin-container">
@@ -43,7 +45,10 @@
     {
         await LoadCleanupDay();
     }
-
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
     private async Task LoadCleanupDay()
     {
         try

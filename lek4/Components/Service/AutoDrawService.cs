@@ -36,6 +36,9 @@ public class AutoDrawService
         {
             try
             {
+                DateTime currentUtcDate = DateTime.UtcNow.Date;
+                DateTime productDrawUtcDate = product.DrawDate.ToUniversalTime().Date;
+
                 // Kontrollera om produkten är en jackpot
                 if (product.IsJackpot)
                 {
@@ -52,37 +55,33 @@ public class AutoDrawService
                 }
 
                 // Kontrollera om dragningens datum matchar dagens datum
-                if (product.DrawDate.Date == DateTime.UtcNow.Date)
+                if (productDrawUtcDate == currentUtcDate)
                 {
-                    Console.WriteLine($"Product {product.ProductNumber}: Draw is scheduled for today at {product.DrawDate.TimeOfDay}.");
+                    Console.WriteLine($"[INFO] Product {product.ProductNumber}: Draw is scheduled for today at {product.DrawDate.ToUniversalTime().TimeOfDay} UTC.");
                     ScheduleDrawTimerForToday(product);
                 }
-                else
+                else if (productDrawUtcDate < currentUtcDate)
                 {
-                    // Kontrollera om dragningens datum har passerat
-                    if (product.DrawDate.Date < DateTime.UtcNow.Date)
-                    {
-                        Console.WriteLine($"Product {product.ProductNumber}: Draw date {product.DrawDate.Date} has already passed.");
+                    Console.WriteLine($"[WARNING] Product {product.ProductNumber}: Draw date {productDrawUtcDate} has already passed.");
 
-                        if (!await HasDrawBeenPerformedTodayAsync(product.ProductNumber))
-                        {
-                            Console.WriteLine($"No winner has been drawn for product {product.ProductNumber}. Performing draw now.");
-                            await PerformDrawAsync(product);
-                        }
-                        else
-                        {
-                            Console.WriteLine($"Winner already drawn for product {product.ProductNumber}. Skipping.");
-                        }
+                    if (!await HasDrawBeenPerformedTodayAsync(product.ProductNumber))
+                    {
+                        Console.WriteLine($"No winner has been drawn for product {product.ProductNumber}. Performing draw now.");
+                        await PerformDrawAsync(product);
                     }
                     else
                     {
-                        Console.WriteLine($"Product {product.ProductNumber}: Draw date {product.DrawDate.Date} does not match today. Skipping.");
+                        Console.WriteLine($"Winner already drawn for product {product.ProductNumber}. Skipping.");
                     }
+                }
+                else
+                {
+                    Console.WriteLine($"[INFO] Product {product.ProductNumber}: Draw date {productDrawUtcDate} is in the future. Skipping.");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error handling product {product.ProductNumber}: {ex.Message}");
+                Console.WriteLine($"[ERROR] Error handling product {product.ProductNumber}: {ex.Message}");
             }
         }
     }
@@ -93,14 +92,23 @@ public class AutoDrawService
 
         try
         {
-            // Kontrollera om winner.json redan finns
+            // ✅ Kontrollera om dragningen skulle ske idag ELLER om den har missats
+            bool shouldPerformDraw = await IsJackpotDrawDayOrMissedAsync(product);
+
+            if (!shouldPerformDraw)
+            {
+                Console.WriteLine($"[INFO] Product {product.ProductNumber}: Draw is NOT scheduled for today and has not been missed. Skipping jackpot draw.");
+                return;
+            }
+
+            // ✅ Kontrollera om winner.json redan finns
             if (await HasWinnerBeenDeclaredAsync(product.ProductNumber))
             {
                 Console.WriteLine($"Winner already declared for jackpot product {product.ProductNumber}. Skipping draw.");
                 return;
             }
 
-            // Hämta jackpotbiljetter
+            // ✅ Hämta jackpotbiljetter
             var tickets = await _drawJackpotService.GetJackpotTickets();
             if (!tickets.Any())
             {
@@ -108,16 +116,16 @@ public class AutoDrawService
                 return;
             }
 
-            // Generera en slumpmässig vinnande biljett
+            // ✅ Generera en slumpmässig vinnande biljett
             var winningTicket = _drawJackpotService.GenerateRandomTicket();
 
-            // Hitta vinnaren
+            // ✅ Hitta vinnaren
             string winnerEmail = tickets
                 .Where(ticket => _drawJackpotService.IsMatchingTicket(ticket, winningTicket))
                 .Select(ticket => ticket.UserEmail)
                 .FirstOrDefault() ?? "No winner";
 
-            // Spara resultatet i Firebase
+            // ✅ Spara resultatet i Firebase
             await _drawJackpotService.SaveWinnerToFirebase(product.ProductNumber, winnerEmail, DateTime.UtcNow, winningTicket);
 
             Console.WriteLine($"Jackpot draw completed for product {product.ProductNumber}. Winner: {winnerEmail}");
@@ -127,6 +135,49 @@ public class AutoDrawService
             Console.WriteLine($"Error processing jackpot for product {product.ProductNumber}: {ex.Message}");
         }
     }
+
+    private async Task<bool> IsJackpotDrawDayAsync(ProductService.ProductData product)
+    {
+        DateTime currentUtcDate = DateTime.UtcNow.Date;
+        DateTime productDrawUtcDate = product.DrawDate.ToUniversalTime().Date;
+
+        Console.WriteLine($"[DEBUG] Checking jackpot draw date for product {product.ProductNumber}");
+        Console.WriteLine($"[DEBUG] Current UTC Date: {currentUtcDate}");
+        Console.WriteLine($"[DEBUG] Product Draw UTC Date: {productDrawUtcDate}");
+
+        return productDrawUtcDate == currentUtcDate;
+    }
+    private async Task<bool> IsJackpotDrawDayOrMissedAsync(ProductService.ProductData product)
+    {
+        DateTime currentUtcDate = DateTime.UtcNow.Date;
+        DateTime productDrawUtcDate = product.DrawDate.ToUniversalTime().Date;
+
+        Console.WriteLine($"[DEBUG] Checking jackpot draw date for product {product.ProductNumber}");
+        Console.WriteLine($"[DEBUG] Current UTC Date: {currentUtcDate}");
+        Console.WriteLine($"[DEBUG] Product Draw UTC Date: {productDrawUtcDate}");
+
+        if (productDrawUtcDate == currentUtcDate)
+        {
+            Console.WriteLine($"[INFO] Today is the draw date for product {product.ProductNumber}.");
+            return true;
+        }
+
+        // ✅ Om DrawDate har passerat, kolla om vi har missat dragningen
+        if (productDrawUtcDate < currentUtcDate)
+        {
+            bool hasDrawBeenPerformed = await HasDrawBeenPerformedTodayAsync(product.ProductNumber);
+
+            if (!hasDrawBeenPerformed)
+            {
+                Console.WriteLine($"[WARNING] Draw date for product {product.ProductNumber} has PASSED and NO draw has been performed. Running draw now!");
+                return true;
+            }
+        }
+
+        // 🔹 Om dragningen inte är idag eller har missats, returnera false
+        return false;
+    }
+
     private async Task<bool> HasWinnerBeenDeclaredAsync(int productNumber)
     {
         var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fwinner%2Fproduct{productNumber}%2Fwinner.json?alt=media";
@@ -159,13 +210,13 @@ public class AutoDrawService
 
     private void ScheduleDrawTimerForToday(ProductService.ProductData product)
     {
-        // Beräkna tiden kvar till dragningens tidpunkt
-        var currentTime = DateTime.UtcNow;
-        var timeUntilDraw = product.DrawDate - currentTime;
+        var currentUtcTime = DateTime.UtcNow;
+        var drawUtcTime = product.DrawDate.ToUniversalTime();
+        var timeUntilDraw = drawUtcTime - currentUtcTime;
 
         if (timeUntilDraw <= TimeSpan.Zero)
         {
-            Console.WriteLine($"Product {product.ProductNumber}: Draw time has already passed.");
+            Console.WriteLine($"[WARNING] Product {product.ProductNumber}: Draw time has already passed. Skipping timer setup.");
             return;
         }
 
@@ -175,13 +226,9 @@ public class AutoDrawService
         timer.AutoReset = false; // Kör bara en gång
         timer.Start();
 
-        Console.WriteLine($"Timer set for product {product.ProductNumber}: Draw will trigger in {timeUntilDraw.TotalMinutes} minutes.");
+        Console.WriteLine($"[INFO] Timer set for product {product.ProductNumber}: Draw will trigger in {timeUntilDraw.TotalMinutes} minutes UTC.");
 
-        // Lägg till timern i dictionaryn för spårning
         _timers[product.ProductNumber] = timer;
-
-        // Spara timerinfo i Firebase
-        SaveTimerInfoToFirebase(product.ProductNumber, currentTime, product.DrawDate, timeUntilDraw);
     }
 
     private async Task SaveTimerInfoToFirebase(int productNumber, DateTime currentTime, DateTime drawTime, TimeSpan timeUntilDraw)
@@ -335,13 +382,15 @@ public class AutoDrawService
         if (response.IsSuccessStatusCode)
         {
             var jsonResponse = await response.Content.ReadAsStringAsync();
-            var lastDrawDate = JsonSerializer.Deserialize<DateTime>(jsonResponse);
+            var lastDrawDate = JsonSerializer.Deserialize<DateTime>(jsonResponse).ToUniversalTime();
 
-            // Kontrollera om datumet är samma som idag
+            Console.WriteLine($"[INFO] Last draw date for product {productNumber}: {lastDrawDate} UTC.");
+            Console.WriteLine($"[INFO] Current UTC date: {DateTime.UtcNow.Date}");
+
             return lastDrawDate.Date == DateTime.UtcNow.Date;
         }
 
-        // Om ingen data finns, returnera false
+        Console.WriteLine($"[INFO] No previous draw date found for product {productNumber}. Assuming no draw has been performed.");
         return false;
     }
 

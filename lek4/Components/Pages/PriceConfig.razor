@@ -32,8 +32,19 @@
 
     private async Task SaveConfigurationsToFirebase()
     {
+        // Kolla om det redan finns en konfiguration med samma CorrectAnswersRequired
+        var existingConfig = OutcomeConfigurations.FirstOrDefault(c => c.CorrectAnswersRequired == NewOutcomeConfig.CorrectAnswersRequired);
+
+        if (existingConfig != null)
+        {
+            // Ersätt den befintliga konfigurationen
+            OutcomeConfigurations.Remove(existingConfig);
+        }
+
+        // Lägg till den uppdaterade konfigurationen
         OutcomeConfigurations.Add(NewOutcomeConfig);
 
+        // Serialisera och spara i Firebase
         var json = JsonSerializer.Serialize(OutcomeConfigurations);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -41,15 +52,17 @@
 
         if (response.IsSuccessStatusCode)
         {
-            Console.WriteLine("Outcome configurations saved successfully.");
-            NewOutcomeConfig = new OutcomeConfiguration(); // Reset form fields
+            Console.WriteLine("Outcome configuration updated successfully.");
+            NewOutcomeConfig = new OutcomeConfiguration(); // Återställ formuläret
         }
         else
         {
             var errorContent = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"Failed to save configurations: {response.StatusCode}. Error: {errorContent}");
+            Console.WriteLine($"Failed to save configuration: {response.StatusCode}. Error: {errorContent}");
         }
     }
+
+
 
     private async Task DeleteOutcomeConfiguration()
     {
@@ -92,6 +105,7 @@
         public double PrizeValue { get; set; }
         public string CompanyName { get; set; } // For GiftCard
         public string ProductName { get; set; } // For Product
+        public string ImageUrl { get; set; }    // NEW - Image URL for GiftCard, Product, and Jackpot
     }
 }
 
@@ -156,6 +170,9 @@
 
             <label for="prize-value">Gift Card Value:</label>
             <input id="prize-value" type="number" @bind="NewOutcomeConfig.PrizeValue" placeholder="0" />
+
+            <label for="giftcard-image">Gift Card Image URL:</label>
+            <input id="giftcard-image" type="text" @bind="NewOutcomeConfig.ImageUrl" placeholder="Enter Image URL" />
         }
         else if (NewOutcomeConfig.PrizeType == "Product")
         {
@@ -164,11 +181,17 @@
 
             <label for="prize-value">Product Value:</label>
             <input id="prize-value" type="number" @bind="NewOutcomeConfig.PrizeValue" placeholder="0" />
+
+            <label for="product-image">Product Image URL:</label>
+            <input id="product-image" type="text" @bind="NewOutcomeConfig.ImageUrl" placeholder="Enter Image URL" />
         }
         else if (NewOutcomeConfig.PrizeType == "Jackpot")
         {
             <label for="jackpot-amount">Jackpot Prize Amount:</label>
             <input id="jackpot-amount" type="number" value="@jackpotAmount" readonly />
+
+            <label for="jackpot-image">Jackpot Image URL:</label>
+            <input id="jackpot-image" type="text" @bind="NewOutcomeConfig.ImageUrl" placeholder="Enter Image URL" />
         }
 
         <div class="button-row">
@@ -186,6 +209,7 @@
                         <th>Message</th>
                         <th>Prize Type</th>
                         <th>Prize Value</th>
+                        <th>Image</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -207,6 +231,16 @@
                                 else
                                 {
                                     @config.PrizeValue
+                                }
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(config.ImageUrl))
+                                {
+                                    <img src="@config.ImageUrl" alt="Prize Image" width="80" height="80" style="border-radius: 8px;" />
+                                }
+                                else
+                                {
+                                    <span>No Image</span>
                                 }
                             </td>
                         </tr>

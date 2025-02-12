@@ -3,6 +3,9 @@
 @using System.Text
 @inject HttpClient HttpClient
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<button @onclick="NavigateBack">← Back</button>
 
 <h1 class="page-title">Admin - Winners Management</h1>
 
@@ -27,6 +30,7 @@
                         <div class="winner-info">
                             <p><strong>Winner:</strong> @winner.Winner</p>
                             <p><strong>Draw Date:</strong> @winner.DrawDate</p>
+                            <p><strong>Saved Date:</strong> @GetSavedDate(winner.FileName)</p>
                             <p><strong>Jackpot Amount:</strong> @winner.JackpotAmount</p>
                             <p><strong>Email:</strong> @winner.WinningTicket.UserEmail</p>
                             <p><strong>Number:</strong> @winner.WinningTicket.Number</p>
@@ -145,7 +149,24 @@
             message = $"Error loading saved winners: {ex.Message}";
         }
     }
-
+    private string GetSavedDate(string fileName)
+    {
+        try
+        {
+            var parts = fileName.Split('_');
+            if (parts.Length >= 3)
+            {
+                string dateString = parts[2].Substring(0, 8); // YYYYMMDD
+                DateTime savedDate = DateTime.ParseExact(dateString, "yyyyMMdd", null);
+                return savedDate.ToString("yyyy-MM-dd");
+            }
+        }
+        catch
+        {
+            return "Unknown";
+        }
+        return "Unknown";
+    }
     public async Task FetchAndSaveWinners()
     {
         try
@@ -290,7 +311,10 @@
             }
         }
     }
-
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
     private async Task DeleteProductFile(string fileName)
     {
         if (await ConfirmDelete($"Are you sure you want to delete {fileName}?"))
