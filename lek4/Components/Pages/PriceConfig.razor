@@ -106,6 +106,7 @@
         public string CompanyName { get; set; } // For GiftCard
         public string ProductName { get; set; } // For Product
         public string ImageUrl { get; set; }    // NEW - Image URL for GiftCard, Product, and Jackpot
+        public string WebsiteUrl { get; set; } // Ny egenskap för hemsidelänk
     }
 }
 
@@ -162,6 +163,9 @@
         {
             <label for="prize-value">Prize Value (Credits):</label>
             <input id="prize-value" type="number" @bind="NewOutcomeConfig.PrizeValue" placeholder="0" />
+
+            <label for="website-url">Website URL:</label>
+            <input id="website-url" type="text" @bind="NewOutcomeConfig.WebsiteUrl" placeholder="Enter Website URL" />
         }
         else if (NewOutcomeConfig.PrizeType == "GiftCard")
         {
@@ -173,6 +177,9 @@
 
             <label for="giftcard-image">Gift Card Image URL:</label>
             <input id="giftcard-image" type="text" @bind="NewOutcomeConfig.ImageUrl" placeholder="Enter Image URL" />
+
+            <label for="website-url">Website URL:</label>
+            <input id="website-url" type="text" @bind="NewOutcomeConfig.WebsiteUrl" placeholder="Enter Website URL" />
         }
         else if (NewOutcomeConfig.PrizeType == "Product")
         {
@@ -184,6 +191,10 @@
 
             <label for="product-image">Product Image URL:</label>
             <input id="product-image" type="text" @bind="NewOutcomeConfig.ImageUrl" placeholder="Enter Image URL" />
+
+            <label for="website-url">Website URL:</label>
+            <input id="website-url" type="text" @bind="NewOutcomeConfig.WebsiteUrl" placeholder="Enter Website URL" />
+
         }
         else if (NewOutcomeConfig.PrizeType == "Jackpot")
         {
@@ -192,6 +203,10 @@
 
             <label for="jackpot-image">Jackpot Image URL:</label>
             <input id="jackpot-image" type="text" @bind="NewOutcomeConfig.ImageUrl" placeholder="Enter Image URL" />
+        
+            <label for="website-url">Website URL:</label>
+            <input id="website-url" type="text" @bind="NewOutcomeConfig.WebsiteUrl" placeholder="Enter Website URL" />
+
         }
 
         <div class="button-row">

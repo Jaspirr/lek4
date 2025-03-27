@@ -2,6 +2,8 @@
 @using lek4.Components.Layout
 @using lek4.Components.Pages
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
 
 <div class="main">
     @Body
@@ -30,5 +32,12 @@
         {
             InvokeAsync(StateHasChanged);
         };
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("hideLoadingScreen");
+        }
     }
 }

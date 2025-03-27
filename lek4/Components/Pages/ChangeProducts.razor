@@ -1,4 +1,5 @@
 ﻿@page "/change-products"
+@using System.Text.Json
 @using lek4.Components.Service
 @using static lek4.Components.Service.ProductService
 @inject ProductDrawDateService ProductDrawDateService
@@ -6,6 +7,7 @@
 @inject IJSRuntime js
 @inject lek4.Components.Service.ProductService ProductService
 @inject NavigationManager NavigationManager
+@inject HttpClient Http
 
 
 <h2>Manage Products</h2>
@@ -70,7 +72,24 @@
         <input type="checkbox" id="isJackpotProduct" @bind="isJackpotProduct" />
         <label for="isJackpotProduct">Jackpot Product</label>
     </div>
+    <!-- Checkbox för att använda ett outcome som en produkt -->
+    <div class="jackpot-option">
+        <input type="checkbox" id="useOutcomeAsProduct" @bind="useOutcomeAsProduct" />
+        <label for="useOutcomeAsProduct">Use Outcome as Product</label>
+    </div>
 
+    @if (useOutcomeAsProduct)
+    {
+        <label for="selectedOutcome">Select Outcome:</label>
+        <p>Total outcomes found: @OutcomeConfigurations.Count</p>
+        <select id="selectedOutcome" @bind="selectedOutcomeId">
+            <option value="">-- Select Outcome --</option>
+            @foreach (var outcome in OutcomeConfigurations)
+            {
+                <option value="@outcome.CorrectAnswersRequired">@($"{outcome.CorrectAnswersRequired} - {outcome.Message} - {outcome.PrizeType}")</option>
+            }
+        </select>
+    }
     <!-- New Draw Date input with max date 31 days from today -->
     <label for="drawDate">Draw Date</label>
     <input type="datetime-local" id="drawDate" @bind="newDrawDate" min="@minDate" max="@maxDate" />
@@ -91,9 +110,55 @@
     private string minDate = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
     private string maxDate = DateTime.Now.AddDays(31).ToString("yyyy-MM-ddTHH:mm");
 
+    private bool useOutcomeAsProduct = false;
+    private int selectedOutcomeId;
+    private List<OutcomeConfiguration> OutcomeConfigurations = new List<OutcomeConfiguration>();
+
+    private bool isOutcomeProduct = false; // Lägg till denna rad
+
+    public class OutcomeConfiguration
+    {
+        public int CorrectAnswersRequired { get; set; }
+        public string Message { get; set; }
+        public string IconClass { get; set; }
+        public string BackgroundColor { get; set; }
+        public string AnimationClass { get; set; }
+        public string PrizeType { get; set; }
+        public double PrizeValue { get; set; }
+        public string CompanyName { get; set; } // For GiftCard
+        public string ProductName { get; set; } // For Product
+        public string ImageUrl { get; set; }    // Image for GiftCard, Product, and Jackpot
+        public string WebsiteUrl { get; set; }
+
+    }
+    private async Task LoadOutcomeConfigurations()
+    {
+        try
+        {
+            var response = await Http.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2Foutcomeconfigurations.json?alt=media");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                OutcomeConfigurations = JsonSerializer.Deserialize<List<OutcomeConfiguration>>(responseBody) ?? new List<OutcomeConfiguration>();
+
+                Console.WriteLine($"Loaded {OutcomeConfigurations.Count} outcome configurations.");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to load outcome configurations. Status: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching outcome configurations: {ex.Message}");
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         products = await ProductService.FetchAllProductsFromFirebaseAsync();
+        await LoadOutcomeConfigurations();
         await LoadLockedInUsersForAllProducts();
         StateHasChanged();
     }
@@ -114,26 +179,95 @@
     {
         if (newProductNumber > 0 && newProductPrice > 0 && !string.IsNullOrEmpty(newProductName))
         {
+            ProductService.ProductData newProduct;
+
+            if (useOutcomeAsProduct && selectedOutcomeId > 0)
+            {
+                var selectedOutcome = OutcomeConfigurations.FirstOrDefault(o => o.CorrectAnswersRequired == selectedOutcomeId);
+                if (selectedOutcome != null)
+                {
+                    newProductPrice = selectedOutcome.PrizeValue;
+                    newProductImageUrl = selectedOutcome.ImageUrl;
+                    isJackpotProduct = selectedOutcome.PrizeType == "Jackpot";
+                    isOutcomeProduct = true;
+
+                    string prizeType = selectedOutcome.PrizeType ?? "Unknown";
+                    string websiteUrl = selectedOutcome.WebsiteUrl ?? "";
+
+                    string finalProductName = !string.IsNullOrEmpty(selectedOutcome.CompanyName)
+                        ? $"{selectedOutcome.CompanyName}{selectedOutcome.ProductName}"
+                        : selectedOutcome.ProductName;
+
+                    newProduct = new ProductService.ProductData
+                        {
+                            ProductNumber = newProductNumber,
+                            ProductName = finalProductName,
+                            Price = newProductPrice,
+                            ImageUrl = newProductImageUrl,
+                            IsJackpot = isJackpotProduct,
+                            IsOutcomeProduct = true,
+                            DrawDate = newDrawDate,
+                            CorrectAnswersRequired = selectedOutcome.CorrectAnswersRequired,
+                            PrizeType = prizeType,
+                            WebsiteUrl = websiteUrl
+                        };
+                }
+                else
+                {
+                    Console.WriteLine("Selected outcome not found.");
+                    return;
+                }
+            }
+            else
+            {
+                isOutcomeProduct = false;
+
+                newProduct = new ProductService.ProductData
+                    {
+                        ProductNumber = newProductNumber,
+                        ProductName = newProductName,
+                        Price = newProductPrice,
+                        ImageUrl = newProductImageUrl,
+                        IsJackpot = isJackpotProduct,
+                        IsOutcomeProduct = false,
+                        DrawDate = newDrawDate,
+                        CorrectAnswersRequired = 0,
+                        PrizeType = "Manual",
+                        WebsiteUrl = ""
+                    };
+            }
+
+            // Spara produkten till Firebase
             await ProductService.AddProductToFirebase(
-                newProductNumber,
-                newProductPrice,
-                "user@example.com",
-                newProductName,
-                newProductImageUrl,
-                isJackpotProduct,
-                newDrawDate // Pass the DrawDate
+                newProduct.ProductNumber,
+                newProduct.Price,
+                "user@example.com", // Uppdatera till aktuell användare om möjligt
+                newProduct.ProductName,
+                newProduct.ImageUrl,
+                newProduct.IsJackpot,
+                newProduct.IsOutcomeProduct,
+                newProduct.DrawDate,
+                newProduct.CorrectAnswersRequired,
+                newProduct.PrizeType,
+                newProduct.WebsiteUrl
             );
 
-            // Reset form fields
+            // Återställ formuläret
             newProductNumber = 0;
             newProductPrice = 0;
             newProductName = "";
             newProductImageUrl = "";
             isJackpotProduct = false;
-            newDrawDate = DateTime.Now.AddDays(1); // Reset default date
+            isOutcomeProduct = false;
+            selectedOutcomeId = 0;
+            newDrawDate = DateTime.Now.AddDays(1);
+
+            // Hämta produkterna igen
+            products = await ProductService.FetchAllProductsFromFirebaseAsync();
+            StateHasChanged();
         }
     }
-
+   
     private async Task RemoveProduct(int productNumber)
     {
         try
@@ -276,3 +410,4 @@
             background-color: #45a049;
         }
 </style>
+ 

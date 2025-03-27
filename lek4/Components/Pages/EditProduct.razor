@@ -24,6 +24,12 @@
     <label for="productImageUrl">Product Image URL</label>
     <input type="text" id="productImageUrl" @bind="productImageUrl" />
 
+    <label for="prizeType">Prize Type</label>
+    <input type="text" id="prizeType" @bind="prizeType" />
+
+    <label for="websiteUrl">Website URL</label>
+    <input type="text" id="websiteUrl" @bind="websiteUrl" />
+    
     <div class="checkbox-container">
         <input type="checkbox" id="isJackpot" @bind="isJackpot" />
         <label for="isJackpot">Jackpot Product</label>
@@ -51,6 +57,11 @@
     private DateTime? drawDate;
     private TimeOnly? drawTime;
     private ProductService.ProductData productData;
+    private bool isOutcomeProduct;
+    private int correctAnswersRequired;
+    private string prizeType;
+    private string websiteUrl;
+
 
     private string minDate = DateTime.Now.ToString("yyyy-MM-dd");
     private string maxDate = DateTime.Now.AddDays(31).ToString("yyyy-MM-dd");
@@ -67,6 +78,10 @@
             productName = productData.ProductName;
             productImageUrl = productData.ImageUrl;
             isJackpot = productData.IsJackpot;
+            isOutcomeProduct = productData.IsOutcomeProduct;
+            correctAnswersRequired = productData.CorrectAnswersRequired;
+            prizeType = productData.PrizeType;  // ✅ Lägg till PrizeType
+            websiteUrl = productData.WebsiteUrl;  // ✅ Lägg till WebsiteUrl
 
             DateTime? existingDrawDateTime = ProductDrawDateService.GetDrawDate(productNumber);
             if (existingDrawDateTime.HasValue)
@@ -89,13 +104,16 @@
     {
         if (productData != null)
         {
-            productData.Price = price;
-            productData.LockInAmount = lockInAmount;
-            productData.UserEmail = userEmail;
-            productData.ProductName = productName;
-            productData.ImageUrl = productImageUrl;
-            productData.IsJackpot = isJackpot;
-
+            price = productData.Price;
+            lockInAmount = productData.LockInAmount;
+            userEmail = productData.UserEmail;
+            productName = productData.ProductName;
+            productImageUrl = productData.ImageUrl;
+            isJackpot = productData.IsJackpot;
+            isOutcomeProduct = productData.IsOutcomeProduct;
+            int correctAnswersRequired = productData.CorrectAnswersRequired; // Hämta korrekt värde
+            prizeType = productData.PrizeType; // ✅ Lägg till PrizeType
+            websiteUrl = productData.WebsiteUrl; // ✅ Lägg till WebsiteUrl
             DateTime drawDateTime = DateTime.Now; // Default value if no date and time are provided
 
             if (drawDate.HasValue && drawTime.HasValue)
@@ -104,6 +122,7 @@
                 ProductDrawDateService.SetDrawDate(productNumber, drawDateTime);
             }
 
+            // Uppdatera produkten i Firebase med CorrectAnswersRequired
             await ProductService.SaveProductData(
                 productNumber,
                 userEmail,
@@ -111,7 +130,11 @@
                 productName,
                 productImageUrl,
                 isJackpot,
-                drawDateTime
+                isOutcomeProduct,
+                drawDateTime,
+                correctAnswersRequired,
+                prizeType, // ✅ Skicka PrizeType
+                websiteUrl // ✅ Skicka WebsiteUrl
             );
 
             int userId = 1;
@@ -120,6 +143,7 @@
             NavigationManager.NavigateTo("/change-products");
         }
     }
+
 }
 
 <style>

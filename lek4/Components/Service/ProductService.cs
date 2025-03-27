@@ -28,14 +28,12 @@ namespace lek4.Components.Service
         }
 
         // Add a new product to Firebase with productInfo.json
-        public async Task AddProductToFirebase(int productNumber, double price, string userEmail, string productName, string imageUrl, bool isJackpot, DateTime drawDate)
+        public async Task AddProductToFirebase(int productNumber, double price, string userEmail, string productName, string imageUrl, bool isJackpot, bool isOutcomeProduct, DateTime drawDate, int correctAnswersRequired, string prizeType,string websiteUrl)
         {
-            // Call SaveProductData with the new parameters, including drawDate
-            await SaveProductData(productNumber, userEmail, price, productName, imageUrl, isJackpot, drawDate);
+            await SaveProductData(productNumber, userEmail, price, productName, imageUrl, isJackpot, isOutcomeProduct, drawDate, correctAnswersRequired, prizeType, websiteUrl);
         }
 
-
-        public async Task AddJackpotToFirebase(string productName, string imageUrl, double startingPrizePool)
+        public async Task AddJackpotToFirebase(string productName, string imageUrl, double startingPrizePool, string prizeType, string websiteUrl)
         {
             // Skapa en unik productNumber för jackpot, t.ex. 999
             int productNumber = 999;
@@ -48,7 +46,11 @@ namespace lek4.Components.Service
                 productName: productName,
                 imageUrl: imageUrl,
                 isJackpot: true,
-                drawDate: drawDate // Markera som jackpot
+                isOutcomeProduct: false,
+                drawDate: drawDate, // Markera som jackpot
+                 correctAnswersRequired: 0,
+                 prizeType: prizeType,
+                 websiteUrl: websiteUrl
             );
 
             // Initialisera prispotten
@@ -74,7 +76,7 @@ namespace lek4.Components.Service
         }
 
         // Save product info to Firebase
-        public async Task SaveProductData(int productNumber, string userEmail, double price, string productName, string imageUrl, bool isJackpot, DateTime drawDate)
+        public async Task SaveProductData(int productNumber, string userEmail, double price, string productName, string imageUrl, bool isJackpot, bool isOutcomeProduct, DateTime drawDate, int correctAnswersRequired, string prizeType, string websiteUrl)
         {
             var productData = new ProductData
             {
@@ -84,29 +86,26 @@ namespace lek4.Components.Service
                 ProductName = productName,
                 ImageUrl = imageUrl,
                 IsJackpot = isJackpot,
-                DrawDate = drawDate // Set the draw date here
+                IsOutcomeProduct = isOutcomeProduct,
+                DrawDate = drawDate,
+                CorrectAnswersRequired = correctAnswersRequired,
+                PrizeType = prizeType, // ✅ Spara PrizeType
+                WebsiteUrl = websiteUrl // ✅ Spara WebsiteUrl
             };
 
             var productJson = JsonSerializer.Serialize(productData);
-            Console.WriteLine($"Serialized JSON: {productJson}");
-
-            // Firebase Storage URL (without ?alt=media for uploading)
             var path = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o?name=users/products/product{productNumber}/productInfo.json";
 
             var content = new StringContent(productJson, Encoding.UTF8, "application/json");
-
-            // Use POST to upload the product data
             var response = await _httpClient.PostAsync(path, content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"Response content: {responseContent}");
 
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Product data for {productNumber} saved successfully.");
+                Console.WriteLine($"Product {productNumber} saved successfully.");
             }
             else
             {
-                Console.WriteLine($"Failed to save product data for {productNumber}. Error: {response.StatusCode}");
+                Console.WriteLine($"Failed to save product {productNumber}. Status: {response.StatusCode}");
             }
         }
 
@@ -744,9 +743,13 @@ namespace lek4.Components.Service
             public string ProductName { get; set; }
             public string ImageUrl { get; set; }
             public bool IsJackpot { get; set; } // Nytt fält för att markera om produkten är en jackpot
+            public bool IsOutcomeProduct { get; set; }
             public double PrizePool { get; set; } = 0; // För att spåra jackpot-belopp
             public List<string> Participants { get; set; } = new List<string>();
             public DateTime DrawDate { get; set; }
+            public int CorrectAnswersRequired { get; set; }
+            public string PrizeType { get; set; } // ✅ Lägg till PrizeType
+            public string WebsiteUrl { get; set; }
         }
        
 

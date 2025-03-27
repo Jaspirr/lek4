@@ -22,6 +22,7 @@
 @using Plugin.MauiMTAdmob
 @using Plugin.MauiMTAdmob.Extra
 @using System.Text.Json
+@using System.Globalization
 @using lek4.Components.Service
 
 @code {
@@ -64,6 +65,7 @@
     private double startValue = 0.0;
     private double endValue = 100000000000.0;
 
+    private bool isOutcomeProduct = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -78,6 +80,7 @@
             productExists = true;
             price = productData.Price;
             isJackpotSelected = productData.IsJackpot;
+            isOutcomeProduct = productData.IsOutcomeProduct;
 
             if (productData.DrawDate != DateTime.MinValue) // Ensure DrawDate is valid
             {
@@ -615,25 +618,81 @@
         {
             if (jackpotAmount > 999.99)
             {
-                return Math.Floor(jackpotAmount).ToString("F0"); // No decimals for values greater than 999.99
+                return Math.Floor(jackpotAmount).ToString("#,0", new CultureInfo("sv-SE"));
             }
+
             return jackpotAmount % 1 == 0
-                ? jackpotAmount.ToString("F0") // Remove .00 for whole numbers
-                : jackpotAmount.ToString("0.00"); // Keep two decimals for non-whole numbers
+                ? jackpotAmount.ToString("#,0", new CultureInfo("sv-SE"))
+                : jackpotAmount.ToString("#,0.00", new CultureInfo("sv-SE"));
         }
     }
 }
 
 
 <div class="product-container">
-    <!-- Product Name outside and above the product -->
-    <p class="product-name">@productData?.ProductName</p>
-
+   
     <div class="product-details" style="@(productData != null && !string.IsNullOrEmpty(productData.ImageUrl) ? $"background-image: url('{productData.ImageUrl}'); background-size: cover; background-position: center;" : "")">
+        <button @onclick="GoBack" class="icon-button">
+            <i class="fas fa-arrow-left"></i>
+        </button>
         @if (!productExists)
         {
             <p>The product you are trying to view no longer exists.</p>
             <button @onclick="GoBack">Back to Products</button>
+        }
+        else if (isOutcomeProduct) // NY: Separat design för Outcome
+        {
+
+            <div class="outcome-container">
+                <div class="outcome-prize-box">
+                    <h2 class="outcome-prize-text">@productData.PrizeType</h2>
+                </div>
+
+                @if (productData.PrizeType == "Credits")
+                {
+                    <div class="outcome-image-credit">
+                        <img src="images/Voidglas2.webp" alt="Voidglas Icon" class="voidglas-icon-large" />
+                    </div>
+                }
+                else
+                {
+                    <img class="outcome-image" src="@productData.ImageUrl" alt="Outcome Image" />
+                }
+
+                @if (productData.PrizeType != "Credits")
+                {
+                    <div class="outcome-info-box">
+                        <div class="credits-price-wrapper">
+                            <span class="outcome-text black-text">@productData.ProductName</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="outcome-info-box">
+                    @if (productData.PrizeType == "Credits")
+                    {
+                        <div class="credits-price-wrapper">
+                            <span class="credits-price">@productData.Price</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="credits-price-wrapper">
+                            <span class="outcome-text black-text">@productData.Price @currencySymbol</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="outcome-info-box">
+                    <div class="credits-price-wrapper">
+                        <span class="outcome-text black-text">🎯 @productData.CorrectAnswersRequired</span>
+                    </div>
+                </div>
+                @if (productData.PrizeType != "Credits")
+                {
+                    <a class="outcome-website" href="@productData.WebsiteUrl" target="_blank">Visit Website</a>
+                }
+            </div>
         }
         else
         {
@@ -776,7 +835,7 @@
     .ticket-cost {
         margin-top: 0px; /* Litet mellanrum från knappen */
         font-size: 0.6em; /* Gör texten mindre */
-        color: #000; /* Svart text */
+        color: white;
         text-align: center; /* Centrerar texten under knappen */
     }
 
@@ -990,7 +1049,7 @@
             border-radius: 50%;
         }
 
-    .modal-overlay {
+    .modal-overlay { 
         position: fixed;
         top: 0;
         left: 0;
@@ -1191,6 +1250,149 @@
         object-fit: cover; /* Behåll proportionerna för bilden */
         box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2); /* Förbättra skuggan något */
     }
+
+    .outcome-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: linear-gradient(145deg, #F0FFF0, #556B2F);
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.2);
+        max-width: 400px;
+        margin: auto;
+    }
+
+    .outcome-header {
+        font-size: 1.8em;
+        font-weight: bold;
+        color: #F0FFF0;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    .outcome-image {
+        width: 120px;
+        height: 120px;
+        border-radius: 15px;
+        object-fit: cover;
+        margin-bottom: 15px;
+        box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .outcome-info-box {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+        padding: 10px 15px;
+        margin-bottom: 10px;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1em;
+        font-weight: bold;
+        color: #FFD700;
+        transition: transform 0.2s ease-in-out, box-shadow 0.3s;
+    }
+
+        .outcome-info-box:hover {
+            transform: translateY(-3px);
+            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+    .outcome-icon {
+        font-size: 1.2em;
+        margin-right: 10px;
+        color: #FFD700;
+    }
+
+    .outcome-text {
+        color: #F0FFF0;
+        font-size: 1em;
+        font-weight: normal;
+    }
+
+    .outcome-website {
+        text-align: center;
+        font-size: 1.1em;
+        color: darkseagreen;
+        text-decoration: none;
+        font-weight: bold;
+        margin-top: 10px;
+        transition: color 0.3s ease-in-out;
+    }
+
+        .outcome-website:hover {
+            color: #ffffff;
+            text-decoration: underline;
+        }
+
+    .outcome-prize-box {
+        max-width: 90%;
+        padding: 10px 15px;
+        border: 2px solid #FFD700; /* Guld */
+        border-radius: 8px;
+        background: linear-gradient(135deg, #fff4d7, #ffe8a3); /* Mjuk gul gradient */
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15); /* Mjukare skugga */
+        text-align: center;
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #b38b00; /* Lyxig guldfärg */
+        margin-bottom: 15px;
+        text-transform: uppercase;
+    }
+
+    .outcome-prize-text {
+        margin: 0;
+        font-weight: bold;
+        font-size: 1.5em;
+        letter-spacing: 0.5px;
+    }
+
+    .outcome-image-credit {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 10px;
+    }
+
+    .voidglas-icon-large {
+        width: 120px;
+        height: 120px;
+        background-color: white;
+        border-radius: 20px;
+        padding: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    .credits-price-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .credits-price {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #556B2F;
+    }
+
+    .voidglas-icon-outcome {
+        width: 26px;
+        height: 26px;
+        object-fit: contain;
+    }
+
+    .black-text {
+        color: black !important;
+    }
+
 </style>
 
 <script>

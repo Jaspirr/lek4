@@ -11,7 +11,115 @@
 @inject IJSRuntime JSRuntime
 @inject HttpClient HttpClient
 
+<!-- Info-knapp i övre vänstra hörnet -->
+<button @onclick="ToggleInfoPopup" class="info-button">
+    <i class="fas fa-info-circle"></i>
+</button>
 
+<!-- Info-popup -->
+@if (showInfoPopup)
+{
+    <div class="popup-container">
+        <div id="info-content">
+            <div class="info-page active">
+                <h3>What is the number 0.0?</h3>
+                <p>
+                    <br>1000 steps you take equals 0.1<br>
+                    The more you move, the higher your chances. 
+                    Once you've built up enough odds, you'll level up and get a credit <img src='images/Voidglas2.webp' alt='Voidglas Icon' class='inline-voidglas'/>
+                    <br>Odds reset every week so everyone starts fresh — giving everyone the same chance each week!<br />
+                </p>
+            </div>
+
+            <div class="info-page">
+                <h3>What are credits for?</h3>
+                <p><img src="images/Voidglas2.webp" alt="Voidglas Icon" class="inline-voidglas" /> are used to buy tickets for the <strong>BIG BANG draw</strong>.</p>
+                <p>
+                    The prize pool for <strong>BIG BANG</strong> grows based on how many <img src="images/Voidglas2.webp" alt="Voidglas Icon" class="inline-voidglas" /> <br>users collect together.<br />
+                    Invite your friends to boost the amount!
+                </p>
+            </div>
+            <div class="info-page compact">
+                <h3>BIG BANG Jackpot</h3>
+                <p>
+                    Join the BIG BANG by locking in <strong>credits</strong> for a chance to win the full jackpot!
+                </p>
+
+                <h4>How it works:</h4>
+                <ul class="info-list">
+                    <li><strong>1.</strong> Lock in using <img src="images/Voidglas2.webp" alt="Voidglas Icon" class="inline-voidglas" /> credits.</li>
+                    <li><strong>2.</strong> Each entry costs e.g. <span class="highlight-box">50</span> credits.</li>
+                    <li><strong>3.</strong> Create your ticket after lock-in.</li>
+                    <li><strong>4.</strong> A random ticket generates on draw day.</li>
+                    <li>
+                        <strong>5.</strong> Prizes by matches:
+                        <ul class="sublist">
+                            <li><strong>6/6:</strong> BIG BANG prize money win! 🎉</li>
+                            <li><strong>5/6:</strong> Big prize (e.g. gift cards, premium products)</li>
+                            <li><strong>4/6:</strong> Medium prize (gift cards, premium products or credits)</li>
+                            <li><strong>3/6:</strong> Small prize (credits or mystery item)</li>
+                            <li><strong>0–2:</strong> Maybe a smal credit bonus 💫</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <div class="info-page">
+                <h3>Create Your Ticket</h3>
+                <p>
+                    In 6 quick steps, you build your unique ticket for the <strong>BIG BANG draw</strong>:
+                    <br /><br />
+                    <div class="left-aligned-list">
+                        <p><strong>1.</strong> Pick a number (1–50)</p>
+                        <p><strong>2.</strong> Choose a color</p>
+                        <p><strong>3.</strong> Select a symbol (like <i class="fas fa-star"></i>, <i class="fas fa-dragon"></i>, <i class="fas fa-bolt"></i>)</p>
+                        <p><strong>4.</strong> Pick a star sign</p>
+                        <p><strong>5.</strong> Choose a planet 🌍🪐</p>
+                        <p><strong>6.</strong> Pick an element (Earth, Fire, Water, Air)</p>
+                    </div>
+                </p>
+                <p>
+                    Your combo = your ticket.<br />
+                    The more tickets you hold, the higher your chance to win BIG!
+                </p>
+            </div>
+            <div class="info-page">
+                <h3>How do  <i class="fas fa-boxes"></i> page work?</h3>
+                <p>
+                    On this page, you’ll find <strong>BIG BANG</strong> and different products you can unlock based on your current <strong>Credits</strong> value or <strong>Odds</strong> level.
+                </p>
+                <p>
+                    Some products require you to collect enough odds, while others — like special prices — show a number like this:
+                    <span class="outcome-box inline-box"><span class="outcome-text">3</span></span>
+                    This means you need to match 3 answers correctly in the <strong>BIG BANG draw</strong> to win the reward.
+                </p>
+                <p>
+                    When your <strong>Credits</strong> or <strong>Odds</strong> match the product’s requirement, then you can <strong>LOCK IN</strong> to get the chance to win.
+                </p>
+            </div>
+            <div class="info-page">
+                <h3>How do <i class="fas fa-hand-holding-heart"></i> page work?</h3>
+                <p>
+                    <br>The <i class="fas fa-hand-holding-heart"></i> page lets you collect even more credits
+                    through daily rewards, helping friends, charities, and other events <br/>
+                    <br>It's the good way to boost your chances in the <strong>BIG BANG draw</strong>!<br />
+                </p>
+            </div>
+        </div>
+       
+
+        <!-- Navigeringspilar -->
+        <div class="carousel-controls">
+            <button class="nav-button" onclick="previousPage()">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="nav-button" onclick="nextPage()">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+
+        <button class="close-button" @onclick="ToggleInfoPopup">Close</button>
+    </div>
+}
 <div class="container" style="background-color: @(GetBackgroundColor())">
     <!-- Credits display in top-right corner -->
     <div class="credits-box">
@@ -139,6 +247,217 @@
         opacity: 0;
     }
 }
+    /* Stil för info-knappen */
+    .info-button {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: none;
+        border: none;
+        color: gainsboro;
+        font-size: 1.5rem;
+        cursor: pointer;
+    }
+
+        .info-button:hover {
+            transform: scale(1.1);
+            color: darkolivegreen;
+        }
+
+    /* Stil för popup */
+    /* Stil för popup */
+    .popup-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        text-align: center;
+        max-width: 320px;
+        width: 90%;
+    }
+
+    /* Navigeringsknappar */
+    .carousel-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 100px; /* Lägger till mellanrum mellan pilarna */
+        margin-top: 15px;
+    }
+
+    /* Stil för pilar */
+    .nav-button {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out, color 0.2s ease-in-out;
+    }
+
+        .nav-button i {
+            color: darkolivegreen; /* Färg på pilar */
+            transition: color 0.2s ease-in-out;
+        }
+
+        /* Effekt vid hover */
+        .nav-button:hover i {
+            transform: scale(1.3);
+            color: black; /* Ändrar färg vid hover */
+        }
+
+    /* Sida-indikator */
+    .page-indicator {
+        font-size: 1rem;
+        margin: 0 10px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    /* Stäng-knapp */
+    .close-button {
+        background: darkolivegreen;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        margin-top: 10px;
+    }
+
+        .close-button:hover {
+            background: #ff4d6d;
+        }
+
+    .left-aligned-list {
+        text-align: left;
+        margin: 0 auto;
+        max-width: 300px; /* Optional, for clean layout */
+    }
+    /* Make outcome box inline-friendly */
+    .inline-box {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: bold;
+        padding: 3px 6px;
+        border-radius: 6px;
+        margin: 0 6px;
+        min-width: 24px;
+        min-height: 24px;
+        line-height: 1;
+        vertical-align: middle;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+
+        .inline-box .outcome-text {
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+    .info-page.compact {
+        font-size: 0.85em;
+        padding: 10px;
+    }
+
+    .info-page.compact .info-list {
+        padding-left: 16px;
+    }
+
+    .info-page.compact .sublist {
+        padding-left: 12px;
+        font-size: 0.82em;
+    }
+
+    .inline-voidglas {
+        width: 16px;
+        height: 16px;
+        vertical-align: middle;
+    }
+
+    .info-page {
+        padding: 20px;
+        max-width: 700px;
+        margin: auto;
+        color: #333;
+        background-color: #fdfdfd;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .info-page h3 {
+        font-size: 1.8em;
+        color: #556B2F;
+        margin-bottom: 10px;
+    }
+
+    .info-page h4 {
+        margin-top: 20px;
+        font-size: 1.3em;
+        color: #333;
+    }
+
+    .info-list {
+        list-style: none;
+        padding-left: 0;
+    }
+
+        .info-list li {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+    .sublist {
+        list-style-type: circle;
+        margin-left: 20px;
+        margin-top: 5px;
+    }
+
+    .highlight-box {
+        display: inline-block;
+        padding: 2px 8px;
+        background-color: #556B2F;
+        color: white;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+
+    .jackpot-highlight {
+        color: #b38b00;
+        font-weight: bold;
+    }
+
+    .tip {
+        margin-top: 20px;
+        font-style: italic;
+        color: #888;
+    }
+
+    .inline-voidglas {
+        width: 20px;
+        height: 20px;
+        margin-bottom: -4px;
+    }
+
+    ul.info-list li {
+        text-align: left;
+    }
+
+    ul.sublist {
+        margin-top: 5px;
+        margin-left: 20px;
+        padding-left: 15px;
+        list-style-type: disc; /* eller none om du vill ta bort punkterna */
+        text-align: left;
+    }
 
 </style>
 @code {
@@ -156,6 +475,32 @@
             NumberService.Number = Math.Round((double)value, 1); // Explicit typkonvertering till double
             CheckAndShowAd();
         }
+    }
+    private bool showInfoPopup = false;
+    private int currentPage = 0;
+
+    private string[] infoPages = new string[]
+      {
+        "Välkommen! Här kan du se din statistik och prestationer.",
+        "För att öka dina odds, gå in varje dag och vara aktiv.",
+        "Planeterna visar din framgång – fortsätt röra dig framåt!",
+        "Du kan tjäna Starshards genom att hålla en streak!",
+        "Lycka till och fortsätt framåt!"
+      };
+
+    private void ToggleInfoPopup()
+    {
+        showInfoPopup = !showInfoPopup;
+    }
+
+    private void NextPage()
+    {
+        currentPage = (currentPage + 1) % infoPages.Length; // Går runt i en loop
+    }
+
+    private void PreviousPage()
+    {
+        currentPage = (currentPage - 1 + infoPages.Length) % infoPages.Length; // Går runt i en loop
     }
 
     private int steps = 0;
@@ -567,4 +912,47 @@ private class AdConfiguration
         box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2); /* Förbättra skuggan något */
     }
 
+    .info-page {
+        display: none;
+    }
+
+        .info-page.active {
+            display: block;
+        }
+
+    .inline-voidglas {
+        width: 50px;
+        height: 50px;
+        vertical-align: middle;
+        margin-left: 4px;
+    }
+
 </style>
+<script>
+    let currentPage = 0;
+
+    function showPage(index) {
+        const pages = document.querySelectorAll('.info-page');
+        if (pages.length === 0) return;
+
+        pages.forEach(p => p.classList.remove('active'));
+        pages[index].classList.add('active');
+    }
+
+    function nextPage() {
+        const pages = document.querySelectorAll('.info-page');
+        currentPage = (currentPage + 1) % pages.length;
+        showPage(currentPage);
+    }
+
+    function previousPage() {
+        const pages = document.querySelectorAll('.info-page');
+        currentPage = (currentPage - 1 + pages.length) % pages.length;
+        showPage(currentPage);
+    }
+
+    // När popup öppnas - visa första sidan
+    document.addEventListener('DOMContentLoaded', () => {
+        showPage(0);
+    });
+</script>
