@@ -12,6 +12,14 @@
 @inject SpecialService specialService
 
 <section class="value-page">
+    <div id="loading-screen" style="@loadingScreenStyle">
+    <div class="loading-animation">
+        <div class="loading-circle"></div>
+        <div class="loading-circle"></div>
+        <div class="loading-circle"></div>
+    </div>
+</div>
+
     <div class="content-wrapper">
         <div class="actions">
             @if (buttonVisibility.ContainsKey("DailyReward") && buttonVisibility["DailyReward"])
@@ -389,6 +397,8 @@
     private bool showSpecialInfo = false;
     private bool hasClaimedSpecialReward = false;
 
+    private string loadingScreenStyle = "display: flex;";
+
     private void ToggleCommunityInfo()
     {
         showCommunityInfo = !showCommunityInfo;
@@ -554,6 +564,8 @@
         {
             Console.WriteLine($"Error initializing page: {ex.Message}");
         }
+        loadingScreenStyle = "display: none;";
+
     }
 
     private async Task LoadButtonVisibility()
@@ -1266,4 +1278,58 @@
         background: #5E964D;
     }
 
+</style>
+<style>
+    #loading-screen {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4); /* 💡 Halvtransparent svart bakgrund */
+        backdrop-filter: blur(4px); /* 💫 Lägger till suddighet bakom loading */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-in-out;
+    }
+
+    .loading-animation {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        width: 100px;
+    }
+
+    .loading-circle {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: white;
+        opacity: 0.3;
+        animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .loading-circle:nth-child(1) {
+        animation-delay: -0.32s;
+    }
+
+    .loading-circle:nth-child(2) {
+        animation-delay: -0.16s;
+    }
+
+    .loading-circle:nth-child(3) {
+        animation-delay: 0s;
+    }
+
+    @@keyframes bounce {
+        0%, 80%, 100% {
+            transform: translateY(6px) scale(0.9);
+            opacity: 0.3;
+        }
+
+        40% {
+            transform: translateY(0px) scale(1);
+            opacity: 1;
+        }
+    }
 </style>

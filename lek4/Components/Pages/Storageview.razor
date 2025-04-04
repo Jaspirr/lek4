@@ -1,0 +1,189 @@
+﻿@page "/admin-storage"
+@using lek4.Components.Service
+@inject StorageService StorageService
+@inject NavigationManager NavigationManager
+
+<button @onclick="NavigateBack">← Back</button>
+
+<h2>Firebase Storage Monitor</h2>
+
+@if (storageItems == null)
+{
+    <p>Loading storage data...</p>
+}
+else
+{
+    <div class="max-limit-editor">
+        <label>Max GB Limit:</label>
+        <input type="number" step="0.1" @bind="maxStorageLimit" />
+        <button @onclick="SaveMaxLimit">Save</button>
+    </div>
+
+    <table class="storage-table">
+        <thead>
+            <tr>
+                <th>Folder</th>
+                <th>Usage</th>
+                <th>Used (%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in storageItems)
+            {
+                <tr class="@GetRowClass(item.PercentUsed)">
+                    <td>
+                        <span class="status-dot @GetDotClass(item.PercentUsed)"></span>
+                        @(displayNames.ContainsKey(item.Folder) ? displayNames[item.Folder] : item.Folder)
+                    </td>
+                    <td>@FormatSize(item.SizeGB)</td>
+                    <td>@FormatPercent(item.PercentUsed)</td>
+                </tr>
+            }
+            <tr class="total-row">
+                <td><strong>Totalt</strong></td>
+                <td><strong>@($"{totalSizeGB:F6} GB")</strong></td>
+                <td><strong>@FormatPercent(totalPercentUsed)</strong></td>
+            </tr>
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<StorageService.StorageItem> storageItems;
+    private double maxStorageLimit = 5.0;
+
+    // Visningsnamn för mappar
+    private readonly Dictionary<string, string> displayNames = new()
+        {
+            ["users/"] = "All user files",
+            ["users/UserStats/"] = "User statistics",
+            ["users/SavedInfo/"] = "Saved information",
+            ["users/SpecialInfo/"] = "Special info",
+            ["users/DailyRewards/"] = "Daily rewards",
+            ["users/Jackpot/"] = "Jackpot data"
+        };
+
+    private double totalSizeGB => storageItems?.Sum(i => i.SizeGB) ?? 0;
+    private double totalPercentUsed => (totalSizeGB / maxStorageLimit) * 100;
+
+    protected override async Task OnInitializedAsync()
+    {
+        maxStorageLimit = await StorageService.GetMaxStorageLimitGB();
+        storageItems = await StorageService.GetStorageUsageAsync();
+    }
+
+    private string GetRowClass(double percent)
+    {
+        if (percent >= 90) return "critical";
+        if (percent >= 70) return "warning";
+        return "normal";
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
+    private async Task SaveMaxLimit()
+    {
+        bool success = await StorageService.SaveMaxStorageLimit(maxStorageLimit);
+        if (success)
+        {
+            storageItems = await StorageService.GetStorageUsageAsync();
+            StateHasChanged();
+        }
+    }
+
+    private string FormatSize(double sizeGB)
+    {
+        if (sizeGB >= 1)
+            return $"{sizeGB:F2} GB";
+        var sizeMB = sizeGB * 1024;
+        if (sizeMB >= 1)
+            return $"{sizeMB:F1} MB";
+        var sizeKB = sizeMB * 1024;
+        return $"{sizeKB:F0} KB";
+    }
+    private string GetDotClass(double percent)
+    {
+        if (percent >= 90) return "dot-critical";
+        if (percent >= 70) return "dot-warning";
+        return "dot-ok";
+    }
+    private string FormatPercent(double percent)
+    {
+        if (percent >= 1)
+            return $"{percent:F0} %";
+        if (percent >= 0.1)
+            return $"{percent:F1} %";
+        if (percent > 0)
+            return "< 0.1 %";
+        return "0 %";
+    }
+}
+
+<style>
+    .storage-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+        .storage-table th, .storage-table td {
+            padding: 10px;
+            border: 1px solid #ccc;
+            text-align: left;
+        }
+
+    .critical {
+        background-color: #ffe5e5;
+        color: #c70000;
+        font-weight: bold;
+    }
+
+    .warning {
+        background-color: #fff5cc;
+        color: #996600;
+    }
+
+    .normal {
+        background-color: #f9f9f9;
+    }
+
+    .total-row {
+        background-color: #e6f2ff;
+        font-weight: bold;
+    }
+
+    .max-limit-editor {
+        margin-bottom: 20px;
+    }
+
+        .max-limit-editor input {
+            width: 80px;
+            margin-left: 10px;
+            margin-right: 10px;
+        }
+
+    .status-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    .dot-ok {
+        background-color: #4CAF50; /* grön */
+    }
+
+    .dot-warning {
+        background-color: #FFA500; /* orange */
+    }
+
+    .dot-critical {
+        background-color: #F44336; /* röd */
+    }
+
+</style>

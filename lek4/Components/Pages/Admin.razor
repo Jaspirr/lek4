@@ -48,6 +48,7 @@
             <button class="action-button product-management-btn" @onclick="JackpotConversion">Manage Jackpot Conversion(How much in to jackpotprize)</button>
             <button class="action-button product-management-btn" @onclick="PriceConfig">Price Config(Prices to jackpot)</button>
             <button class="action-button product-management-btn" @onclick="AdSpan">Manage Ads Span(How many ads?)</button>
+            <button class="action-button product-management-btn" @onclick="Storage">Database storage(Takes time,and can cost)</button>
         </div>
 
         <!-- Section 5: Time and Notifications -->
@@ -97,6 +98,7 @@
     private void WinnersInfoClean() => NavigationManager.NavigateTo("/admin-schedule-cleanup");
     private void DrawdateUpdate() => NavigationManager.NavigateTo("/admin-jackpot-config");
     private void ClearTickets() => NavigationManager.NavigateTo("/admin-clear-tickets");
+    private void Storage() => NavigationManager.NavigateTo("/admin-storage");
 
 }
 

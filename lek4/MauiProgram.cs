@@ -70,6 +70,7 @@ namespace lek4
             builder.Services.AddScoped<CommunityService>();
             builder.Services.AddScoped<SpecialService>();
             builder.Services.AddScoped<WinnerCleanupService>();
+            builder.Services.AddScoped<StorageService>();
 
             builder.Services.AddSingleton(AudioManager.Current);
             builder.Services.AddTransient<MainPage>();
