@@ -28,11 +28,15 @@
             <div class="stars-container">
                 @for (int i = 1; i <= 5; i++)
                 {
-                    var isFilled = userStats?.DailyStreak?.Stars >= i;
+                    var actualStars = userStats?.DailyStreak?.Stars ?? 1; // Visa minst 1 som default
+                    var isFilled = actualStars >= i;
                     <i class="fa fa-star @(isFilled ? "filled" : "")"></i>
                 }
             </div>
-            <p class="stars-count">@(userStats?.DailyStreak?.Stars ?? 0) / 5 </p>
+
+            <p class="stars-count">
+                @(Math.Max(userStats?.DailyStreak?.Stars ?? 1, 1)) / 5
+            </p>
         </div>
         <div class="stat-card">
             <h4>Longest Streak</h4>
@@ -101,35 +105,31 @@
                             <span class="planet-progress-text">@progressPercentage.ToString("0.0")%</span>
                         </div>
                         <!-- Next Planet (Top) -->
-                        @if (nextPlanetImage != null)
-                        {
-                            <div class="planet-item next-planet">
+                        <div class="planet-item next-planet">
+                            @if (nextPlanetImage != null)
+                            {
                                 <img src="@nextPlanetImage.ImageUrl" alt="@nextPlanetImage.Name" class="planet-icon" />
                                 <span class="planet-name">@nextPlanetImage.Name</span>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="planet-item next-planet">
-                                <div class="planet-icon placeholder-icon"></div>
-                                <span class="planet-name">No next planet yet</span>
-                            </div>
-                        }
+                            }
+                            else
+                            {
+                                <img src="images/Venus2.webp" alt="Venus" class="planet-icon" />
+                                <span class="planet-name">Venus</span>
+                            }
+                        </div>
 
-                        @if (currentPlanetImage != null)
-                        {
-                            <div class="planet-item current-planet">
+                        <div class="planet-item current-planet">
+                            @if (currentPlanetImage != null)
+                            {
                                 <img src="@currentPlanetImage.ImageUrl" alt="@currentPlanet" class="planet-icon" />
                                 <span class="planet-name">@currentPlanet</span>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="planet-item current-planet">
-                                <div class="planet-icon placeholder-icon"></div>
-                                <span class="planet-name">Starting journey...</span>
-                            </div>
-                        }
+                            }
+                            else
+                            {
+                                <img src="images/mercurus2.webp" alt="Mercury" class="planet-icon" />
+                                <span class="planet-name">Mercury</span>
+                            }
+                        </div>
                     </div>
 
                     <!-- Vertical Progress Bar -->

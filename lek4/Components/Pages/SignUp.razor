@@ -247,8 +247,8 @@
             var userCredential = await AuthClient.CreateUserWithEmailAndPasswordAsync(signupModel.Email, signupModel.Password);
             Console.WriteLine($"User created with UID: {userCredential.User.Uid}");
 
-            // Spara användarprofil i Firebase
-            signupModel.PhoneNumber = $"{selectedCountryCode}{signupModel.PhoneNumber}"; // Slå ihop landskod och telefonnummer
+            signupModel.PhoneNumber = FormatPhoneNumber(selectedCountryCode, signupModel.PhoneNumber);
+
             await SaveUserProfileToStorage(userCredential.User);
             Console.WriteLine("User profile saved to storage.");
 
@@ -271,8 +271,21 @@
 
     private void ValidatePhoneNumber()
     {
-        var fullPhoneNumber = $"{selectedCountryCode}{signupModel.PhoneNumber}";
+        var fullPhoneNumber = FormatPhoneNumber(selectedCountryCode, signupModel.PhoneNumber);
         isPhoneNumberValid = System.Text.RegularExpressions.Regex.IsMatch(fullPhoneNumber, @"^\+\d{7,15}$");
+    }
+
+    private string FormatPhoneNumber(string countryCode, string localNumber)
+    {
+        // Länder där ledande 0 ska tas bort i internationellt format
+        var trimLeadingZeroCountries = new[] { "+46", "+47", "+45", "+358" };
+
+        if (trimLeadingZeroCountries.Contains(countryCode) && localNumber.StartsWith("0"))
+        {
+            localNumber = localNumber.TrimStart('0');
+        }
+
+        return $"{countryCode}{localNumber}";
     }
 
     private async Task<bool> CheckIfEmailExists(string userEmail)
