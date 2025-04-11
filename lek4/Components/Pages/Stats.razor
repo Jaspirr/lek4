@@ -26,23 +26,17 @@
                 <i class="fas fa-info-circle"></i>
             </button>
             <div class="stars-container">
-                @if (userStats?.DailyStreak != null)
+                @for (int i = 1; i <= 5; i++)
                 {
-                    @for (int i = 1; i <= 5; i++)
-                    {
-                        <i class="fa fa-star @(userStats.DailyStreak.Stars >= i ? "filled" : "")"></i>
-                    }
-                }
-                else
-                {
-                    <p>Loading...</p>
+                    var isFilled = userStats?.DailyStreak?.Stars >= i;
+                    <i class="fa fa-star @(isFilled ? "filled" : "")"></i>
                 }
             </div>
             <p class="stars-count">@(userStats?.DailyStreak?.Stars ?? 0) / 5 </p>
         </div>
         <div class="stat-card">
             <h4>Longest Streak</h4>
-            <p>@longestStreak days</p>
+            <p>@(longestStreak > 0 ? $"{longestStreak} days" : "1 days")</p>
         </div>
         <div class="stat-card">
             <h4>Starshards</h4>
@@ -68,7 +62,8 @@
                              -webkit-background-clip: text;
                              -webkit-text-fill-color: transparent;">
                     <i class="@(userStats?.WeeklyOdds >= averageOdds ? "fa fa-arrow-up" : "fa fa-arrow-down")"></i>
-                                            @userStats?.WeeklyOdds.ToString("0.0")
+                        @(userStats?.WeeklyOdds > 0 ? userStats.WeeklyOdds.ToString("0.0") : "0.0")
+
                 </span>
                 </div>
                 <div class="performance-row">
@@ -111,15 +106,30 @@
                             <div class="planet-item next-planet">
                                 <img src="@nextPlanetImage.ImageUrl" alt="@nextPlanetImage.Name" class="planet-icon" />
                                 <span class="planet-name">@nextPlanetImage.Name</span>
-
                             </div>
                         }
-                        <!-- Current Planet (Bottom) -->
-                       <div class="planet-item current-planet">
-                            <img src="@currentPlanetImage?.ImageUrl" alt="@currentPlanet" class="planet-icon" />
-                            <span class="planet-name">@currentPlanet</span>
-                           
-                        </div>
+                        else
+                        {
+                            <div class="planet-item next-planet">
+                                <div class="planet-icon placeholder-icon"></div>
+                                <span class="planet-name">No next planet yet</span>
+                            </div>
+                        }
+
+                        @if (currentPlanetImage != null)
+                        {
+                            <div class="planet-item current-planet">
+                                <img src="@currentPlanetImage.ImageUrl" alt="@currentPlanet" class="planet-icon" />
+                                <span class="planet-name">@currentPlanet</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="planet-item current-planet">
+                                <div class="planet-icon placeholder-icon"></div>
+                                <span class="planet-name">Starting journey...</span>
+                            </div>
+                        }
                     </div>
 
                     <!-- Vertical Progress Bar -->
@@ -1164,6 +1174,21 @@
         .info-button-dark i {
             pointer-events: none; /* Förhindrar att endast ikonen blir klickbar */
         }
+
+    .planet-icon.placeholder-icon {
+        width: 100px;
+        height: 100px;
+        background-color: #ddd;
+        color: #777;
+        font-size: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-weight: bold;
+        box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+
 </style>
 <script>
     document.querySelector('.popup-container').classList.add('animated-popup');
