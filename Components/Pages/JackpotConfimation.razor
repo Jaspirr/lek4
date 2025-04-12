@@ -1,0 +1,168 @@
+﻿@page "/jackpot/{productNumber:int}/confirmation"
+@inject NavigationManager NavigationManager
+@inject lek4.Components.Service.ProductService ProductService
+@using System.Timers
+
+<div class="confirmation-container fade-in">
+    <h2 class="fade-in">🎉 Your Ticket Has Been Submitted! 🎉</h2>
+    <p class="thank-you-message fade-in">Thank you for entering. Stay tuned for the result!</p>
+
+    <div class="timer-section fade-in">
+        @if (targetDate > DateTime.Now)
+        {
+            <div class="countdown-timer fade-in">
+                <h4>Time Remaining:</h4>
+                <p>@remainingTime</p>
+            </div>
+        }
+        else
+        {
+            <p>Time is up! The winner ticket has been drawn!</p>
+        }
+    </div>
+
+    <button class="back-button fade-in" @onclick="GoBackToHome">Go Back</button>
+</div>
+
+@code {
+    [Parameter] public int productNumber { get; set; }
+    private DateTime targetDate;
+    private string remainingTime;
+    private Timer countdownTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var productData = await ProductService.GetProductFromFirebaseAsync(productNumber);
+
+        if (productData != null && productData.DrawDate != DateTime.MinValue)
+        {
+            targetDate = productData.DrawDate;
+        }
+        else
+        {
+            targetDate = DateTime.Now.AddDays(28); // Fallback if no date is found
+        }
+
+        StartCountdown();
+    }
+
+    private void StartCountdown()
+    {
+        countdownTimer = new Timer(1000); // Update every second
+        countdownTimer.Elapsed += UpdateRemainingTime;
+        countdownTimer.Start();
+    }
+
+    private void UpdateRemainingTime(object sender, ElapsedEventArgs e)
+    {
+        var timeLeft = targetDate - DateTime.Now;
+        if (timeLeft.TotalSeconds <= 0)
+        {
+            remainingTime = "Draw time has arrived!";
+            countdownTimer.Stop();
+        }
+        else
+        {
+            remainingTime = $"{timeLeft.Days}d {timeLeft.Hours}h {timeLeft.Minutes}m {timeLeft.Seconds}s";
+        }
+        InvokeAsync(StateHasChanged); // Refresh UI
+    }
+
+    private void GoBackToHome()
+    {
+        countdownTimer?.Stop();
+        NavigationManager.NavigateTo("/products");
+    }
+
+    public void Dispose()
+    {
+        countdownTimer?.Dispose();
+    }
+}
+
+<style>
+    /* Add fade-in effect to elements */
+    .fade-in {
+        opacity: 0;
+        transform: translateY(20px); /* Start slightly downwards */
+        animation: fadeIn 0.5s forwards;
+    }
+
+    @@keyframes fadeIn {
+        to {
+            opacity: 1;
+            transform: translateY(0); /* Move to its original position */
+        }
+    }
+
+    .confirmation-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 20px;
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+        .confirmation-container h2 {
+            font-size: 2em;
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+    .thank-you-message {
+        font-size: 1.2em;
+        color: #555;
+        margin-bottom: 20px;
+    }
+
+    .timer-section {
+        margin-top: 20px;
+        margin-bottom: 30px;
+        font-size: 1.1em;
+        color: #333;
+    }
+
+    .back-button {
+        padding: 12px 20px;
+        font-size: 1em;
+        font-weight: bold;
+        color: #ffffff;
+        background-color: #28a745;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .back-button:hover {
+            background-color: #218838;
+        }
+
+    .countdown-timer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #e9f7ef;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+        .countdown-timer h4 {
+            font-size: 1.2em;
+            color: #28a745;
+            margin: 0;
+        }
+
+        .countdown-timer p {
+            font-size: 1.5em;
+            color: #155724;
+            font-weight: bold;
+        }
+</style>

@@ -6,304 +6,315 @@
 @inject NavigationManager NavigationManager
 
 <div class="stats-page">
-    <div class="header-container">
-        <header class="stats-header">
-            <div class="header-flex">
-                <button @onclick="NavigateToSettings" class="settings-button">
-                    <i class="fas fa-cog"></i>
-                </button>
-                <div class="title">
-                    <h1>Personal Stats</h1>
-                    <p>Your achievements and progress at a glance.</p>
-                </div>
-            </div>
-        </header>
-    </div>
-    <section class="stats-cards">
-        <div class="stat-card">
-            <h4>Daily Streak</h4>
-            <button class="info-button-dark" @onclick="ToggleDailyStreakInfo">
-                <i class="fas fa-info-circle"></i>
-            </button>
+	<div class="header-container">
+		<header class="stats-header">
+			<div class="header-flex">
+				<button @onclick="NavigateToSettings" class="settings-button">
+					<i class="fas fa-cog"></i>
+				</button>
+				<div class="title">
+					<h1>Personal Stats</h1>
+					<p>Your achievements and progress at a glance.</p>
+				</div>
+			</div>
+		</header>
+	</div>
+	<section class="stats-cards">
+		<div class="stat-card">
+			<h4>Daily Streak</h4>
+			<button class="info-button-dark" @onclick="ToggleDailyStreakInfo">
+				<i class="fas fa-info-circle"></i>
+			</button>
             <div class="stars-container">
-                @if (userStats?.DailyStreak != null)
+                @for (int i = 1; i <= 5; i++)
                 {
-                    @for (int i = 1; i <= 5; i++)
-                    {
-                        <i class="fa fa-star @(userStats.DailyStreak.Stars >= i ? "filled" : "")"></i>
-                    }
+                    var actualStars = userStats?.DailyStreak?.Stars ?? 1; // Visa minst 1 som default
+                    var isFilled = actualStars >= i;
+            <i class="fa fa-star @(isFilled ? "filled" : "")"></i>
                 }
-                else
-                {
-                    <p>Loading...</p>
-                }
-            </div>
-            <p class="stars-count">@(userStats?.DailyStreak?.Stars ?? 0) / 5 </p>
-        </div>
-        <div class="stat-card">
-            <h4>Longest Streak</h4>
-            <p>@longestStreak days</p>
-        </div>
-        <div class="stat-card">
-            <h4>Starshards</h4>
-            <div class="starshard-container">
-                <div class="starshard-count-box">
-                    <span class="starshard-count">@starShards</span>
-                </div>
-                <div class="starshard-box">
-                    <img src="images/Starshard.png" alt="Starshard Icon" class="starshard-icon" />
-                </div>
-            </div>
-        </div>
-        <div class="stat-card performance-card">
-            <h4>Week Performance</h4>
-            <button class="info-button-dark" @onclick="ToggleWeekPerformanceInfo">
-                <i class="fas fa-info-circle"></i>
-            </button>
-            <div class="performance-details">
-                <div class="performance-row">
-                    <span class="label">Your Odds:</span>
-                  <span class="value"
-                      style="background: @GetOddsTextColor(userStats?.WeeklyOdds, averageOdds);
+</div>
+
+<p class="stars-count">
+                @(Math.Max(userStats?.DailyStreak?.Stars ?? 1, 1)) / 5
+</p>
+
+		</div>
+		<div class="stat-card">
+			<h4>Longest Streak</h4>
+			<p>@(longestStreak > 0 ? $"{longestStreak} days" : "1 days")</p>
+		</div>
+		<div class="stat-card">
+			<h4>Starshards</h4>
+			<div class="starshard-container">
+				<div class="starshard-count-box">
+					<span class="starshard-count">@starShards</span>
+				</div>
+				<div class="starshard-box">
+					<img src="images/Starshard.png" alt="Starshard Icon" class="starshard-icon" />
+				</div>
+			</div>
+		</div>
+		<div class="stat-card performance-card">
+			<h4>Week Performance</h4>
+			<button class="info-button-dark" @onclick="ToggleWeekPerformanceInfo">
+				<i class="fas fa-info-circle"></i>
+			</button>
+			<div class="performance-details">
+				<div class="performance-row">
+					<span class="label">Your Odds:</span>
+				  <span class="value"
+					  style="background: @GetOddsTextColor(userStats?.WeeklyOdds, averageOdds);
                              -webkit-background-clip: text;
                              -webkit-text-fill-color: transparent;">
-                    <i class="@(userStats?.WeeklyOdds >= averageOdds ? "fa fa-arrow-up" : "fa fa-arrow-down")"></i>
-                                            @userStats?.WeeklyOdds.ToString("0.0")
-                </span>
-                </div>
-                <div class="performance-row">
-                    <span class="label">Everyone's Average Odds:</span>
-                    <span class="value">@averageOdds.ToString("0.0")</span>
-                </div>
-            </div>
-            <div class="performance-bar-container">
-                <div class="performance-bar-background">
-                    <div class="performance-bar"
-                         style="background: @GetPerformanceBarColor(userStats?.WeeklyOdds, averageOdds);
+					<i class="@(userStats?.WeeklyOdds >= averageOdds ? "fa fa-arrow-up" : "fa fa-arrow-down")"></i>
+						@(userStats?.WeeklyOdds > 0 ? userStats.WeeklyOdds.ToString("0.0") : "0.0")
+
+				</span>
+				</div>
+				<div class="performance-row">
+					<span class="label">Everyone's Average Odds:</span>
+					<span class="value">@averageOdds.ToString("0.0")</span>
+				</div>
+			</div>
+			<div class="performance-bar-container">
+				<div class="performance-bar-background">
+					<div class="performance-bar"
+						 style="background: @GetPerformanceBarColor(userStats?.WeeklyOdds, averageOdds);
                     width: @(Math.Min(((userStats?.WeeklyOdds ?? 0) / (averageOdds > 0 ? averageOdds : 1)) * 100, 100))%;
                     border-radius: 5px;">
-                    </div>
-                    <!-- Genomsnittsstreck -->
-                    <div class="average-line" style="left: @(Math.Min(((averageOdds > 0 ? averageOdds : 1) / (userStats?.WeeklyOdds > 0 ? userStats.WeeklyOdds : 1)) * 100, 100))%;">
-                        <span class="average-text">Average</span>
-                    </div>
-                </div>
-            </div>
-            <p class="comparison-message">
-                @comparisonMessage
-            </p>
+					</div>
+					<!-- Genomsnittsstreck -->
+					<div class="average-line" style="left: @(Math.Min(((averageOdds > 0 ? averageOdds : 1) / (userStats?.WeeklyOdds > 0 ? userStats.WeeklyOdds : 1)) * 100, 100))%;">
+						<span class="average-text">Average</span>
+					</div>
+				</div>
+			</div>
+			<p class="comparison-message">
+				@comparisonMessage
+			</p>
 
-        </div>
-        <section class="space-section">
-            <div class="space-container">
-                <div class="timeline-container">
-                    <button @onclick="ToggleInfoPopup" class="info-button">
-                        <i class="fas fa-info-circle"></i>
-                    </button>
-                    <!-- Central Container for Planets and Rocket -->
-                    <div class="central-container">
-                        <div class="planet-progress-container">
-                            <span class="planet-progress-text">@progressPercentage.ToString("0.0")%</span>
+		</div>
+		<section class="space-section">
+			<div class="space-container">
+				<div class="timeline-container">
+					<button @onclick="ToggleInfoPopup" class="info-button">
+						<i class="fas fa-info-circle"></i>
+					</button>
+					<!-- Central Container for Planets and Rocket -->
+					<div class="central-container">
+						<div class="planet-progress-container">
+							<span class="planet-progress-text">@progressPercentage.ToString("0.0")%</span>
+						</div>
+					   <div class="planet-item next-planet">
+							@if (nextPlanetImage != null)
+							{
+				                <img src="@nextPlanetImage.ImageUrl" alt="@nextPlanetImage.Name" class="planet-icon" />
+				                <span class="planet-name">@nextPlanetImage.Name</span>
+							}
+							else
+							{
+				            <img src="images/Venus2.webp" alt="Venus" class="planet-icon" />
+				            <span class="planet-name">Venus</span>
+							}
                         </div>
-                        <!-- Next Planet (Top) -->
-                        @if (nextPlanetImage != null)
-                        {
-                            <div class="planet-item next-planet">
-                                <img src="@nextPlanetImage.ImageUrl" alt="@nextPlanetImage.Name" class="planet-icon" />
-                                <span class="planet-name">@nextPlanetImage.Name</span>
 
-                            </div>
-                        }
-                        <!-- Current Planet (Bottom) -->
-                       <div class="planet-item current-planet">
-                            <img src="@currentPlanetImage?.ImageUrl" alt="@currentPlanet" class="planet-icon" />
-                            <span class="planet-name">@currentPlanet</span>
-                           
+                        <div class="planet-item current-planet">
+							                        @if (currentPlanetImage != null)
+							                        {
+				                        <img src="@currentPlanetImage.ImageUrl" alt="@currentPlanet" class="planet-icon" />
+				                        <span class="planet-name">@currentPlanet</span>
+							                        }
+							                        else
+							                        {
+				                        <img src="images/mercurus2.webp" alt="Mercury" class="planet-icon" />
+				                        <span class="planet-name">Mercury</span>
+							                        }
                         </div>
-                    </div>
 
-                    <!-- Vertical Progress Bar -->
-                    <div class="vertical-progress-bar">
-                        <div class="vertical-progress" style="height: @progressPercentage%;">
-                            <div class="rocket-container">
-                                <img src="images/raket6.png" alt="Rocket Icon" class="icon" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <div class="stat-card">
-            <h4>All Users Odds</h4>
-            <p>@allUsersTotalOdds.ToString("0.0")</p>
-        </div>
+					</div>
 
-        <!-- Your Total Steps -->
-        <div class="stat-card">
-            <h4>Your Total Steps</h4>
-            <p>@yourTotalSteps</p>
-        </div>
+					<!-- Vertical Progress Bar -->
+					<div class="vertical-progress-bar">
+						<div class="vertical-progress" style="height: @progressPercentage%;">
+							<div class="rocket-container">
+								<img src="images/raket6.png" alt="Rocket Icon" class="icon" />
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+		<div class="stat-card">
+			<h4>All Users Odds</h4>
+			<p>@allUsersTotalOdds.ToString("0.0")</p>
+		</div>
 
-        <!-- Entire App Steps -->
-        <div class="stat-card">
-            <h4>Everyone's Steps</h4>
-            <p>@entireAppSteps</p>
-        </div>
-        <div class="stat-card">
-            <h4>Credits</h4>
-            <p>@totalCredits</p>
-        </div>
-    </section>
+		<!-- Your Total Steps -->
+		<div class="stat-card">
+			<h4>Your Total Steps</h4>
+			<p>@yourTotalSteps</p>
+		</div>
 
-    @if (showRewardPopup)
-    {
-        <div class="popup-container">
-            <h2>Congratulations!</h2>
-            <p>You achieved a streak of 5/5 and earned a Starshard!</p>
-            <img src="images/Starshard.png" alt="Starshard" class="starshard" />
-            <button class="close-button" @onclick="ClosePopup">Claim</button>
-        </div>
+		<!-- Entire App Steps -->
+		<div class="stat-card">
+			<h4>Everyone's Steps</h4>
+			<p>@entireAppSteps</p>
+		</div>
+		<div class="stat-card">
+			<h4>Credits</h4>
+			<p>@totalCredits</p>
+		</div>
+	</section>
 
-    }
-    @if (showInfoPopup)
-    {
-        <div class="popup-container">
-            <h2>Information</h2>
-            <ul class="planet-info-list">
-                @foreach (var planet in planetProgression)
-                {
-                    <li>
-                        <strong>@planet.Planet:</strong> @planet.StepGoal steps 
-                    </li>
-                }
-            </ul>
-            <button class="close-button" @onclick="ToggleInfoPopup">Close</button>
-        </div>
-    }
-    @if (showWeekPerformanceInfo)
-    {
-        <div class="popup-container">
-            <div class="info-popup-content">
-               
-                <h4>Information</h4>
-                <p><strong>Your Odds:</strong> Represents your weekly performance.</p>
-                <p><strong>Everyone's Average Odds:</strong> Displays the average odds calculated from all users.</p>
-                <p><strong>Performance Bar:</strong> A visual indicator of how your odds compare to the average. The longer the bar, the better you are performing.</p>
-                <p><strong> | :</strong> The vertical line shows the average performance of all users. Use this as a benchmark to compare your progress.</p>
-                <p>
-                    <strong>Icons:</strong>
-                    <i class="fa fa-arrow-up" style="color: green;"></i> Indicates your odds are above average.
-                    <i class="fa fa-arrow-down" style="color: red;"></i> Indicates your odds are below average.
-                </p>
-                <button class="close-button" @onclick="ToggleWeekPerformanceInfo">Close</button>
-            </div>
-        </div>
-    }
-    @if (showDailyStreakInfo)
-    {
-        <div class="popup-container">
-            <div class="info-popup-content">
-                
-                <h4>Information</h4>
-                <p><strong>Daily Streak:</strong> Represents the number of consecutive days you have logged into the app and stayed active.</p>
-                <p><strong>Stars:</strong> Each star corresponds to a completed daily streak. Earn 5 stars to gain rewards.</p>
-                <button class="close-button" @onclick="ToggleDailyStreakInfo">Close</button>
-            </div>
-        </div>
-    }
+	@if (showRewardPopup)
+	{
+			<div class="popup-container">
+				<h2>Congratulations!</h2>
+				<p>You achieved a streak of 5/5 and earned a Starshard!</p>
+				<img src="images/Starshard.png" alt="Starshard" class="starshard" />
+				<button class="close-button" @onclick="ClosePopup">Claim</button>
+			</div>
+
+	}
+	@if (showInfoPopup)
+	{
+			<div class="popup-container">
+				<h2>Information</h2>
+				<ul class="planet-info-list">
+				@foreach (var planet in planetProgression)
+				{
+							<li>
+								<strong>@planet.Planet:</strong> @planet.StepGoal steps 
+							</li>
+				}
+				</ul>
+				<button class="close-button" @onclick="ToggleInfoPopup">Close</button>
+			</div>
+	}
+	@if (showWeekPerformanceInfo)
+	{
+			<div class="popup-container">
+				<div class="info-popup-content">
+
+					<h4>Information</h4>
+					<p><strong>Your Odds:</strong> Represents your weekly performance.</p>
+					<p><strong>Everyone's Average Odds:</strong> Displays the average odds calculated from all users.</p>
+					<p><strong>Performance Bar:</strong> A visual indicator of how your odds compare to the average. The longer the bar, the better you are performing.</p>
+					<p><strong> | :</strong> The vertical line shows the average performance of all users. Use this as a benchmark to compare your progress.</p>
+					<p>
+						<strong>Icons:</strong>
+						<i class="fa fa-arrow-up" style="color: green;"></i> Indicates your odds are above average.
+						<i class="fa fa-arrow-down" style="color: red;"></i> Indicates your odds are below average.
+					</p>
+					<button class="close-button" @onclick="ToggleWeekPerformanceInfo">Close</button>
+				</div>
+			</div>
+	}
+	@if (showDailyStreakInfo)
+	{
+			<div class="popup-container">
+				<div class="info-popup-content">
+
+					<h4>Information</h4>
+					<p><strong>Daily Streak:</strong> Represents the number of consecutive days you have logged into the app and stayed active.</p>
+					<p><strong>Stars:</strong> Each star corresponds to a completed daily streak. Earn 5 stars to gain rewards.</p>
+					<button class="close-button" @onclick="ToggleDailyStreakInfo">Close</button>
+				</div>
+			</div>
+	}
 </div>
 
 @code {
-    private double totalCredits;
-    private double lockInAmount;
-    private int currentStreak;
-    private int longestStreak;
-    private bool showRewardPopup = false;
-    private int starShards;
-    private bool showPopup = false;
-    private double allUsersTotalOdds;
-    private int yourTotalSteps;
-    private int entireAppSteps;
-    private UserService.UserStats userStats;
+	private double totalCredits;
+	private double lockInAmount;
+	private int currentStreak;
+	private int longestStreak;
+	private bool showRewardPopup = false;
+	private int starShards;
+	private bool showPopup = false;
+	private double allUsersTotalOdds;
+	private int yourTotalSteps;
+	private int entireAppSteps;
+	private UserService.UserStats userStats;
 
-    private double averageOdds;
-    private string comparisonMessage;
-    private string comparisonIconClass;
-    private string comparisonMessageColor = "linear-gradient(to right, #32CD32, #7fff00)"; // Default gradient
+	private double averageOdds;
+	private string comparisonMessage;
+	private string comparisonIconClass;
+	private string comparisonMessageColor = "linear-gradient(to right, #32CD32, #7fff00)"; // Default gradient
 
-    private double progressPercentage;
-    private double RocketPosition => Math.Min(progressPercentage, 100);
-    private bool showInfoPopup = false;
+	private double progressPercentage;
+	private double RocketPosition => Math.Min(progressPercentage, 100);
+	private bool showInfoPopup = false;
 
-    private void ToggleInfoPopup()
-    {
-        showInfoPopup = !showInfoPopup;
-    }
-    private bool showWeekPerformanceInfo = false;
+	private void ToggleInfoPopup()
+	{
+		showInfoPopup = !showInfoPopup;
+	}
+	private bool showWeekPerformanceInfo = false;
 
-    private void ToggleWeekPerformanceInfo()
-    {
-        showWeekPerformanceInfo = !showWeekPerformanceInfo;
-    }
-    private bool showDailyStreakInfo = false;
+	private void ToggleWeekPerformanceInfo()
+	{
+		showWeekPerformanceInfo = !showWeekPerformanceInfo;
+	}
+	private bool showDailyStreakInfo = false;
 
-    private void ToggleDailyStreakInfo()
-    {
-        showDailyStreakInfo = !showDailyStreakInfo;
-    }
+	private void ToggleDailyStreakInfo()
+	{
+		showDailyStreakInfo = !showDailyStreakInfo;
+	}
 
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            var userEmail = await LocalStorage.GetItemAsync<string>("userEmail");
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			var userEmail = await LocalStorage.GetItemAsync<string>("userEmail");
 
-            if (string.IsNullOrEmpty(userEmail))
-            {
-                NavigationManager.NavigateTo("/login");
-                return;
-            }
+			if (string.IsNullOrEmpty(userEmail))
+			{
+				NavigationManager.NavigateTo("/login");
+				return;
+			}
 
-            // Uppdatera användarens daily streak
-            await UserService.UpdateDailyStreakInUserStats(userEmail);
+			// Uppdatera användarens daily streak
+			await UserService.UpdateDailyStreakInUserStats(userEmail);
 
-            // Hämta användarens statistik
-            userStats = await UserService.GetUserFromFirebase(userEmail);
+			// Hämta användarens statistik
+			userStats = await UserService.GetUserFromFirebase(userEmail);
 
-            if (userStats != null)
-            {
-                totalCredits = userStats.Credits;
-                lockInAmount = userStats.LockInAmount;
-                currentStreak = userStats.DailyStreak?.CurrentStreak ?? 0;
-                longestStreak = userStats.DailyStreak?.LongestStreak ?? 0;
-                starShards = userStats.StarShards;
+			if (userStats != null)
+			{
+				totalCredits = userStats.Credits;
+				lockInAmount = userStats.LockInAmount;
+				currentStreak = userStats.DailyStreak?.CurrentStreak ?? 0;
+				longestStreak = userStats.DailyStreak?.LongestStreak ?? 0;
+				starShards = userStats.StarShards;
 
-                // Beräkna användarens steg baserat på TotalOdds
-                yourTotalSteps = (int)(userStats.TotalOdds * 10000); // 0.1 odds motsvarar 1000 steg
+				// Beräkna användarens steg baserat på TotalOdds
+				yourTotalSteps = (int)(userStats.TotalOdds * 10000); // 0.1 odds motsvarar 1000 steg
 
-                // Uppdatera planetprogression
-                UpdatePlanetProgress(yourTotalSteps);
+				// Uppdatera planetprogression
+				UpdatePlanetProgress(yourTotalSteps);
 
-                // Visa popup om Stars >= 5
-                if (userStats.DailyStreak.Stars >= 5)
-                {
-                    showRewardPopup = true;
-                }
-            }
+				// Visa popup om Stars >= 5
+				if (userStats.DailyStreak.Stars >= 5)
+				{
+					showRewardPopup = true;
+				}
+			}
 
-            // Hämta och bearbeta alla användares odds
-            await FetchAllUsersOdds();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading stats: {ex.Message}");
-        }
-    }
+			// Hämta och bearbeta alla användares odds
+			await FetchAllUsersOdds();
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Error loading stats: {ex.Message}");
+		}
+	}
 
-    // Planetprogression: Dynamisk logik
-    private List<(string Planet, int StepGoal)> planetProgression = new List<(string, int)>
-    {
-        ("Mercury", 100000),     // 100,000 steg
+	// Planetprogression: Dynamisk logik
+	private List<(string Planet, int StepGoal)> planetProgression = new List<(string, int)>
+	{
+		("Mercury", 100000),     // 100,000 steg
         ("Venus", 300000),       // +200,000 steg
         ("Earth", 700000),       // +400,000 steg
         ("Mars", 1500000),       // +800,000 steg
@@ -313,222 +324,231 @@
         ("Neptune", 25500000)    // +12,800,000 steg
     };
 
-    private string currentPlanet = "None";
-    private int stepsToNextPlanet;
+	private string currentPlanet = "None";
+	private int stepsToNextPlanet;
 
-    private List<PlanetOption> planets = new List<PlanetOption>
+	private List<PlanetOption> planets = new List<PlanetOption>
 {
-    new PlanetOption { Name = "Mercury", ImageUrl = "images/mercurus2.webp" },
-    new PlanetOption { Name = "Venus", ImageUrl = "images/Venus2.webp" },
-    new PlanetOption { Name = "Earth", ImageUrl = "images/earth2.webp" },
-    new PlanetOption { Name = "Mars", ImageUrl = "images/Mars2.webp" },
-    new PlanetOption { Name = "Jupiter", ImageUrl = "images/jupiter2.webp" },
-    new PlanetOption { Name = "Saturn", ImageUrl = "images/Saturnus2.webp" },
-    new PlanetOption { Name = "Uranus", ImageUrl = "images/uranus2.webp" },
-    new PlanetOption { Name = "Neptune", ImageUrl = "images/Neptunus2.webp" }
+	new PlanetOption { Name = "Mercury", ImageUrl = "images/mercurus2.webp" },
+	new PlanetOption { Name = "Venus", ImageUrl = "images/Venus2.webp" },
+	new PlanetOption { Name = "Earth", ImageUrl = "images/earth2.webp" },
+	new PlanetOption { Name = "Mars", ImageUrl = "images/Mars2.webp" },
+	new PlanetOption { Name = "Jupiter", ImageUrl = "images/jupiter2.webp" },
+	new PlanetOption { Name = "Saturn", ImageUrl = "images/Saturnus2.webp" },
+	new PlanetOption { Name = "Uranus", ImageUrl = "images/uranus2.webp" },
+	new PlanetOption { Name = "Neptune", ImageUrl = "images/Neptunus2.webp" }
 };
 
-    private PlanetOption currentPlanetImage;
-    private PlanetOption nextPlanetImage;
+	private PlanetOption currentPlanetImage;
+	private PlanetOption nextPlanetImage;
 
-    private void UpdatePlanetProgress(int totalSteps)
-    {
-        for (int i = 0; i < planetProgression.Count; i++)
-        {
-            if (totalSteps < planetProgression[i].StepGoal)
-            {
-                currentPlanet = planetProgression[i].Planet;
-                stepsToNextPlanet = planetProgression[i].StepGoal - totalSteps;
+	private void UpdatePlanetProgress(int totalSteps)
+	{
+		for (int i = 0; i < planetProgression.Count; i++)
+		{
+			if (totalSteps < planetProgression[i].StepGoal)
+			{
+				currentPlanet = planetProgression[i].Planet;
+				stepsToNextPlanet = planetProgression[i].StepGoal - totalSteps;
 
-                // Sätt aktuell och nästa planetbild
-                currentPlanetImage = planets.FirstOrDefault(p => p.Name == currentPlanet);
-                nextPlanetImage = i + 1 < planetProgression.Count ? planets[i + 1] : null;
+				// Sätt aktuell och nästa planetbild
+				currentPlanetImage = planets.FirstOrDefault(p => p.Name == currentPlanet);
+				nextPlanetImage = i + 1 < planetProgression.Count ? planets[i + 1] : null;
 
-                // Beräkna progress i procent mellan föregående och nuvarande planet
-                int previousGoal = i == 0 ? 0 : planetProgression[i - 1].StepGoal;
-                progressPercentage = ((double)(totalSteps - previousGoal) / (planetProgression[i].StepGoal - previousGoal)) * 100;
+				// Beräkna progress i procent mellan föregående och nuvarande planet
+				int previousGoal = i == 0 ? 0 : planetProgression[i - 1].StepGoal;
+				progressPercentage = ((double)(totalSteps - previousGoal) / (planetProgression[i].StepGoal - previousGoal)) * 100;
 
-                return;
-            }
-        }
+				return;
+			}
+		}
 
-        // Om användaren har fler steg än den sista planetens mål
-        currentPlanet = "All planets visited!";
-        stepsToNextPlanet = 0;
-        currentPlanetImage = null;
-        nextPlanetImage = null;
-        progressPercentage = 100;
-    }
-
-
-    public class PlanetOption
-    {
-        public string Name { get; set; }
-        public string ImageUrl { get; set; }
-    }
-
-    private string GetPerformanceBarColor(double? userOdds, double averageOdds)
-    {
-        var ratio = (userOdds ?? 0) / (averageOdds > 0 ? averageOdds : 1);
-        return GetUnifiedGradient(ratio);
-    }
-
-    private string GetOddsTextColor(double? userOdds, double averageOdds)
-    {
-        var ratio = (userOdds ?? 0) / (averageOdds > 0 ? averageOdds : 1);
-        return GetUnifiedGradient(ratio);
-    }
-
-    private string GetComparisonMessageColor(double userOdds, double averageOdds)
-    {
-        var ratio = userOdds / (averageOdds > 0 ? averageOdds : 1);
-        return GetUnifiedGradient(ratio);
-    }
-
-    private string GetUnifiedGradient(double value)
-    {
-        if (value > 2.0)
-            return "linear-gradient(to right, #00FF00, #32CD32)"; // Bright green
-        if (value > 1.5)
-            return "linear-gradient(to right, #ADFF2F, #7CFC00)"; // Lime green
-        if (value > 1.0)
-            return "linear-gradient(to right, #FFD700, #FFA500)"; // Gold-orange
-        if (value > 0.5)
-            return "linear-gradient(to right, #FFCC00, #FF9900)"; // Yellow-orange
-        if (value >= 0)
-            return "linear-gradient(to right, #7FFF00, #32CD32)"; // Light green
-        if (value > -0.5)
-            return "linear-gradient(to right, #FFD700, #FFA500)"; // Light yellow-orange
-        if (value > -1.0)
-            return "linear-gradient(to right, #FF6347, #FF4500)"; // Red-orange
-        return "linear-gradient(to right, #FF0000, #8B0000)"; // Dark red
-    }
+		// Om användaren har fler steg än den sista planetens mål
+		currentPlanet = "All planets visited!";
+		stepsToNextPlanet = 0;
+		currentPlanetImage = null;
+		nextPlanetImage = null;
+		progressPercentage = 100;
+	}
 
 
-    private async Task FetchAllUsersOdds()
-    {
-        try
-        {
-            // Hämta data från TotalUsersOdds.json
-            var totalUsersOdds = await UserService.GetAllUsersOdds();
+	public class PlanetOption
+	{
+		public string Name { get; set; }
+		public string ImageUrl { get; set; }
+	}
 
-            if (totalUsersOdds != null && totalUsersOdds.Count > 0)
-            {
-                // Summera alla användares Odds
-                allUsersTotalOdds = totalUsersOdds.Sum(u => u.Value);
+	private string GetPerformanceBarColor(double? userOdds, double averageOdds)
+	{
+		var ratio = (userOdds ?? 0) / (averageOdds > 0 ? averageOdds : 1);
+		return GetUnifiedGradient(ratio);
+	}
 
-                // Omvandla totala Odds till steg
-                entireAppSteps = (int)(allUsersTotalOdds * 10000);
-            }
+	private string GetOddsTextColor(double? userOdds, double averageOdds)
+	{
+		var ratio = (userOdds ?? 0) / (averageOdds > 0 ? averageOdds : 1);
+		return GetUnifiedGradient(ratio);
+	}
 
-            // Hämta data från TotalUsersWeeklyOdds.json
-            var totalUsersWeeklyOdds = await UserService.GetAllUsersWeeklyOdds();
+	private string GetComparisonMessageColor(double userOdds, double averageOdds)
+	{
+		var ratio = userOdds / (averageOdds > 0 ? averageOdds : 1);
+		return GetUnifiedGradient(ratio);
+	}
 
-            if (totalUsersWeeklyOdds != null && totalUsersWeeklyOdds.Count > 0)
-            {
-                // Beräkna genomsnittliga Weekly Odds
-                averageOdds = totalUsersWeeklyOdds.Sum(u => u.Value) / totalUsersWeeklyOdds.Count;
+	private string GetUnifiedGradient(double value)
+	{
+		if (value > 2.0)
+			return "linear-gradient(to right, #00FF00, #32CD32)"; // Bright green
+		if (value > 1.5)
+			return "linear-gradient(to right, #ADFF2F, #7CFC00)"; // Lime green
+		if (value > 1.0)
+			return "linear-gradient(to right, #FFD700, #FFA500)"; // Gold-orange
+		if (value > 0.5)
+			return "linear-gradient(to right, #FFCC00, #FF9900)"; // Yellow-orange
+		if (value >= 0)
+			return "linear-gradient(to right, #7FFF00, #32CD32)"; // Light green
+		if (value > -0.5)
+			return "linear-gradient(to right, #FFD700, #FFA500)"; // Light yellow-orange
+		if (value > -1.0)
+			return "linear-gradient(to right, #FF6347, #FF4500)"; // Red-orange
+		return "linear-gradient(to right, #FF0000, #8B0000)"; // Dark red
+	}
 
-                // Jämför användarens Weekly Odds med genomsnittet
-                if (userStats != null)
-                {
-                    double oddsDifference = userStats.WeeklyOdds - averageOdds;
 
-                    if (oddsDifference > 2.0)
-                    {
-                        comparisonMessage = "You're leading the pack! Incredible performance!";
-                        comparisonIconClass = "fa fa-crown";
-                    }
-                    else if (oddsDifference > 1.5)
-                    {
-                        comparisonMessage = "You're soaring high! Keep up this amazing momentum!";
-                        comparisonIconClass = "fa fa-star";
-                    }
-                    else if (oddsDifference > 1.0)
-                    {
-                        comparisonMessage = "Fantastic progress! You're truly inspiring!";
-                        comparisonIconClass = "fa fa-trophy";
-                    }
-                    else if (oddsDifference > 0.5)
-                    {
-                        comparisonMessage = "Great job! You're above the average. Stay strong!";
-                        comparisonIconClass = "fa fa-medal";
-                    }
-                    else if (oddsDifference >= 0)
-                    {
-                        comparisonMessage = "You're on the right track! Consistency is key.";
-                        comparisonIconClass = "fa fa-thumbs-up";
-                    }
-                    else if (oddsDifference > -0.5)
-                    {
-                        comparisonMessage = "Keep pushing! You're almost at the average.";
-                        comparisonIconClass = "fa fa-compass";
-                    }
-                    else if (oddsDifference > -1.0)
-                    {
-                        comparisonMessage = "Don't give up! Small steps lead to big wins.";
-                        comparisonIconClass = "fa fa-rocket";
-                    }
-                    else
-                    {
-                        comparisonMessage = "Stay motivated! Every step forward counts.";
-                        comparisonIconClass = "fa fa-mountain";
-                    }
+	private async Task FetchAllUsersOdds()
+	{
+		try
+		{
+			// Hämta data från TotalUsersOdds.json
+			var totalUsersOdds = await UserService.GetAllUsersOdds();
 
-                    comparisonMessageColor = GetComparisonMessageColor(userStats.WeeklyOdds, averageOdds);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error fetching users odds data: {ex.Message}");
-        }
-    }
+			if (totalUsersOdds != null && totalUsersOdds.Count > 0)
+			{
+				// Summera alla användares Odds
+				allUsersTotalOdds = totalUsersOdds.Sum(u => u.Value);
 
-    private async Task GiveStarshard(string userEmail)
-    {
-        // Lägg till en Starshard i användarens stats
-        starShards++;
-        await UserService.AddStarshardToUser(userEmail, starShards);
-    }
-    private async Task ClosePopup()
-    {
-        try
-        {
-            if (userStats?.DailyStreak != null)
-            {
-                // Kontrollera att Stars >= 5 för att säkerställa att det finns tillräckligt
-                if (userStats.DailyStreak.Stars >= 5)
-                {
-                    // Minska antalet Stars med 5
-                    userStats.DailyStreak.Stars -= 5;
+				// Omvandla totala Odds till steg
+				entireAppSteps = (int)(allUsersTotalOdds * 10000);
+			}
 
-                    // Lägg till en Starshard till användaren
-                    userStats.StarShards++;
-                    starShards = userStats.StarShards; // Uppdatera lokala variabeln
+			// Hämta data från TotalUsersWeeklyOdds.json
+			var totalUsersWeeklyOdds = await UserService.GetAllUsersWeeklyOdds();
 
-                    // Uppdatera Firebase med nya värden
-                    await UserService.UpdateUserStatsInFirebase(userStats.UserEmail, userStats);
+			if (totalUsersWeeklyOdds != null && totalUsersWeeklyOdds.Count > 0)
+			{
+				// Beräkna genomsnittliga Weekly Odds
+				var validOdds = totalUsersWeeklyOdds.Values.Where(v => v > 0).ToList();
 
-                    // Visa en bekräftelse i konsolen
-                    Console.WriteLine($"Starshard added! Current Starshards: {starShards}");
-                }
+				if (validOdds.Count > 0)
+				{
+					averageOdds = validOdds.Average();
+				}
+				else
+				{
+					averageOdds = 0;
+				}
 
-                // Dölj popup och uppdatera UI
-                showRewardPopup = false;
-                StateHasChanged();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error resetting stars: {ex.Message}");
-        }
-    }
+				// Jämför användarens Weekly Odds med genomsnittet
+				if (userStats != null)
+				{
+					double oddsDifference = userStats.WeeklyOdds - averageOdds;
 
-    private void NavigateToSettings()
-    {
-        NavigationManager.NavigateTo("/settings");
-    }
+					if (oddsDifference > 2.0)
+					{
+						comparisonMessage = "You're leading the pack! Incredible performance!";
+						comparisonIconClass = "fa fa-crown";
+					}
+					else if (oddsDifference > 1.5)
+					{
+						comparisonMessage = "You're soaring high! Keep up this amazing momentum!";
+						comparisonIconClass = "fa fa-star";
+					}
+					else if (oddsDifference > 1.0)
+					{
+						comparisonMessage = "Fantastic progress! You're truly inspiring!";
+						comparisonIconClass = "fa fa-trophy";
+					}
+					else if (oddsDifference > 0.5)
+					{
+						comparisonMessage = "Great job! You're above the average. Stay strong!";
+						comparisonIconClass = "fa fa-medal";
+					}
+					else if (oddsDifference >= 0)
+					{
+						comparisonMessage = "You're on the right track! Every step forward counts.";
+						comparisonIconClass = "fa fa-thumbs-up";
+					}
+					else if (oddsDifference > -0.5)
+					{
+						comparisonMessage = "Keep pushing! You're almost at the average.";
+						comparisonIconClass = "fa fa-compass";
+					}
+					else if (oddsDifference > -1.0)
+					{
+						comparisonMessage = "Don't give up! Small steps lead to big wins.";
+						comparisonIconClass = "fa fa-rocket";
+					}
+					else
+					{
+						comparisonMessage = "Stay motivated! Every step forward counts.";
+						comparisonIconClass = "fa fa-mountain";
+					}
+
+					comparisonMessageColor = GetComparisonMessageColor(userStats.WeeklyOdds, averageOdds);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Error fetching users odds data: {ex.Message}");
+		}
+	}
+
+	private async Task GiveStarshard(string userEmail)
+	{
+		// Lägg till en Starshard i användarens stats
+		starShards++;
+		await UserService.AddStarshardToUser(userEmail, starShards);
+	}
+	private async Task ClosePopup()
+	{
+		try
+		{
+			if (userStats?.DailyStreak != null)
+			{
+				// Kontrollera att Stars >= 5 för att säkerställa att det finns tillräckligt
+				if (userStats.DailyStreak.Stars >= 5)
+				{
+					// Minska antalet Stars med 5
+					userStats.DailyStreak.Stars -= 5;
+
+					// Lägg till en Starshard till användaren
+					userStats.StarShards++;
+					starShards = userStats.StarShards; // Uppdatera lokala variabeln
+
+					// Uppdatera Firebase med nya värden
+					await UserService.UpdateUserStatsInFirebase(userStats.UserEmail, userStats);
+
+					// Visa en bekräftelse i konsolen
+					Console.WriteLine($"Starshard added! Current Starshards: {starShards}");
+				}
+
+				// Dölj popup och uppdatera UI
+				showRewardPopup = false;
+				StateHasChanged();
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Error resetting stars: {ex.Message}");
+		}
+	}
+
+	private void NavigateToSettings()
+	{
+		NavigationManager.NavigateTo("/settings");
+	}
 }
 
 <style>
@@ -643,23 +663,24 @@
         align-items: center; /* Center-align title and description */
     }
 
-    .settings-button {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(145deg, #ffffff, #f4f4f9);
-        color: #2c3e50;
-        border: none;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        cursor: pointer;
-        transition: transform 0.3s, box-shadow 0.3s, background-color 0.3s;
-    }
+  .settings-button {
+    position: absolute;
+    top: 20px;
+    left: -50%;
+    transform: translateX(120px); /* justera detta för hur mycket mot mitten */
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(145deg, #ffffff, #f4f4f9);
+    color: #2c3e50;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s, background-color 0.3s;
+}
 
         .settings-button:hover {
             transform: scale(1.1);

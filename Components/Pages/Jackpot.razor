@@ -1,0 +1,110 @@
+﻿@page "/jackpot"
+@inject NavigationManager NavigationManager
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject lek4.Components.Service.JackpotService JackpotService
+@inject UserService UserService
+
+<h2>Jackpot</h2>
+<p>Current Jackpot Amount: @jackpotAmount kr</p>
+
+@if (!canParticipate)
+{
+    <p class="error-message">@errorMessage</p>
+}
+else
+{
+    <p>Your Credits: @userCredits</p>
+    <button @onclick="JoinJackpot" class="join-button">Join Jackpot (@ticketCost credits)</button>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <p class="success-message">@successMessage</p>
+}
+
+@code {
+    private double jackpotAmount;
+    private double userCredits;
+    private bool canParticipate;
+    private string errorMessage;
+    private string successMessage;
+    private string currentUserEmail;
+    private int productNumber = 1; // Ange ett produktnummer för jackpot om det är specifikt
+    private int ticketCost = 100; // Standardvärde som uppdateras dynamiskt
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUserEmail = await LocalStorage.GetItemAsync<string>("userEmail");
+
+        if (string.IsNullOrEmpty(currentUserEmail))
+        {
+            errorMessage = "User not logged in.";
+            return;
+        }
+
+        await LoadJackpotData();
+    }
+
+    private async Task LoadJackpotData()
+    {
+        try
+        {
+            // Hämta ticketCost från Firebase
+            ticketCost = await JackpotService.GetTicketCost();
+            Console.WriteLine($"Ticket cost fetched: {ticketCost}");
+
+            // Hämta användarens credits och kolla om de kan delta
+            userCredits = await JackpotService.GetUserCredits(currentUserEmail);
+            canParticipate = userCredits >= ticketCost;
+
+            // Hämta aktuellt jackpot-belopp
+            jackpotAmount = await JackpotService.GetJackpotAmount();
+            double totalCredits = await UserService.GetTotalCredits(); // Hämta total credits från UserService
+
+            // Om du vill inkludera totalCredits i jackpotAmount
+            jackpotAmount += totalCredits;
+
+            errorMessage = canParticipate ? null : $"You need at least {ticketCost} credits to join the jackpot.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading jackpot data: {ex.Message}";
+        }
+    }
+
+    private async Task JoinJackpot()
+    {
+        Console.WriteLine($"Försöker gå med i jackpot med användare: {currentUserEmail} och credits: {userCredits}");
+
+        if (!canParticipate)
+        {
+            errorMessage = "Insufficient credits to participate.";
+            return;
+        }
+
+        try
+        {
+            // Gå med i jackpot
+            await JackpotService.JoinJackpot(currentUserEmail, productNumber);
+
+            // Uppdatera användarens credits och jackpot-belopp
+            userCredits -= ticketCost;
+            jackpotAmount += ticketCost * 0.1; // Uppdatera jackpot-beloppet (t.ex. 10% av ticketCost)
+
+            canParticipate = userCredits >= ticketCost; // Kontrollera om användaren kan gå med igen
+
+            successMessage = "You have successfully joined the jackpot!";
+            errorMessage = null; // Rensa eventuella tidigare felmeddelanden
+
+            Console.WriteLine("Lyckades gå med i jackpot, omdirigerar till biljettvalssidan.");
+
+            // Omdirigera till biljettvalssidan
+            NavigationManager.NavigateTo($"/jackpot/{productNumber}/select-ticket");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Kunde inte gå med i jackpot: {ex.Message}";
+            Console.WriteLine(errorMessage);
+        }
+    }
+}

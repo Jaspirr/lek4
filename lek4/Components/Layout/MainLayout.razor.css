@@ -3,11 +3,10 @@
     display: block; /* Ändra till block istället för flex om det påverkar layouten */
 }
 
-main {
-    display: flex;
-    flex-direction: column;
-    align-items: center; /* Centrera innehållet horisontellt */
-    width: 100%;
+.main {
+    min-height: 100vh;
+    padding-bottom: env(safe-area-inset-bottom, 60px);
+    box-sizing: border-box;
 }
 
 .sidebar {

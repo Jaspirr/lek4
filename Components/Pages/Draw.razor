@@ -1,0 +1,243 @@
+﻿@page "/draw"
+@using System.Text.Json
+@using lek4.Components.Service
+
+@inject DrawService DrawService
+@inject ProductService ProductService
+@inject DrawJackpotService DrawJackpotService
+
+<h3>Draw Page</h3>
+
+<div class="product-draw">
+    @if (productNumbers != null)
+    {
+        @foreach (var productNumber in productNumbers)
+        {
+            <div class="product-info">
+                <h4>Product @productNumber</h4>
+
+                <!-- Display winner if available -->
+                <p><strong>Winner: @(winners.ContainsKey(productNumber) && winners[productNumber] != "No winner yet" ? winners[productNumber] : "No winner yet")</strong></p>
+
+                <!-- If no winner has been drawn, display buttons -->
+                @if (!winners.ContainsKey(productNumber) || winners[productNumber] == "No winner yet")
+                {
+                    <!-- Button to draw a winner -->
+                    <button @onclick="() => DrawWinnerForProduct(productNumber)" class="draw-winner-button">Draw Winner</button>
+
+                    <!-- Button to fetch the winner if needed -->
+                    <button @onclick="() => FetchWinnerFromFirebase(productNumber)" class="fetch-winner-button">Fetch Winner</button>
+                }
+
+            </div>
+        }
+    }
+    else
+    {
+        <p>Loading products...</p>
+    }
+</div>
+
+@code {
+    private List<int> productNumbers = new List<int>();
+    private Dictionary<int, string> winners = new Dictionary<int, string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Fetch all products, then extract the product numbers
+        var products = await ProductService.FetchAllProductsFromFirebaseAsync();
+
+        // Extract product numbers from the fetched product data
+        productNumbers = products.Select(p => p.ProductNumber).ToList();
+
+        // Initialize winners dictionary for each product number
+        foreach (var productNumber in productNumbers)
+        {
+            // Fetch winner from Firebase for each product
+            string winner = await FetchWinnerFromFirebase(productNumber);
+            winners[productNumber] = winner ?? "No winner yet";
+        }
+
+        StateHasChanged();  // Trigger a UI refresh after initialization
+    }
+
+    // Fetch the winner from Firebase using ProductService
+    private async Task<string> FetchWinnerFromFirebase(int productNumber)
+    {
+        try
+        {
+            // Fetch winner from Firebase using ProductService
+            var winner = await ProductService.GetWinnerFromFirebase(productNumber);
+            return winner ?? "No winner yet";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error while fetching winner for product {productNumber}: {ex.Message}");
+            return "No winner yet";
+        }
+    }
+
+    // Determine if the product is a jackpot and draw accordingly
+    public async Task DrawWinnerForProduct(int productNumber)
+    {
+        bool isJackpotProduct = await ProductService.CheckIfJackpotProduct(productNumber);
+
+        if (isJackpotProduct)
+        {
+            await DrawJackpotWinner(productNumber);
+        }
+        else
+        {
+            await DrawRegularWinner(productNumber);
+        }
+    }
+
+    // Draw a winner for a jackpot product
+    private async Task DrawJackpotWinner(int productNumber)
+    {
+        // Hämta alla biljetter
+        var tickets = await DrawJackpotService.GetJackpotTickets();
+
+        if (tickets == null || tickets.Count == 0)
+        {
+            Console.WriteLine("No jackpot tickets available for draw.");
+            return;
+        }
+
+        // Generera en slumpmässig biljett
+        var randomTicket = DrawJackpotService.GenerateRandomTicket();
+        Console.WriteLine($"Generated random ticket: {JsonSerializer.Serialize(randomTicket)}");
+
+        // Leta efter en matchande biljett
+        var matchingTicket = tickets.FirstOrDefault(t => DrawJackpotService.IsMatchingTicket(t, randomTicket));
+
+        // Om en matchande biljett hittas
+        if (matchingTicket != null)
+        {
+            Console.WriteLine($"Matching ticket found: {JsonSerializer.Serialize(matchingTicket)}");
+            await DrawJackpotService.SaveWinnerToFirebase(productNumber, matchingTicket.UserEmail, DateTime.Now, matchingTicket);
+
+            winners[productNumber] = $"Winner: {matchingTicket.UserEmail} - Ticket: {matchingTicket.Number}, {matchingTicket.Color}, {matchingTicket.Symbol}, {matchingTicket.Planet}, {matchingTicket.Element}";
+            StateHasChanged();
+        }
+        else
+        {
+            // Ingen matchande biljett hittades, spara den slumpmässiga biljetten som "No winner"
+            Console.WriteLine("No matching ticket found. Saving random ticket as 'No winner'.");
+            await DrawJackpotService.SaveWinnerToFirebase(productNumber, null, DateTime.Now, randomTicket);
+
+            winners[productNumber] = "No winner";
+            StateHasChanged();
+        }
+    }
+
+    // Draw a winner for a regular product
+    private async Task DrawRegularWinner(int productNumber)
+    {
+        // Fetch totalusers.json from Firebase
+        var totalUsers = await DrawService.GetAllUserLockInData(productNumber);
+
+        if (totalUsers == null || totalUsers.Count == 0)
+        {
+            Console.WriteLine("No users available for draw.");
+            return;
+        }
+
+        // Perform the draw and get the winner's email
+        var winner = DrawService.DrawWinner(totalUsers);
+
+        // Fetch the price for the product
+        var price = await ProductService.GetPriceForProduct(productNumber);
+
+        if (price == 0)
+        {
+            Console.WriteLine($"Price for product {productNumber} could not be retrieved.");
+            return;
+        }
+
+        // Save the winner to Firebase with the price
+        await DrawService.SaveWinnerToFirebase(productNumber, winner, price);
+
+        // Update UI with the new winner
+        winners[productNumber] = winner;
+        StateHasChanged();
+    }
+
+    // Fetch emails, lock-in amounts, draw winner, and save to Firebase
+    public async Task DrawWinnerFromTotalUsers(int productNumber)
+    {
+        // Draw a winner from all users for a non-jackpot product
+        await DrawRegularWinner(productNumber);
+    }
+
+
+    // Sample method to update product info with winner (modify as needed)
+    private async Task UpdateProductWithWinner(int productNumber, string winnerEmail)
+    {
+        // Call your method to update the product info, Razor UI, etc.
+        Console.WriteLine($"Product {productNumber} updated with winner {winnerEmail}");
+        // You can implement the logic to save the winner to the UI or Firebase here
+    }
+}
+
+<style>
+    .product-draw {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); /* 3 columns */
+        gap: 20px;
+        padding: 20px;
+    }
+
+    .product-info {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        background-color: #f9f9f9;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+        .product-info h4 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            color: #333;
+        }
+
+        .product-info p {
+            margin-bottom: 5px;
+            font-size: 1em;
+            color: #555;
+        }
+
+        .product-info button {
+            margin-top: 10px;
+            padding: 5px 10px; /* Make buttons smaller */
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em; /* Smaller text */
+            transition: background-color 0.3s ease;
+        }
+
+            .product-info button:hover {
+                background-color: #45a049;
+            }
+
+    .draw-winner-button {
+        background-color: #f44336; /* Red button for drawing a winner */
+    }
+
+        .draw-winner-button:hover {
+            background-color: #d32f2f;
+        }
+
+    .fetch-winner-button {
+        background-color: #4CAF50; /* Green button for fetching the winner */
+    }
+
+        .fetch-winner-button:hover {
+            background-color: #388E3C;
+        }
+</style>

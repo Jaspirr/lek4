@@ -1,0 +1,173 @@
+﻿@page "/admin-ads-span"
+@inject IJSRuntime JSRuntime
+@inject HttpClient HttpClient
+@using System.Text.Json
+@using System.Text
+@inject NavigationManager NavigationManager
+
+
+<div class="config-container">
+    <h2>Update Ad Trigger Points</h2>
+    <button @onclick="NavigateBack">← Back</button>
+
+    <div class="preset-selector">
+        <label for="presetDropdown">Choose a preset:</label>
+        <select id="presetDropdown" @onchange="OnPresetChanged">
+            @foreach (var preset in triggerPresets.Keys)
+            {
+                <option value="@preset" selected="@preset == selectedPreset">@preset</option>
+            }
+        </select>
+    </div>
+
+    <div class="selected-configuration">
+        <h3>Selected Configuration:</h3>
+        <p>@string.Join(", ", selectedTriggerPoints)</p>
+    </div>
+
+    <button class="apply-button" @onclick="ApplyConfiguration">Apply Configuration</button>
+</div>
+
+@code {
+    private string selectedPreset = "Standard";
+    private Dictionary<string, List<double>> triggerPresets = new();
+
+    private List<double> selectedTriggerPoints;
+
+    protected override void OnInitialized()
+    {
+        // Generate Rising points dynamically
+        triggerPresets = new Dictionary<string, List<double>>
+        {
+            { "Standard", Enumerable.Range(1, 30).Select(i => Math.Round(i * 0.3, 1)).ToList() },
+            { "High", Enumerable.Range(1, 45).Select(i => Math.Round(i * 0.2, 1)).ToList() },
+            { "Low", Enumerable.Range(1, 18).Select(i => Math.Round(i * 0.5, 1)).ToList() },
+            { "Rising", GenerateRisingTriggerPoints() },
+            { "None", new List<double>() }
+        };
+
+        selectedTriggerPoints = triggerPresets[selectedPreset];
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task ApplyConfiguration()
+    {
+        // Create JSON structure
+        var configData = new
+        {
+            TriggerPoints = selectedTriggerPoints,
+            SelectedPreset = selectedPreset
+        };
+
+        var json = JsonSerializer.Serialize(configData, new JsonSerializerOptions { WriteIndented = true });
+
+        // Send data to Firebase
+        var configUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fads%2FAdsSpan.json";
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await HttpClient.PostAsync(configUrl, content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Configuration successfully updated!");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to update configuration. Status: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error while updating configuration: {ex.Message}");
+        }
+    }
+
+    private void OnPresetChanged(ChangeEventArgs e)
+    {
+        selectedPreset = e.Value.ToString();
+        selectedTriggerPoints = triggerPresets[selectedPreset];
+    }
+
+    private List<double> GenerateRisingTriggerPoints()
+    {
+        var triggerPoints = new List<double>();
+
+        // Range 0.0–1.0: Few points (0.5 increments)
+        for (double i = 0.5; i <= 1.0; i += 0.5)
+        {
+            triggerPoints.Add(Math.Round(i, 1));
+        }
+
+        // Range 1.0–3.0: More points (0.3 increments)
+        for (double i = 1.3; i <= 3.0; i += 0.3)
+        {
+            triggerPoints.Add(Math.Round(i, 1));
+        }
+
+        // Range 3.0–5.0: Moderate points (0.2 increments)
+        for (double i = 3.2; i <= 5.0; i += 0.2)
+        {
+            triggerPoints.Add(Math.Round(i, 1));
+        }
+
+        // Range 5.0–9.0: Dense points (0.1 increments)
+        for (double i = 5.1; i <= 9.0; i += 0.1)
+        {
+            triggerPoints.Add(Math.Round(i, 1));
+        }
+
+        return triggerPoints;
+    }
+}
+
+}
+<style>
+    .config-container {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .preset-selector {
+        margin-bottom: 20px;
+    }
+
+        .preset-selector label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+    .apply-button {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+        .apply-button:hover {
+            background-color: #218838;
+        }
+
+    .selected-configuration {
+        margin: 20px 0;
+        font-size: 1rem;
+        color: #333;
+    }
+
+        .selected-configuration h3 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+</style>

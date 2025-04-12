@@ -12,8 +12,7 @@ namespace MMTAdmobSample
             base.OnCreate(savedInstanceState);
 
             string appId = "ca-app-pub-3940256099942544~3347511713";
-            string license = "YOUR_LICENSE_KEY"; //<-- Your license key here
-            CrossMauiMTAdmob.Current.Init(this, appId, license);
+            CrossMauiMTAdmob.Current.Init(this, appId, null);
         }
 
         protected override void OnResume()

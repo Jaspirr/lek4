@@ -1,0 +1,1013 @@
+﻿@page "/jackpot/{productNumber:int}/SelectTicket"
+@inject JackpotService JackpotService
+@inject NavigationManager NavigationManager
+@inject UserService UserService
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject IJSRuntime JS
+
+
+@using lek4.Components.Service
+
+<div class="ticket-selection-form">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    @if (currentStep == 1)
+    {
+        <div class="number-grid fade-in">
+            @foreach (var number in numbers)
+            {
+                <div class="number-circle @(number == selectedNumber ? "selected" : "")"
+                     style="background-color:@GetRandomColor(number);"
+                     @onclick="() => HighlightNumber(number)">
+                    @number
+                </div>
+            }
+        </div>
+        @if (selectedNumber != 0)
+        {
+            <button class="select-button fade-in" @onclick="ProceedToNextStep">Select</button>
+        }
+    }
+    else if (currentStep == 2)
+    {
+        <div class="color-selection fade-in">
+            <div class="color-grid fade-in">
+                @foreach (var color in colors)
+                {
+                    <div class="color-ball @(color.Name == selectedColor ? "selected" : "")"
+                         style="background-color:@color.ColorCode;"
+                         @onclick="() => HighlightColor(color.Name)">
+                    </div>
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(selectedColor))
+            {
+                <div class="button-container">
+                    <button class="select-button fade-in" @onclick="ProceedToNextStep">Select</button>
+                </div>
+            }
+        </div>
+    }
+    else if (currentStep == 3)
+    {
+        <div class="symbol-selection fade-in">
+            <div class="symbol-grid fade-in">
+                @foreach (var symbol in symbols)
+                {
+                    <div class="symbol-item @(symbol.Name == selectedSymbol ? "selected" : "")"
+                         @onclick="() => HighlightSymbol(symbol.Name)">
+                        <i class="@symbol.IconClass" title="@symbol.Name"></i>
+                    </div>
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(selectedSymbol))
+            {
+                <div class="button-container">
+                <button class="select-button fade-in" @onclick="ProceedToNextStep">Select</button>
+                </div>
+            }
+        </div>
+    }
+    else if (currentStep == 4)
+    {
+        <div class="chinesesymbol-selection fade-in">
+            <div class="chinesesymbol-grid fade-in">
+                @foreach (var symbol in chineseSymbols)
+                {
+                    <div class="chinesesymbol-circle @(symbol.Name == selectedChineseSymbol ? "selected" : "")" @onclick="() => HighlightChineseSymbol(symbol.Name)">
+                        <img src="@symbol.ImageUrl" alt="@symbol.Name" title="@symbol.Name" loading="lazy" />
+                    </div>
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(selectedChineseSymbol))
+            {
+                <div class="button-container">
+                    <button class="select-button fade-in" @onclick="ProceedToNextStep">Select</button>
+                </div>
+            }
+        </div>
+    }
+    else if (currentStep == 5)
+    {
+        <div class="planet-selection fade-in">
+            <div class="planet-grid fade-in">
+                @foreach (var planet in planets)
+                {
+                    <div class="planet-item-content">
+                        <div class="planet-item @(planet.Name == selectedPlanet ? "selected" : "")" @onclick="() => HighlightPlanet(planet.Name)">
+                            <img src="@planet.ImageUrl" alt="@planet.Name" title="@planet.Name" />
+                        </div>
+                        <p>@planet.Name</p>
+                    </div>
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(selectedPlanet))
+            {
+                <button class="select-button fade-in" @onclick="ProceedToNextStep">Select</button>
+            }
+        </div>
+    }
+    else if (currentStep == 6)
+    {
+        <div class="element-selection fade-in">
+            <div class="element-grid fade-in">
+                @foreach (var element in elements)
+                {
+                    <div class="element-item-content">
+                        <div class="element-item @(element.Name == selectedElement ? "selected" : "")"
+                             @onclick="() => HighlightElement(element.Name)">
+                            <img src="@element.ImageUrl" alt="@element.Name" title="@element.Name" />
+                        </div>
+                        <p>@element.Name</p>
+                    </div>
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(selectedElement))
+            {
+                <button class="select-button fade-in" @onclick="ProceedToNextStep">Select</button>
+            }
+        </div>
+    }
+    else if (currentStep == 7)
+    {
+        <div class="summary-display fade-in">
+            <h4>Your Pick:</h4>
+            <div class="selection-items">
+                <div class="selection-box number-box">@selectedNumber</div>
+                <div class="selection-box color-box" style="background-color:@GetColorCode(selectedColor)"></div>
+                <div class="selection-box symbol-box">
+                    <i class="@symbols.FirstOrDefault(s => s.Name == selectedSymbol)?.IconClass"></i>
+                </div>
+                <div class="selection-box chinese-symbol-box">
+                    @if (!string.IsNullOrEmpty(selectedChineseSymbol))
+                    {
+                        <img src="@GetChineseSymbolImage(selectedChineseSymbol)" alt="@selectedChineseSymbol" />
+                    }
+                    else
+                    {
+                        <span>X</span> <!-- Fallback in case no symbol is selected -->
+                    }
+                </div>
+                 <div class="selection-box planet-box">
+                    <img src="@GetPlanetImage(selectedPlanet)" alt="@selectedPlanet" />
+                </div>
+                <div class="selection-box element-box">
+                    <img src="@GetElementImage(selectedElement)" alt="@selectedElement" />
+                </div>
+            </div>
+
+            <button class="confirm-button fade-in" @onclick="ConfirmSelections">Confirm</button>
+            <button class="change-button fade-in" @onclick="GoToFirstStep">Change</button> <!-- New button for changing selections -->
+        </div>
+    }
+    else
+    {
+        <!-- Proceed to other steps or display other content -->
+    }
+</div>
+
+@code {
+    [Parameter] public int productNumber { get; set; }
+
+    private int currentStep = 1;
+    private int selectedNumber;
+    private string selectedSymbol;
+    private string selectedPlanet;
+    private string selectedElement;
+    private string selectedChineseSymbol; // Rename to avoid conflict
+    private string selectedColor; // This stores the name of the selected color
+    private List<int> numbers = Enumerable.Range(1, 50).ToList();
+
+    protected override void OnInitialized()
+    {
+        // Förladda bilder när sidan initieras
+        JS.InvokeVoidAsync("preloadImages", imageUrls);
+    }
+
+    private void HighlightNumber(int number) => selectedNumber = number;
+
+    private void HighlightColor(string colorName) => selectedColor = colorName;
+
+    private void HighlightSymbol(string symbolName) => selectedSymbol = symbolName;
+
+    private void HighlightChineseSymbol(string symbolName) => selectedChineseSymbol = symbolName;
+
+    private void HighlightPlanet(string planetName) => selectedPlanet = planetName;
+
+    private void HighlightElement(string elementName) => selectedElement = elementName;
+
+    private void ProceedToNextStep() => currentStep++;
+
+    private void GoToFirstStep()
+    {
+        currentStep = 1; // Set to the first step
+    }
+    private string GetChineseSymbolImage(string chineseSymbolName)
+    {
+        var chineseSymbol = chineseSymbols.FirstOrDefault(cs => cs.Name == chineseSymbolName);
+        return chineseSymbol?.ImageUrl ?? "default_image_url"; // Return the image URL, or a default if not found
+    }
+
+    // Generates a unique color based on the number
+    private string GetRandomColor(int number)
+    {
+        var colors = new[] { "#FF5733", "#33C4FF", "#FF33A8", "#33FF57", "#FFD433" };
+        return colors[number % colors.Length];
+    }
+      // Helper function to get color code
+    private string GetColorCode(string colorName) =>
+        colors.FirstOrDefault(c => c.Name == colorName)?.ColorCode ?? "#000000"; // Default to black if not found
+
+    // Helper function to get planet image URL
+    private string GetPlanetImage(string planetName) =>
+        planets.FirstOrDefault(p => p.Name == planetName)?.ImageUrl ?? "default_planet_image_url";
+
+    // Helper function to get element image URL
+    private string GetElementImage(string elementName) =>
+        elements.FirstOrDefault(e => e.Name == elementName)?.ImageUrl ?? "default_element_image_url";
+        
+    private async Task ConfirmSelections()
+    {
+        // Try to get the user email from UserService
+        var userEmail = UserService.GetCurrentUserEmail();
+
+        // If UserService does not have the email, try to get it from LocalStorage
+        if (string.IsNullOrEmpty(userEmail))
+        {
+            userEmail = await LocalStorage.GetItemAsync<string>("userEmail");
+
+            // Set the retrieved email in UserService for future use
+            if (!string.IsNullOrEmpty(userEmail))
+            {
+                UserService.SetCurrentUserEmail(userEmail);
+            }
+        }
+
+        // If we still do not have a valid email, log an error and return
+        if (string.IsNullOrEmpty(userEmail))
+        {
+            Console.WriteLine("User email not found.");
+            return;
+        }
+
+        // Format the ticket as a single-line string
+        var ticketData = $"{selectedNumber}, {selectedColor}, {selectedSymbol}, {selectedChineseSymbol}, {selectedPlanet}, {selectedElement}";
+
+        // Save the ticket data in Firebase
+        await JackpotService.SaveUserTicketAsSingleLine(productNumber, userEmail, ticketData);
+
+        // Navigate to the confirmation page
+        NavigationManager.NavigateTo($"/jackpot/{productNumber}/confirmation");
+    }
+    private List<string> imageUrls = new List<string>
+    {
+        "images/Orion.webp",
+        "images/Andromeda.webp",
+        "images/Lejonet.webp",
+        "images/Skytten.webp",
+        "images/Skorpionen.webp",
+        "images/Vaduren.webp",
+        "images/Tvillingarna.webp",
+        "images/Oxen.webp",
+        "images/Vagen.webp",
+        "images/Jungfrun.webp",
+        "images/Kraftan.webp",
+        "images/Storabjornen.webp",
+        "images/Stenbocken.webp",
+        "images/Fiskarna.webp",
+        "images/Draken.webp",
+        "images/Ornen.webp",
+        "images/Kentauren.webp",
+        "images/Lyra.webp",
+        "images/Orionhunden.webp",
+        "images/Delfinen.webp",
+        "images/Korpen.webp",
+        "images/Krukan.webp",
+        "images/Hydran.webp",
+        "images/Kameleonten.webp",
+        "images/Teleskopet.webp",
+        "images/Svardfisken.webp",
+        "images/Pafageln.webp",
+        "images/Fenix.webp",
+        "images/Flygfisken.webp",
+        "images/Vargen.webp",
+        "images/Enhorningen.webp",
+        "images/Kaninen.webp"
+        };
+
+    private List<ColorOption> colors = new List<ColorOption>
+    {
+        new ColorOption { Name = "Red", ColorCode = "#FF5733" },
+        new ColorOption { Name = "Green", ColorCode = "#33FF57" },
+        new ColorOption { Name = "Blue", ColorCode = "#3357FF" },
+        new ColorOption { Name = "Yellow", ColorCode = "#FFFF33" },
+        new ColorOption { Name = "Purple", ColorCode = "#9B33FF" },
+        new ColorOption { Name = "Orange", ColorCode = "#FF8C33" },
+        new ColorOption { Name = "Pink", ColorCode = "#FF33A8" },
+        new ColorOption { Name = "Brown", ColorCode = "#8B4513" },
+        new ColorOption { Name = "Cyan", ColorCode = "#33FFF6" },
+        new ColorOption { Name = "Magenta", ColorCode = "#FF33FF" },
+        new ColorOption { Name = "Teal", ColorCode = "#008080" },
+        new ColorOption { Name = "Lime", ColorCode = "#BFFF00" },
+        new ColorOption { Name = "Olive", ColorCode = "#808000" },
+        new ColorOption { Name = "Maroon", ColorCode = "#800000" },
+        new ColorOption { Name = "Navy", ColorCode = "#000080" },
+        new ColorOption { Name = "Gold", ColorCode = "#FFD700" },
+        new ColorOption { Name = "Silver", ColorCode = "#C0C0C0" },
+        new ColorOption { Name = "Coral", ColorCode = "#FF7F50" },
+        new ColorOption { Name = "Turquoise", ColorCode = "#40E0D0" },
+        new ColorOption { Name = "Indigo", ColorCode = "#4B0082" },
+        new ColorOption { Name = "Lavender", ColorCode = "#E6E6FA" },
+        new ColorOption { Name = "Salmon", ColorCode = "#FA8072" },
+        new ColorOption { Name = "SlateBlue", ColorCode = "#6A5ACD" },
+        new ColorOption { Name = "Mint", ColorCode = "#98FF98" },
+        new ColorOption { Name = "Crimson", ColorCode = "#DC143C" },
+        new ColorOption { Name = "Peach", ColorCode = "#FFE5B4" },
+        new ColorOption { Name = "ForestGreen", ColorCode = "#228B22" },
+        new ColorOption { Name = "SkyBlue", ColorCode = "#87CEEB" },
+        new ColorOption { Name = "Violet", ColorCode = "#EE82EE" },
+        new ColorOption { Name = "Tan", ColorCode = "#D2B48C" },
+        new ColorOption { Name = "Sienna", ColorCode = "#A0522D" },
+        new ColorOption { Name = "Khaki", ColorCode = "#F0E68C" },
+        new ColorOption { Name = "Orchid", ColorCode = "#DA70D6" },
+        new ColorOption { Name = "Chocolate", ColorCode = "#D2691E" },
+        new ColorOption { Name = "Tomato", ColorCode = "#FF6347" },
+        new ColorOption { Name = "SteelBlue", ColorCode = "#4682B4" },
+        new ColorOption { Name = "Periwinkle", ColorCode = "#CCCCFF" },
+        new ColorOption { Name = "Lemon", ColorCode = "#FFF44F" },
+        new ColorOption { Name = "SeaGreen", ColorCode = "#2E8B57" },
+        new ColorOption { Name = "Fuchsia", ColorCode = "#FF00FF" },
+        new ColorOption { Name = "Aqua", ColorCode = "#00FFFF" },
+        new ColorOption { Name = "Amethyst", ColorCode = "#9966CC" },
+        new ColorOption { Name = "Copper", ColorCode = "#B87333" },
+        new ColorOption { Name = "Ruby", ColorCode = "#E0115F" },
+        new ColorOption { Name = "Emerald", ColorCode = "#50C878" },
+        new ColorOption { Name = "Charcoal", ColorCode = "#36454F" },
+        new ColorOption { Name = "Ivory", ColorCode = "#FFFFF0" },
+        new ColorOption { Name = "Sand", ColorCode = "#C2B280" },
+        new ColorOption { Name = "MidnightBlue", ColorCode = "#191970" },
+        new ColorOption { Name = "Rose", ColorCode = "#FF007F" }
+    };
+    private List<SymbolOption> symbols = new List<SymbolOption>
+    {
+        new SymbolOption { Name = "Anchor", IconClass = "fas fa-anchor" },
+        new SymbolOption { Name = "Frog", IconClass = "fas fa-frog" },
+        new SymbolOption { Name = "Balance Scale", IconClass = "fas fa-balance-scale" },
+        new SymbolOption { Name = "Bell", IconClass = "fas fa-bell" },
+        new SymbolOption { Name = "Bicycle", IconClass = "fas fa-bicycle" },
+        new SymbolOption { Name = "Binoculars", IconClass = "fas fa-binoculars" },
+        new SymbolOption { Name = "Bolt", IconClass = "fas fa-bolt" },
+        new SymbolOption { Name = "Bomb", IconClass = "fas fa-bomb" },
+        new SymbolOption { Name = "Book", IconClass = "fas fa-book" },
+        new SymbolOption { Name = "Briefcase", IconClass = "fas fa-briefcase" },
+        new SymbolOption { Name = "Camera", IconClass = "fas fa-camera" },
+        new SymbolOption { Name = "Car", IconClass = "fas fa-car" },
+        new SymbolOption { Name = "Certificate", IconClass = "fas fa-certificate" },
+        new SymbolOption { Name = "Cloud", IconClass = "fas fa-cloud" },
+        new SymbolOption { Name = "Code", IconClass = "fas fa-code" },
+        new SymbolOption { Name = "Coffee", IconClass = "fas fa-coffee" },
+        new SymbolOption { Name = "Compass", IconClass = "fas fa-compass" },
+        new SymbolOption { Name = "Crown", IconClass = "fas fa-crown" },
+        new SymbolOption { Name = "Dice", IconClass = "fas fa-dice" },
+        new SymbolOption { Name = "Dragon", IconClass = "fas fa-dragon" },
+        new SymbolOption { Name = "Feather", IconClass = "fas fa-feather" },
+        new SymbolOption { Name = "Fire", IconClass = "fas fa-fire" },
+        new SymbolOption { Name = "Football", IconClass = "fas fa-football-ball" },
+        new SymbolOption { Name = "Ghost", IconClass = "fas fa-ghost" },
+        new SymbolOption { Name = "Globe", IconClass = "fas fa-globe" },
+        new SymbolOption { Name = "Guitar", IconClass = "fas fa-guitar" },
+        new SymbolOption { Name = "Heart", IconClass = "fas fa-heart" },
+        new SymbolOption { Name = "Horse", IconClass = "fas fa-horse" },
+        new SymbolOption { Name = "Key", IconClass = "fas fa-key" },
+        new SymbolOption { Name = "Leaf", IconClass = "fas fa-leaf" },
+        new SymbolOption { Name = "Lightbulb", IconClass = "fas fa-lightbulb" },
+        new SymbolOption { Name = "Magic", IconClass = "fas fa-magic" },
+        new SymbolOption { Name = "Medal", IconClass = "fas fa-medal" },
+        new SymbolOption { Name = "Mobile", IconClass = "fas fa-mobile-alt" },
+        new SymbolOption { Name = "Moon", IconClass = "fas fa-moon" },
+        new SymbolOption { Name = "Music", IconClass = "fas fa-music" },
+        new SymbolOption { Name = "Paper Plane", IconClass = "fas fa-paper-plane" },
+        new SymbolOption { Name = "Paw", IconClass = "fas fa-paw" },
+        new SymbolOption { Name = "Plane", IconClass = "fas fa-plane" },
+        new SymbolOption { Name = "Robot", IconClass = "fas fa-robot" },
+        new SymbolOption { Name = "Rocket", IconClass = "fas fa-rocket" },
+        new SymbolOption { Name = "Skull", IconClass = "fas fa-skull" },
+        new SymbolOption { Name = "Snowflake", IconClass = "fas fa-snowflake" },
+        new SymbolOption { Name = "Star", IconClass = "fas fa-star" },
+        new SymbolOption { Name = "Sun", IconClass = "fas fa-sun" },
+        new SymbolOption { Name = "Theater Masks", IconClass = "fas fa-theater-masks" },
+        new SymbolOption { Name = "Thumbs Up", IconClass = "fas fa-thumbs-up" },
+        new SymbolOption { Name = "Tree", IconClass = "fas fa-tree" },
+        new SymbolOption { Name = "Umbrella", IconClass = "fas fa-umbrella" },
+        new SymbolOption { Name = "Volleyball", IconClass = "fas fa-volleyball-ball" }
+    };
+
+   private List<ChineseSymbolOption> chineseSymbols = new List<ChineseSymbolOption>
+    {
+        new ChineseSymbolOption { Name = "Orion", ImageUrl = "images/Orion.webp" },
+        new ChineseSymbolOption { Name = "Andromeda", ImageUrl = "images/Andromeda.webp" },
+        new ChineseSymbolOption { Name = "Leo", ImageUrl = "images/Lejonet.webp" },
+        new ChineseSymbolOption { Name = "Sagittarius", ImageUrl = "images/Skytten.webp" },
+        new ChineseSymbolOption { Name = "Scorpius", ImageUrl = "images/Skorpionen.webp" },
+        new ChineseSymbolOption { Name = "Aries", ImageUrl = "images/Vaduren.webp" },
+        new ChineseSymbolOption { Name = "Gemini", ImageUrl = "images/Tvillingarna.webp" },
+        new ChineseSymbolOption { Name = "Taurus", ImageUrl = "images/Oxen.webp" },
+        new ChineseSymbolOption { Name = "Libra", ImageUrl = "images/Vagen.webp" },
+        new ChineseSymbolOption { Name = "Virgo", ImageUrl = "images/Jungfrun.webp" },
+        new ChineseSymbolOption { Name = "Cancer", ImageUrl = "images/Kraftan.webp" },
+        new ChineseSymbolOption { Name = "Ursa Major", ImageUrl = "images/Storabjornen.webp" },
+        new ChineseSymbolOption { Name = "Capricornus", ImageUrl = "images/Stenbocken.webp" },
+        new ChineseSymbolOption { Name = "Pisces", ImageUrl = "images/Fiskarna.webp" },
+        new ChineseSymbolOption { Name = "Draco", ImageUrl = "images/Draken.webp" },
+        new ChineseSymbolOption { Name = "Aquila", ImageUrl = "images/Ornen.webp" },
+        new ChineseSymbolOption { Name = "Centaurus", ImageUrl = "images/Kentauren.webp" },
+        new ChineseSymbolOption { Name = "Lyra", ImageUrl = "images/Lyra.webp" },
+        new ChineseSymbolOption { Name = "Canis Major", ImageUrl = "images/Orionhunden.webp" },
+        new ChineseSymbolOption { Name = "Delphinus", ImageUrl = "images/Delfinen.webp" },
+        new ChineseSymbolOption { Name = "Corvus", ImageUrl = "images/Korpen.webp" },
+        new ChineseSymbolOption { Name = "Crater", ImageUrl = "images/Krukan.webp" },
+        new ChineseSymbolOption { Name = "Hydra", ImageUrl = "images/Hydran.webp" },
+        new ChineseSymbolOption { Name = "Chamaeleon", ImageUrl = "images/Kameleonten.webp" },
+        new ChineseSymbolOption { Name = "Telescopium", ImageUrl = "images/Teleskopet.webp" },
+        new ChineseSymbolOption { Name = "Dorado", ImageUrl = "images/Svardfisken.webp" },
+        new ChineseSymbolOption { Name = "Pavo", ImageUrl = "images/Pafageln.webp" },
+        new ChineseSymbolOption { Name = "Phoenix", ImageUrl = "images/Fenix.webp" },
+        new ChineseSymbolOption { Name = "Volans", ImageUrl = "images/Flygfisken.webp" },
+        new ChineseSymbolOption { Name = "Lupus", ImageUrl = "images/Vargen.webp" },
+        new ChineseSymbolOption { Name = "Monoceros", ImageUrl = "images/Enhorningen.webp" },
+        new ChineseSymbolOption { Name = "Lepus", ImageUrl = "images/Kaninen.webp" },
+    };
+
+   private List<PlanetOption> planets = new List<PlanetOption>
+    {
+        new PlanetOption { Name = "Mercury", ImageUrl = "images/mercurus2.webp" },
+        new PlanetOption { Name = "Venus", ImageUrl = "images/Venus2.webp" },
+        new PlanetOption { Name = "Earth", ImageUrl = "images/earth2.webp" },
+        new PlanetOption { Name = "Mars", ImageUrl = "images/Mars2.webp" },
+        new PlanetOption { Name = "Jupiter", ImageUrl = "images/jupiter2.webp" },
+        new PlanetOption { Name = "Saturn", ImageUrl = "images/Saturnus2.webp" },
+        new PlanetOption { Name = "Uranus", ImageUrl = "images/uranus2.webp" },
+        new PlanetOption { Name = "Neptune", ImageUrl = "images/Neptunus2.webp" }
+    };
+     private List<ElementOption> elements = new List<ElementOption>
+    {
+        new ElementOption { Name = "Earth", ImageUrl = "/images/Jord2.webp" },
+        new ElementOption { Name = "Fire", ImageUrl = "/images/Fire2.webp" },
+        new ElementOption { Name = "Water", ImageUrl = "/images/Water2.webp" },
+        new ElementOption { Name = "Air", ImageUrl = "/images/Air2.webp" },
+    };
+
+     public class ColorOption
+    {
+        public string Name { get; set; }
+        public string ColorCode { get; set; }
+    }
+   public class SymbolOption
+    {
+        public string Name { get; set; }
+        public string IconClass { get; set; } // Add this line
+    }
+       public class PlanetOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+    public class ElementOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+    public class ChineseSymbolOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+}
+<style>
+.ticket-selection-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.number-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 50px); /* 5 items per row */
+    gap: 10px;
+    max-width: 300px;
+    margin-top: 20px;
+}
+.symbol-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 60px); /* 5 items per row */
+    gap: 10px;
+    max-width: 300px;
+    margin-top: 20px;
+}
+/* Common styles for grids */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+    gap: 10px;
+    max-width: 300px;
+    margin-top: 20px;
+}
+
+/* Number selection styling */
+.number-circle {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: white;
+    cursor: pointer;
+    background-color: #007bff; /* Default color for numbers */
+    transition: transform 0.2s ease;
+}
+
+.number-circle:hover {
+    transform: scale(1.1);
+}
+
+.number-circle.selected {
+    background-color: #ff5722;
+    box-shadow: 0 0 10px rgba(255, 87, 34, 0.6);
+}
+
+.selected-number-display {
+    margin-top: 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+/* Color selection styling */
+.color-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 50px);
+    gap: 10px;
+    max-width: 300px;
+    margin-top: 20px;
+}
+
+.color-ball {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.color-ball:hover {
+    transform: scale(1.1);
+}
+
+.color-ball.selected {
+    border: 3px solid #333; /* Highlight selected color */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.selected-color-display {
+    margin-top: 10px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+/* Symbol selection styling */
+    .symbol-selection .symbol-circle.selected {
+        background-color: #000 !important; /* Svart bakgrund */
+        color: #fff !important; /* Vit text */
+        border: 2px solid #333;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+    }
+
+.symbol-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 50px);
+    gap: 10px;
+    justify-content: center;
+    max-width: 300px;
+    margin-top: 20px;
+    margin-bottom: 0px;
+}
+
+.symbol-item {
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4em; /* Adjust for FontAwesome icons */
+    margin-bottom: 0px;
+}
+
+.symbol-circle {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.5em; /* Increase font size for larger symbols */
+    font-weight: bold;
+    color: #333; /* Text color */
+    background-color: #f5f5f5; /* Light background to make symbols stand out */
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+}
+
+.symbol-circle:hover {
+    transform: scale(1.1);
+}
+
+
+.symbol-item.selected {
+    border: 2px solid #333;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.symbol-item img, .symbol-item i {
+    font-size: 1.5em; /* Size for FontAwesome icon or image */
+}
+
+.selected-symbol-display {
+    margin-top: 10px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+
+.planet-selection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+    .planet-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 80px); /* Two columns initially */
+        gap: 20px;
+        justify-content: center;
+        max-width: 300px;
+        margin-top: 20px;
+    }
+
+    .planet-item-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .planet-item {
+        width: 70px;
+        height: 70px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+        border: 2px solid transparent;
+        border-radius: 50%; /* Circular container */
+        padding: 0; /* Remove padding to ensure the image fills the circle */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #f5f5f5;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        overflow: hidden; /* Ensures the image stays within the circular bounds */
+    }
+
+        .planet-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures the image covers the entire circle */
+            border-radius: 50%; /* Ensures the image itself is circular */
+        }
+
+    /* Style for planet name text */
+    .planet-item-content p {
+        margin-top: 5px;
+        font-size: 0.9em;
+        color: #333;
+        text-align: center;
+    }
+
+    .planet-item.selected {
+        border: 2px solid #333;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+    }
+
+    .selected-planet-display {
+    margin-top: 10px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+    .planet-item-content{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+        .planet-item-content p {
+            margin-top: 5px; /* Space between the image and the text */
+            font-size: 0.9em;
+            color: #333;
+            text-align: center;
+        }
+
+    .element-selection {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 80vh; /* Center vertically on screen */
+        text-align: center;
+    }
+
+    .element-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 100px); /* Adjust columns as needed */
+        gap: 20px; /* Space between items */
+        margin: auto;
+        justify-content: center; /* Center the grid horizontally */
+    }
+
+    .element-item-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .element-item {
+        width: 70px;
+        height: 70px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+        border: 2px solid transparent;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f5f5f5; /* Light background */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+        .element-item.selected {
+            border: 2px solid #333;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+        }
+
+        .element-item img {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+
+    .element-item-content p {
+        margin-top: 8px; /* Space between the image and the text */
+        font-size: 1em;
+        color: #333;
+        text-align: center;
+        white-space: nowrap; /* Prevents text wrapping */
+    }
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 15px; /* Add some space above the button */
+}
+
+.select-button {
+    margin-top: 15px;
+    padding: 10px 20px;
+    font-size: 1em;
+    font-weight: bold;
+    background-color: #556B2F; /* Honeydew */
+    color: #F0FFF0; /* Dark Olive Green */
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.select-button:hover {
+    background-color: #0056b3;
+}
+.summary-display {
+    text-align: center;
+    margin-top: 200px;
+}
+
+.summary-display h4 {
+    font-size: 1.5em;
+    margin-bottom: 10px;
+}
+
+.selection-items {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+    .selection-box {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: #f0f0f0;
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #333;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+    }
+
+.color-box {
+    background-color: var(--color);
+}
+
+.symbol-box i {
+    font-size: 1.5em;
+    color: #333;
+}
+
+    .chinese-symbol-box {
+        width: 50px; /* Match the size of the other items */
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f5f5f5; /* Light background */
+        border-radius: 50%; /* Ensure it's circular */
+        overflow: hidden; /* Ensure the image is contained within the circle */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Add shadow for consistency */
+    }
+
+        .chinese-symbol-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures the image fills the circle */
+            border-radius: 50%; /* Ensure the image itself is circular */
+        }
+
+    .chinesesymbol-selection .fade-in {
+        animation-duration: 1s; /* Längre fade-in effekt */
+    }
+
+    .planet-box, .element-box {
+        width: 50px; /* Match the size of the other items */
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%; /* Make the containers circular */
+        background-color: #f0f0f0;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Matching shadow for consistency */
+        overflow: hidden; /* Ensures content stays within bounds */
+    }
+
+        .planet-box img, .element-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures the image covers the entire circle without stretching */
+            border-radius: 50%; /* Ensure the image itself is circular */
+        }
+    .chinesesymbol-circle img,
+    .planet-item img,
+    .element-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: opacity 0.5s ease-in-out; /* Smooth fade-in */
+    }
+.confirm-button {
+    margin-top: 15px;
+    padding: 10px 20px;
+    font-size: 1em;
+    font-weight: bold;
+    color: white;
+    background-color: #28a745;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.confirm-button:hover {
+    background-color: #218838;
+}
+
+/* Fade-in effect */
+.fade-in {
+    opacity: 0;
+    transform: translateY(20px); /* Start slightly downwards */
+    animation: fadeIn 0.5s forwards;
+}
+
+@@keyframes fadeIn {
+    to {
+        opacity: 1;
+        transform: translateY(0); /* Move to its original position */
+    }
+}
+
+    .change-button {
+        margin-top: 10px;
+        padding: 8px 15px;
+        font-size: 1em;
+        font-weight: bold;
+        color: #ffffff;
+        background-color: #FF6F3C; /* Blue color for the change button */
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+        .change-button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
+
+   .chinesesymbol-selection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+    text-align: center;
+}
+
+.chinesesymbol-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* 4 items per row */
+    gap: 15px; /* Space between items */
+    max-width: 400px; /* Adjust to fit the layout */
+    margin-top: 20px;
+}
+
+.chinesesymbol-circle {
+    width: 60px; /* Reduced size of the circle */
+    height: 60px; /* Reduced size of the circle */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%; /* Makes the div circular */
+    background-color: #f5f5f5; /* Light background color */
+    overflow: hidden; /* Ensures the image fits within the circle */
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chinesesymbol-circle:hover {
+    transform: scale(1.1); /* Slightly enlarge on hover */
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* Add a shadow effect */
+}
+
+.chinesesymbol-circle.selected {
+    border: 2px solid #333; /* Highlight selected symbol */
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.6); /* Highlight the selection */
+}
+
+.chinesesymbol-circle img {
+    width: 100%; /* Fill the circle */
+    height: 100%; /* Fill the circle */
+    object-fit: cover; /* Ensure the image covers the entire circle without stretching */
+}
+
+.selected-chinesesymbol-display {
+    margin-top: 10px;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+</style>
+
+<script>
+    function preloadImages(imageUrls) {
+        var preloadedImages = [];
+        var promises = imageUrls.map(function (url) {
+            return new Promise(function (resolve, reject) {
+                var img = new Image();
+                img.src = url;
+                img.onload = resolve; // När bilden är inläst, kör resolve
+                img.onerror = reject; // Om det uppstår ett problem, kör reject
+            });
+        });
+        Promise.all(promises).then(function () {
+            console.log('Alla bilder har förladdats');
+        }).catch(function (error) {
+            console.log('Något gick fel vid förladdning av bilder:', error);
+        });
+    }
+    }</script>

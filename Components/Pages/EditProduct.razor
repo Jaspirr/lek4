@@ -1,0 +1,230 @@
+﻿@page "/edit-product/{productNumber:int}"
+@using lek4.Components.Service
+
+@inject NavigationManager NavigationManager
+@inject lek4.Components.Service.ProductService ProductService
+@inject ProductDrawDateService ProductDrawDateService
+
+<button @onclick="NavigateBack">← Back</button>
+<h3>Edit Product @productNumber</h3>
+
+<div class="edit-product-form">
+    <label for="price">Price</label>
+    <input type="number" id="price" min="0" step="0.1" @bind="price" />
+
+    <label for="lockInAmount">Lock-in Amount</label>
+    <input type="number" id="lockInAmount" min="0" step="0.1" @bind="lockInAmount" />
+
+    <label for="userEmail">User Email</label>
+    <input type="email" id="userEmail" @bind="userEmail" />
+
+    <label for="productName">Product Name</label>
+    <input type="text" id="productName" @bind="productName" />
+
+    <label for="productImageUrl">Product Image URL</label>
+    <input type="text" id="productImageUrl" @bind="productImageUrl" />
+
+    <label for="prizeType">Prize Type</label>
+    <input type="text" id="prizeType" @bind="prizeType" />
+
+    <label for="websiteUrl">Website URL</label>
+    <input type="text" id="websiteUrl" @bind="websiteUrl" />
+    
+    <div class="checkbox-container">
+        <input type="checkbox" id="isJackpot" @bind="isJackpot" />
+        <label for="isJackpot">Jackpot Product</label>
+    </div>
+
+    <label for="drawDate">Draw Date</label>
+    <input type="date" id="drawDate" @bind="drawDate" min="@minDate" max="@maxDate" />
+
+    <label for="drawTime">Draw Time</label>
+    <input type="time" id="drawTime" @bind="drawTime" />
+
+    <button @onclick="SaveChanges" class="save-button">Save Changes</button>
+</div>
+
+@code {
+    [Parameter]
+    public int productNumber { get; set; }
+
+    private double price;
+    private double lockInAmount;
+    private string userEmail;
+    private string productName;
+    private string productImageUrl;
+    private bool isJackpot;
+    private DateTime? drawDate;
+    private TimeOnly? drawTime;
+    private ProductService.ProductData productData;
+    private bool isOutcomeProduct;
+    private int correctAnswersRequired;
+    private string prizeType;
+    private string websiteUrl;
+
+
+    private string minDate = DateTime.Now.ToString("yyyy-MM-dd");
+    private string maxDate = DateTime.Now.AddDays(31).ToString("yyyy-MM-dd");
+
+    protected override async Task OnInitializedAsync()
+    {
+        productData = await ProductService.GetProductFromFirebaseAsync(productNumber);
+
+        if (productData != null)
+        {
+            price = productData.Price;
+            lockInAmount = productData.LockInAmount;
+            userEmail = productData.UserEmail;
+            productName = productData.ProductName;
+            productImageUrl = productData.ImageUrl;
+            isJackpot = productData.IsJackpot;
+            isOutcomeProduct = productData.IsOutcomeProduct;
+            correctAnswersRequired = productData.CorrectAnswersRequired;
+            prizeType = productData.PrizeType;  // ✅ Lägg till PrizeType
+            websiteUrl = productData.WebsiteUrl;  // ✅ Lägg till WebsiteUrl
+
+            DateTime? existingDrawDateTime = ProductDrawDateService.GetDrawDate(productNumber);
+            if (existingDrawDateTime.HasValue)
+            {
+                drawDate = existingDrawDateTime.Value.Date;
+                drawTime = TimeOnly.FromDateTime(existingDrawDateTime.Value);
+            }
+        }
+        else
+        {
+            Console.WriteLine("Product not found.");
+            NavigationManager.NavigateTo("/change-products");
+        }
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task SaveChanges()
+    {
+        if (productData != null)
+        {
+            price = productData.Price;
+            lockInAmount = productData.LockInAmount;
+            userEmail = productData.UserEmail;
+            productName = productData.ProductName;
+            productImageUrl = productData.ImageUrl;
+            isJackpot = productData.IsJackpot;
+            isOutcomeProduct = productData.IsOutcomeProduct;
+            int correctAnswersRequired = productData.CorrectAnswersRequired; // Hämta korrekt värde
+            prizeType = productData.PrizeType; // ✅ Lägg till PrizeType
+            websiteUrl = productData.WebsiteUrl; // ✅ Lägg till WebsiteUrl
+            DateTime drawDateTime = DateTime.Now; // Default value if no date and time are provided
+
+            if (drawDate.HasValue && drawTime.HasValue)
+            {
+                drawDateTime = drawDate.Value.Add(drawTime.Value.ToTimeSpan());
+                ProductDrawDateService.SetDrawDate(productNumber, drawDateTime);
+            }
+
+            // Uppdatera produkten i Firebase med CorrectAnswersRequired
+            await ProductService.SaveProductData(
+                productNumber,
+                userEmail,
+                price,
+                productName,
+                productImageUrl,
+                isJackpot,
+                isOutcomeProduct,
+                drawDateTime,
+                correctAnswersRequired,
+                prizeType, // ✅ Skicka PrizeType
+                websiteUrl // ✅ Skicka WebsiteUrl
+            );
+
+            int userId = 1;
+            await ProductService.SaveUserToProduct(productNumber, userId, productData);
+
+            NavigationManager.NavigateTo("/change-products");
+        }
+    }
+
+}
+
+<style>
+    h3 {
+        text-align: center;
+        font-size: 1.8em;
+        color: #333;
+        margin-bottom: 20px;
+    }
+
+    .edit-product-form {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    label {
+        font-size: 1em;
+        color: #333;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    input[type="number"],
+    input[type="email"],
+    input[type="text"],
+    input[type="date"],
+    input[type="time"] {
+        width: 100%;
+        padding: 10px;
+        font-size: 1em;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-sizing: border-box;
+        background-color: #ffffff; /* White background */
+        color: #000000; /* Black text */
+    }
+
+        /* Ensure date and time picker elements are visible */
+        input[type="date"]::-webkit-inner-spin-button,
+        input[type="time"]::-webkit-inner-spin-button {
+            display: block;
+        }
+
+    .checkbox-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .save-button {
+        background-color: #28a745;
+        color: white;
+        font-size: 1.1em;
+        font-weight: bold;
+        padding: 12px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .save-button:hover {
+            background-color: #218838;
+        }
+
+    input[type="number"]:focus,
+    input[type="email"]:focus,
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    input[type="time"]:focus {
+        border-color: #28a745;
+        outline: none;
+        box-shadow: 0 0 5px rgba(40, 167, 69, 0.3);
+    }
+</style>
+

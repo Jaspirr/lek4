@@ -71,7 +71,6 @@
 </head>
 
 <body>
-    <div class="status-bar-safe-area"></div>
     <div id="loading-screen">
         <div class="loading-animation">
             <div class="loading-circle"></div>
@@ -80,8 +79,7 @@
         </div>
     </div>
 
-    <div id="app" style="display: none;"></div>
- 
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             console.log("DOM laddad, väntar på Blazor...");
@@ -190,6 +188,7 @@
         }
 
     </script>
+    <div id="app" style="display: none;"></div>
 </body>
 </html>
 <style>

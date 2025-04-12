@@ -1,0 +1,335 @@
+﻿@page "/admin-specialcount"
+@using System.Text
+@using System.Text.Json
+@using lek4.Components.Service
+@inject HttpClient HttpClient
+@inject SpecialService SpecialService
+@inject NavigationManager NavigationManager
+
+<button @onclick="NavigateBack">← Back</button>
+<h2 class="admin-title">Special Reward Admin Panel</h2>
+
+<div class="admin-container">
+    <!-- Refresh and Save Buttons -->
+    <div class="button-group">
+        <button class="action-button refresh-button" @onclick="RefreshSpecialInfo">🔄 Refresh Info</button>
+        <button class="action-button save-button" @onclick="SaveSpecialInfo">💾 Save Summary</button>
+        <button class="action-button delete-button" @onclick="ResetSpecialInfo">🗑️ Reset Info & Claims</button>
+    </div>
+
+    <!-- Displaying Special Information -->
+    <div class="info-section">
+        <h3 class="section-title">Special Information</h3>
+        <p><strong>Name:</strong> <span class="highlight">@specialInfo.Name</span></p>
+        <p><strong>Description:</strong> <span class="highlight">@specialInfo.Description</span></p>
+        <p><strong>Credits:</strong> <span class="highlight">@specialInfo.Credits</span></p>
+        <p><strong>Link Clicks:</strong> <span class="highlight">@specialInfo.LinkClicks</span></p>
+        <p><strong>Total Claimed Rewards:</strong> <span class="highlight">@totalClaims</span></p>
+        <p><strong>Saved Date:</strong> <span class="highlight">@DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")</span></p>
+    </div>
+
+    <!-- Saved Summaries Section -->
+    @if (savedSpecialSummaries.Any())
+    {
+        <h3 class="section-title">📦 All Saved Summaries</h3>
+        <div class="saved-summaries-list">
+            @foreach (var summary in savedSpecialSummaries)
+            {
+                <div class="summary-container">
+                    <p><strong>Name:</strong> @summary.Name</p>
+                    <p><strong>Description:</strong> @summary.Description</p>
+                    <p><strong>Credits:</strong> @summary.Credits</p>
+                    <p><strong>Link Clicks:</strong> @summary.LinkClicks</p>
+                    <p><strong>Total Claims:</strong> @summary.TotalClaims</p>
+                    <p><strong>Saved On:</strong> @summary.SavedDateTime</p>
+                    <button class="delete-button" @onclick="() => DeleteSpecialSummary(summary.FileName)">🗑️ Delete</button>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="info-text">No saved summaries found.</p>
+    }
+</div>
+
+@code {
+    private SpecialInfo specialInfo = new SpecialInfo();
+    private List<SavedSpecialInfo> savedSpecialSummaries = new List<SavedSpecialInfo>();
+    private const string savedSpecialBaseUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSpecialInfo%2F";
+    private int totalClaims = 0; // Total claims count
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshSpecialInfo();
+        await LoadAllSpecialSummaries();
+        await CalculateTotalClaims();
+    }
+
+    private async Task RefreshSpecialInfo()
+    {
+        try
+        {
+            specialInfo = await SpecialService.GetSpecialInfo();
+            await CalculateTotalClaims(); // Recalculate total claims on refresh
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing special info: {ex.Message}");
+        }
+    }
+    private async Task ResetSpecialInfo()
+    {
+        try
+        {
+            await SpecialService.ClearSpecialInfo();
+            await SpecialService.ClearSpecialClaims();
+            await RefreshSpecialInfo();
+            Console.WriteLine("Special info and claims have been reset.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error resetting special info: {ex.Message}");
+        }
+    }
+
+    private async Task SaveSpecialInfo()
+    {
+        try
+        {
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            var fileName = $"SpecialSummary_{timestamp}.json";
+
+            var summary = new SavedSpecialInfo
+                {
+                    Name = specialInfo.Name,
+                    Description = specialInfo.Description,
+                    Credits = specialInfo.Credits,
+                    LinkClicks = specialInfo.LinkClicks,
+                    TotalClaims = totalClaims, // Save the total claims count
+                    SavedDateTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                    FileName = fileName
+                };
+
+            var json = JsonSerializer.Serialize(summary);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            await HttpClient.PostAsync($"{savedSpecialBaseUrl}{fileName}", content);
+
+            // Update the index file
+            var indexResponse = await HttpClient.GetAsync($"{savedSpecialBaseUrl}SpecialSummary_Index.json?alt=media");
+            List<string> indexFiles = new List<string>();
+
+            if (indexResponse.IsSuccessStatusCode)
+            {
+                var indexJson = await indexResponse.Content.ReadAsStringAsync();
+                var indexData = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(indexJson);
+                indexFiles = indexData["files"];
+            }
+
+            indexFiles.Add(fileName);
+            var updatedIndex = new { files = indexFiles };
+            var indexJsonContent = new StringContent(JsonSerializer.Serialize(updatedIndex), Encoding.UTF8, "application/json");
+            await HttpClient.PostAsync($"{savedSpecialBaseUrl}SpecialSummary_Index.json", indexJsonContent);
+
+            savedSpecialSummaries.Add(summary);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving special info: {ex.Message}");
+        }
+    }
+
+    private async Task LoadAllSpecialSummaries()
+    {
+        try
+        {
+            savedSpecialSummaries.Clear();
+            var response = await HttpClient.GetAsync($"{savedSpecialBaseUrl}SpecialSummary_Index.json?alt=media");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var indexData = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(jsonResponse);
+                var fileNames = indexData["files"];
+
+                foreach (var fileName in fileNames)
+                {
+                    var fileResponse = await HttpClient.GetAsync($"{savedSpecialBaseUrl}{fileName}?alt=media");
+                    if (fileResponse.IsSuccessStatusCode)
+                    {
+                        var fileJson = await fileResponse.Content.ReadAsStringAsync();
+                        var savedInfo = JsonSerializer.Deserialize<SavedSpecialInfo>(fileJson);
+                        savedInfo.FileName = fileName;
+                        savedSpecialSummaries.Add(savedInfo);
+                    }
+                }
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading special summaries: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteSpecialSummary(string fileName)
+    {
+        try
+        {
+            var deleteResponse = await HttpClient.DeleteAsync($"{savedSpecialBaseUrl}{fileName}");
+
+            if (!deleteResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to delete the file: {fileName}");
+                return;
+            }
+
+            var indexResponse = await HttpClient.GetAsync($"{savedSpecialBaseUrl}SpecialSummary_Index.json?alt=media");
+            if (!indexResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Failed to load the index file.");
+                return;
+            }
+
+            var jsonResponse = await indexResponse.Content.ReadAsStringAsync();
+            var indexData = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(jsonResponse);
+            var fileList = indexData["files"];
+
+            if (fileList.Contains(fileName))
+            {
+                fileList.Remove(fileName);
+
+                var updatedIndex = new { files = fileList };
+                var jsonContent = new StringContent(JsonSerializer.Serialize(updatedIndex), Encoding.UTF8, "application/json");
+                await HttpClient.PostAsync($"{savedSpecialBaseUrl}SpecialSummary_Index.json", jsonContent);
+            }
+
+            var summaryToRemove = savedSpecialSummaries.FirstOrDefault(s => s.FileName == fileName);
+            if (summaryToRemove != null)
+            {
+                savedSpecialSummaries.Remove(summaryToRemove);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting special summary: {ex.Message}");
+        }
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task CalculateTotalClaims()
+    {
+        try
+        {
+            var claims = await SpecialService.GetSpecialClaims();
+            totalClaims = claims.Count(kv => kv.Value == 1); // Sum up all claims
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error calculating total claims: {ex.Message}");
+        }
+    }
+
+    public class SavedSpecialInfo
+    {
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public int Credits { get; set; }
+        public int LinkClicks { get; set; }
+        public int TotalClaims { get; set; }
+        public string SavedDateTime { get; set; }
+        public string FileName { get; set; }
+    }
+}
+
+<style>
+    /* Admin Panel Styling */
+    .admin-container {
+        padding: 30px;
+        border: 2px solid #ddd;
+        border-radius: 15px;
+        background: #f3f3f3;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        max-width: 700px;
+        margin: 20px auto;
+        text-align: center;
+    }
+
+    .admin-title {
+        font-size: 2rem;
+        text-align: center;
+        color: #333;
+        margin-bottom: 20px;
+    }
+
+    .button-group {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .action-button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        color: white;
+    }
+
+    .refresh-button {
+        background: #4caf50;
+    }
+
+    .save-button {
+        background: #2196f3;
+    }
+
+    .delete-button {
+        background: #e53935;
+    }
+
+        .delete-button:hover {
+            background: #d32f2f;
+        }
+
+    .info-section, .summary-container {
+        margin-top: 20px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background: white;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .saved-summaries-list {
+        margin-top: 20px;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        color: #4caf50;
+        margin-bottom: 15px;
+    }
+
+    .highlight {
+        font-weight: bold;
+        color: #333;
+    }
+
+    .summary-container {
+        border: 2px solid #4caf50;
+        background: #e8f5e9;
+        margin-bottom: 10px;
+    }
+</style>

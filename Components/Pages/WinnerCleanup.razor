@@ -1,0 +1,166 @@
+﻿@page "/admin-schedule-cleanup"
+@using System.Text.Json
+@using System.Text
+@inject HttpClient HttpClient
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<button @onclick="NavigateBack">← Back</button>
+<h1 class="page-title">Admin - Schedule Weekly Cleanup</h1>
+
+<div class="admin-container">
+    <p>Set a day of the week for automatically cleaning up the saved winner files.</p>
+
+    <!-- Dropdown for Selecting Day -->
+    <div class="form-group">
+        <label for="cleanupDay">Select Day of the Week:</label>
+        <select id="cleanupDay" class="form-control" @bind="selectedDay">
+            @foreach (var day in daysOfWeek)
+            {
+                <option value="@day">@day</option>
+            }
+        </select>
+    </div>
+
+    <!-- Buttons -->
+    <div class="button-group">
+        <button class="action-button save-button" @onclick="SaveCleanupDay">Save Cleanup Day</button>
+        <button class="action-button reset-button" @onclick="ResetCleanupDay">Reset Cleanup Day</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert">@message</div>
+    }
+</div>
+
+@code {
+    private string selectedDay = "Monday";
+    private string message = string.Empty;
+    private const string ConfigFileUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FCleanupConfig.json";
+
+    private readonly List<string> daysOfWeek = new() { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCleanupDay();
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task LoadCleanupDay()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync($"{ConfigFileUrl}?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var config = JsonSerializer.Deserialize<CleanupConfig>(jsonResponse);
+
+                if (config != null)
+                {
+                    selectedDay = config.DayOfWeek;
+                    message = "Cleanup day loaded successfully.";
+                }
+            }
+            else
+            {
+                message = "No cleanup configuration found. Defaulting to Monday.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading cleanup day: {ex.Message}";
+        }
+    }
+
+    private async Task SaveCleanupDay()
+    {
+        try
+        {
+            var config = new CleanupConfig { DayOfWeek = selectedDay };
+            var jsonContent = new StringContent(JsonSerializer.Serialize(config), Encoding.UTF8, "application/json");
+
+            var response = await HttpClient.PostAsync(ConfigFileUrl, jsonContent);
+            if (response.IsSuccessStatusCode)
+            {
+                message = $"Cleanup day set to {selectedDay}.";
+            }
+            else
+            {
+                message = "Failed to save cleanup day.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error saving cleanup day: {ex.Message}";
+        }
+    }
+
+    private async Task ResetCleanupDay()
+    {
+        selectedDay = "Monday";
+        await SaveCleanupDay();
+        message = "Cleanup day reset to Monday.";
+    }
+
+    public class CleanupConfig
+    {
+        public string DayOfWeek { get; set; }
+    }
+}
+
+<style>
+    .admin-container {
+        max-width: 600px;
+        margin: auto;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        margin-top: 5px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 10px;
+    }
+
+    .action-button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        color: white;
+    }
+
+    .save-button {
+        background-color: #4caf50;
+    }
+
+    .reset-button {
+        background-color: #f44336;
+    }
+
+    .alert {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f8d7da;
+        color: #721c24;
+        border-radius: 5px;
+    }
+</style>

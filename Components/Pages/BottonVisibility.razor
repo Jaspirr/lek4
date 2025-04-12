@@ -1,0 +1,239 @@
+﻿@page "/admin-button-visibility"
+@using System.Text
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+
+<button @onclick="NavigateBack">← Back</button>
+<div class="admin-container">
+    <h2>Admin - Button Visibility Control</h2>
+    <p class="description">Easily toggle button visibility for the user page or manage buttons by adding or removing them.</p>
+
+    @if (buttonVisibility != null)
+    {
+        <div class="visibility-list">
+            @foreach (var button in buttonVisibility.Keys.ToList())
+            {
+                <div class="button-item">
+                    <label>
+                        <input type="checkbox" @bind="buttonVisibility[button]" class="toggle-checkbox" />
+                        <span>@button</span>
+                    </label>
+                    <button class="btn btn-remove" @onclick="() => RemoveButton(button)">Remove</button>
+                </div>
+            }
+        </div>
+
+        <div class="add-new-button-section">
+            <label for="newButton">Add New Button:</label>
+            <input id="newButton" type="text" @bind="newButtonName" placeholder="Enter button name" class="input-field" />
+            <button class="btn btn-add" @onclick="AddNewButton">Add Button</button>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-reload" @onclick="ReloadButtonVisibility">Reload</button>
+            <button class="btn btn-save" @onclick="SaveButtonVisibility">Save Changes</button>
+        </div>
+    }
+    else
+    {
+        <p>Loading button settings...</p>
+    }
+</div>
+
+@code {
+    private Dictionary<string, bool> buttonVisibility;
+    private string newButtonName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadButtonVisibility();
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task LoadButtonVisibility()
+    {
+        var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FButtonVisibilityConfig.json?alt=media");
+        if (response.IsSuccessStatusCode)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            buttonVisibility = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, bool>>(json) ?? new Dictionary<string, bool>();
+        }
+        else
+        {
+            buttonVisibility = new Dictionary<string, bool>
+            {
+                { "DailyReward", true },
+                { "DownloadApp", true },
+                { "BoostSelf", true },
+                { "BoostFriend", true },
+                { "Charity", true },
+                { "Organizations", true },
+                { "Special", true },
+                { "Community", true }
+            };
+        }
+    }
+
+    private async Task ReloadButtonVisibility()
+    {
+        await LoadButtonVisibility();
+        StateHasChanged();
+    }
+
+    private void AddNewButton()
+    {
+        if (!string.IsNullOrWhiteSpace(newButtonName) && !buttonVisibility.ContainsKey(newButtonName))
+        {
+            buttonVisibility[newButtonName] = true;
+            newButtonName = string.Empty;
+        }
+    }
+
+    private void RemoveButton(string buttonName)
+    {
+        if (buttonVisibility.ContainsKey(buttonName))
+        {
+            buttonVisibility.Remove(buttonName);
+        }
+    }
+
+    private async Task SaveButtonVisibility()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(buttonVisibility);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        await HttpClient.PostAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FButtonVisibilityConfig.json", content);
+        NavigationManager.NavigateTo("/addvalue");
+    }
+}
+<style>
+    .admin-container {
+        max-width: 700px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        background: #f9f9f9;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+        text-align: center;
+        font-size: 2rem;
+        color: #4CAF50;
+        margin-bottom: 15px;
+    }
+
+    .description {
+        text-align: center;
+        font-size: 1rem;
+        margin-bottom: 20px;
+        color: #555;
+    }
+
+    .visibility-list {
+        margin-bottom: 20px;
+    }
+
+    .button-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+        .button-item label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1rem;
+            color: #333;
+        }
+
+    .toggle-checkbox {
+        width: 18px;
+        height: 18px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        font-size: 1rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s ease, transform 0.1s;
+    }
+
+    .btn-remove {
+        background: #e53935;
+        color: white;
+    }
+
+        .btn-remove:hover {
+            background: #d32f2f;
+        }
+
+    .add-new-button-section {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .input-field {
+        padding: 10px;
+        font-size: 1rem;
+        border: 2px solid #ccc;
+        border-radius: 5px;
+        flex: 1;
+    }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+        }
+
+    .btn-add {
+        background: #4CAF50;
+        color: white;
+    }
+
+        .btn-add:hover {
+            background: #45A049;
+        }
+
+    .action-buttons {
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .btn-reload {
+        background: #2196F3;
+        color: white;
+    }
+
+        .btn-reload:hover {
+            background: #1976D2;
+        }
+
+    .btn-save {
+        background: #FF9800;
+        color: white;
+    }
+
+        .btn-save:hover {
+            background: #F57C00;
+        }
+</style>

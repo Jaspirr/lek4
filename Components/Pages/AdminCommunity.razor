@@ -1,0 +1,303 @@
+﻿@page "/admin-communitycount"
+@using System.Text
+@using System.Text.Json
+@using lek4.Components.Service
+@inject HttpClient HttpClient
+@inject CommunityService CommunityService
+@inject NavigationManager NavigationManager
+
+<button @onclick="NavigateBack">← Back</button>
+<h2 class="admin-title">Community Reward Admin Panel</h2>
+
+<div class="admin-container">
+    
+    <!-- Refresh and Save Buttons -->
+    <div class="button-group">
+        <button class="action-button refresh-button" @onclick="RefreshClaimsCount">🔄 Refresh Claims</button>
+        <button class="action-button save-button" @onclick="SaveSummary">💾 Save Summary</button>
+        <button class="action-button delete-button" @onclick="ResetCommunityInfo">🗑️ Reset Info & Claims</button>
+    </div>
+
+    <!-- Displaying Community Information -->
+    <div class="info-section">
+        <h3 class="section-title">Community Information</h3>
+        <p><strong>Total Claimed Rewards:</strong> <span class="highlight">@totalClaims</span></p>
+        <p><strong>Community Name:</strong> <span class="highlight">@communityInfo.Name</span></p>
+        <p><strong>Credits:</strong> <span class="highlight">@communityInfo.Credits</span></p>
+        <p><strong>Link Clicks:</strong> <span class="highlight">@communityInfo.LinkClicks</span></p>
+        <p><strong>Duration(Days):</strong> <span class="highlight">@communityInfo.Duration</span></p>
+    </div>
+
+    <!-- Saved Summaries Section -->
+    @if (savedSummaries.Any())
+    {
+        <h3 class="section-title">📦 All Saved Summaries</h3>
+        <div class="saved-summaries-list">
+            @foreach (var summary in savedSummaries)
+            {
+                <div class="summary-container">
+                    <p><strong>Total Claims:</strong> @summary.TotalClaims</p>
+                    <p><strong>Community Name:</strong> @summary.CommunityName</p>
+                    <p><strong>Credits:</strong> @summary.Credits</p>
+                    <p><strong>Link Clicks:</strong> @summary.LinkClicks</p>
+                    <p><strong>Duration(Days):</strong> @summary.Duration</p>
+                    <p><strong>Saved On:</strong> @summary.SavedDateTime</p>
+                    <button class="delete-button" @onclick="() => DeleteSummary(summary.FileName)">🗑️ Delete</button>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="info-text">No saved summaries found.</p>
+    }
+</div>
+
+@code {
+    private int totalClaims = 0;
+    private CommunityInfo communityInfo = new CommunityInfo();
+    private List<SavedInfo> savedSummaries = new List<SavedInfo>();
+    private const string savedInfoBaseUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2F";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // ✅ Laddar community info och sparade sammanfattningar direkt vid sidladdning
+        await RefreshClaimsCount();
+        await LoadAllSavedSummaries();
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task SaveSummary()
+    {
+        try
+        {
+            // Call the method from CommunityService
+            await CommunityService.SaveSummaryInfo(totalClaims, communityInfo);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving summary: {ex.Message}");
+        }
+    }
+    private async Task RefreshClaimsCount()
+    {
+        try
+        {
+            communityInfo = await CommunityService.GetCommunityInfo();
+            var claims = await CommunityService.GetCommunityClaims();
+            totalClaims = claims.Count(kv => kv.Value == 1);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error calculating total claims: {ex.Message}");
+        }
+    }
+    private async Task ResetCommunityInfo()
+    {
+        try
+        {
+            // Call the service methods to clear data
+            await CommunityService.ClearCommunityInfo();
+            await CommunityService.ClearCommunityClaims();
+
+            // Refresh the data
+            await RefreshClaimsCount();
+
+            Console.WriteLine("Community information and claims have been reset.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error resetting community info: {ex.Message}");
+        }
+    }
+    private async Task LoadAllSavedSummaries()
+    {
+        try
+        {
+            savedSummaries.Clear();
+            var response = await HttpClient.GetAsync($"{savedInfoBaseUrl}CommunitySummary_Index.json?alt=media");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var indexData = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(jsonResponse);
+                var fileNames = indexData["files"];
+
+                // Hämta varje fil individuellt
+                foreach (var fileName in fileNames)
+                {
+                    var fileResponse = await HttpClient.GetAsync($"{savedInfoBaseUrl}{fileName}?alt=media");
+                    if (fileResponse.IsSuccessStatusCode)
+                    {
+                        var fileJson = await fileResponse.Content.ReadAsStringAsync();
+                        var savedInfo = JsonSerializer.Deserialize<SavedInfo>(fileJson);
+                        savedInfo.FileName = fileName;
+                        savedSummaries.Add(savedInfo);
+                    }
+                }
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading saved summaries: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteSummary(string fileName)
+    {
+        try
+        {
+            // Radera filen från Firebase
+            var deleteResponse = await HttpClient.DeleteAsync($"{savedInfoBaseUrl}{fileName}");
+
+            if (!deleteResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Failed to delete the file: {fileName}");
+                return;
+            }
+
+            // Hämta indexfilen
+            var indexResponse = await HttpClient.GetAsync($"{savedInfoBaseUrl}CommunitySummary_Index.json?alt=media");
+            if (!indexResponse.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Failed to load the index file.");
+                return;
+            }
+
+            var jsonResponse = await indexResponse.Content.ReadAsStringAsync();
+            var indexData = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(jsonResponse);
+            var fileList = indexData["files"];
+
+            // Ta bort den raderade filen från indexlistan
+            if (fileList.Contains(fileName))
+            {
+                fileList.Remove(fileName);
+
+                // Spara den uppdaterade indexfilen
+                var updatedIndex = new { files = fileList };
+                var jsonContent = new StringContent(JsonSerializer.Serialize(updatedIndex), Encoding.UTF8, "application/json");
+                var uploadResponse = await HttpClient.PostAsync($"{savedInfoBaseUrl}CommunitySummary_Index.json", jsonContent);
+
+                if (!uploadResponse.IsSuccessStatusCode)
+                {
+                    Console.WriteLine("Failed to update the index file.");
+                }
+            }
+
+            // Ta bort från den lokala listan och uppdatera UI
+            var summaryToRemove = savedSummaries.FirstOrDefault(s => s.FileName == fileName);
+            if (summaryToRemove != null)
+            {
+                savedSummaries.Remove(summaryToRemove);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting summary: {ex.Message}");
+        }
+    }
+
+
+    public class SavedInfo
+    {
+        public int TotalClaims { get; set; }
+        public string CommunityName { get; set; }
+        public int Credits { get; set; }
+        public int LinkClicks { get; set; }
+        public int Duration { get; set; }
+        public string SavedDateTime { get; set; }
+        public string FileName { get; set; }
+    }
+}
+
+<style>
+    /* Admin Panel Styling */
+    .admin-container {
+        padding: 30px;
+        border: 2px solid #ddd;
+        border-radius: 15px;
+        background: #f3f3f3;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        max-width: 700px;
+        margin: 20px auto;
+        text-align: center;
+    }
+
+    .admin-title {
+        font-size: 2rem;
+        text-align: center;
+        color: #333;
+        margin-bottom: 20px;
+    }
+
+    .button-group {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .action-button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        color: white;
+    }
+
+    .refresh-button {
+        background: #4caf50;
+    }
+
+    .save-button {
+        background: #2196f3;
+    }
+
+    .delete-button {
+        background: #e53935;
+    }
+
+        .delete-button:hover {
+            background: #d32f2f;
+        }
+
+    .info-section, .summary-container {
+        margin-top: 20px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background: white;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .saved-summaries-list {
+        margin-top: 20px;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        color: #4caf50;
+        margin-bottom: 15px;
+    }
+
+    .highlight {
+        font-weight: bold;
+        color: #333;
+    }
+
+    .summary-container {
+        border: 2px solid #4caf50;
+        background: #e8f5e9;
+        margin-bottom: 10px;
+    }
+</style>

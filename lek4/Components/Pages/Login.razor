@@ -1,4 +1,5 @@
-﻿@page "/login"
+﻿﻿
+@page "/login"
 @using Firebase.Auth
 @using System.Text.Json
 @inject FirebaseAuthClient AuthClient
@@ -11,90 +12,122 @@
 @inject WinnerCleanupService WinnerCleanupService
 
 
-<div class="login-container">
-    <div class="login-form">
-        <h3>Login</h3>
-        <EditForm Model="loginModel" OnValidSubmit="LoginUser">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-            <div class="form-group">
-                <InputText id="email" @bind-Value="loginModel.Email" placeholder="Email" />
+    @if (isCheckingAuth)
+    {
+        <div id="loading-screen">
+            <div class="loading-animation">
+                <div class="loading-circle"></div>
+                <div class="loading-circle"></div>
+                <div class="loading-circle"></div>
             </div>
-            <div class="form-group">
-                <InputText id="password" @bind-Value="loginModel.Password" type="password" placeholder="Password" />
-            </div>
-            <div class="stay-logged-in">
-                <label>
-                    <InputCheckbox @bind-Value="stayLoggedIn" />
-                    <span>Stay Logged In</span>
-                </label>
-            </div>
-            <button type="submit" class="login-button">Login</button>
-        </EditForm>
+        </div>
+    }
+    else
+    {
+    <div class="login-container">
+        <div class="login-form">
+            <h3>Login</h3>
+            <EditForm Model="loginModel" OnValidSubmit="LoginUser">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="form-group">
+                        <InputText id="email" @bind-Value="loginModel.Email" type="email" placeholder="Email" />
+                </div>
+                <div class="form-group">
+                    <InputText id="password" @bind-Value="loginModel.Password" type="password" placeholder="Password" />
+                </div>
+                <div class="stay-logged-in">
+                    <label>
+                        <InputCheckbox @bind-Value="stayLoggedIn" />
+                        <span>Stay Logged In</span>
+                    </label>
+                </div>
+                <button type="submit" class="login-button">Login</button>
+            </EditForm>
 
-        <div class="divider">
-            <hr class="line" />
-            <span>OR</span>
-            <hr class="line" />
+            <div class="divider">
+                <hr class="line" />
+                <span>OR</span>
+                <hr class="line" />
+            </div>
+
+            <!-- Google Login Button -->
+            <div class="google-login-container">
+                <button class="google-login-button" @onclick="StartGoogleLogin">
+                    <img src="images/g-logo.png" alt="Google Logo" />
+                </button>
+            </div>
+            <div class="login-footer">
+                <p>Don't have an account? <NavLink href="/signup">Sign up here</NavLink></p>
+            </div>
+            <div class="error-message">@errorMessage</div>
         </div>
 
-        <!-- Google Login Button -->
-        <div class="google-login-container">
-            <button class="google-login-button" @onclick="StartGoogleLogin">
-                <img src="images/g-logo.png" alt="Google Logo" />
-            </button>
+        <!-- WebView for Google Sign-In -->
+        <div class="google-login-webview" style="display: none;" id="webViewContainer">
+            <iframe id="webView" style="width: 100%; height: 500px; border: none;" @ref="webView"></iframe>
+            <button onclick="hideWebView('webViewContainer')" style="position: absolute; top: 10px; right: 10px;">Close</button>
         </div>
-        <div class="login-footer">
-            <p>Don't have an account? <NavLink href="/signup">Sign up here</NavLink></p>
-        </div>
-        <div class="error-message">@errorMessage</div>
+
     </div>
+    }
 
-    <!-- WebView for Google Sign-In -->
-    <div class="google-login-webview" style="display: none;" id="webViewContainer">
-        <iframe id="webView" style="width: 100%; height: 500px; border: none;" @ref="webView"></iframe>
-        <button onclick="hideWebView('webViewContainer')" style="position: absolute; top: 10px; right: 10px;">Close</button>
-    </div>
-   
-</div>
 
 @code {
     private LoginModel loginModel = new LoginModel();
     private string errorMessage;
     private bool stayLoggedIn = false;
     private ElementReference webView;
+    private string secureUserEmail;
+    private bool isCheckingAuth = true;
+
 
     protected override async Task OnInitializedAsync()
     {
+        isCheckingAuth = true;
         Console.WriteLine("OnInitializedAsync called for Login page");
 
         try
         {
-            // Kontrollera och återställ Weekly Odds vid start
             Console.WriteLine("Starting CheckAndResetWeeklyOddsAsync...");
             await UserService.CheckAndResetWeeklyOddsAsync();
             Console.WriteLine("Weekly Odds checked and reset if needed.");
 
-            // Starta AutoDrawService för att schemalägga dragningar
             Console.WriteLine("Initializing draw timers in AutoDrawService...");
             await AutoDrawService.InitializeDrawTimersAsync();
             Console.WriteLine("Draw timers initialized successfully.");
 
-            // Kontrollera om UID finns i LocalStorage
-            Console.WriteLine("Fetching userUid from localStorage...");
-            var userUid = await localStorage.GetItemAsync<string>("userUid");
+            Console.WriteLine("Fetching userUid ...");
+            var userUid = await SecureStorage.GetAsync("userUid");
 
             Console.WriteLine("Checking and cleaning up winner files...");
             await WinnerCleanupService.CheckAndCleanupWinnerFilesAsync();
             Console.WriteLine("Winner file cleanup check completed.");
+
+            var firebaseToken = await SecureStorage.GetAsync("firebaseToken");
+            if (!string.IsNullOrEmpty(firebaseToken))
+            {
+                var success = await SignInWithCustomTokenAsync(firebaseToken);
+                if (success != null)
+                {
+                    Console.WriteLine("Auto-login with token successful.");
+                    NavigationManager.NavigateTo("/");
+                    return;
+                }
+                else
+                {
+                    Console.WriteLine("Token found but auto-login failed.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No firebaseToken found in SecureStorage.");
+            }
+
             if (!string.IsNullOrEmpty(userUid))
             {
                 Console.WriteLine($"userUid found: {userUid}. Fetching user data from Firebase...");
-
-                // Bygg URL till användarens data i Firebase
                 var getUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userUid}.json?alt=media";
-
-                // Skicka GET-förfrågan för att hämta användardata
                 var response = await HttpClient.GetAsync(getUrl);
 
                 if (response.IsSuccessStatusCode)
@@ -103,22 +136,21 @@
                     Console.WriteLine($"User data fetched successfully for UID: {userUid}");
                     var userData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonData);
 
-                    // Kontrollera om stayLoggedIn är true
-                    if (userData != null && userData.ContainsKey("stayLoggedIn") && userData["stayLoggedIn"] is bool isLoggedIn && isLoggedIn)
+                    if (userData != null &&
+                        userData.TryGetValue("stayLoggedIn", out var value) &&
+                        value is bool stayLoggedIn &&
+                        stayLoggedIn)
                     {
-                        Console.WriteLine("User opted to stay logged in. Redirecting to home page...");
+                        Console.WriteLine("User is marked to stay logged in. Redirecting...");
                         NavigationManager.NavigateTo("/");
                         return;
                     }
-                    else
-                    {
-                        Console.WriteLine("User is not marked to stay logged in. Proceeding to login form...");
-                    }
+
+                    Console.WriteLine("User is not marked to stay logged in. Showing login form...");
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    // Om filen inte finns, fortsätt till inloggningsformuläret
-                    Console.WriteLine($"No data file found for UID: {userUid}. Proceeding to login...");
+                    Console.WriteLine($"No data file found for UID: {userUid}. Showing login form...");
                 }
                 else
                 {
@@ -127,15 +159,21 @@
             }
             else
             {
-                Console.WriteLine("No userUid found in localStorage. Proceeding to login form...");
+                Console.WriteLine("No UID found in SecureStorage. Showing login form...");
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error during initialization: {ex.Message}");
         }
-    }
+        finally
+        {
+            isCheckingAuth = false;
 
+            // 🧠 Dölj native loading screen när vi är klara med auth
+            await JSRuntime.InvokeVoidAsync("hideLoadingScreen");
+        }
+    }
 
     private async Task LoginUser()
     {
@@ -150,9 +188,12 @@
                 // Spara användarens UID och e-post till LocalStorage
                 var userEmail = firebaseUser.Info.Email;
                 var userUid = firebaseUser.Uid;
+                var firebaseToken = await firebaseUser.GetIdTokenAsync();
+                await SecureStorage.SetAsync("firebaseToken", firebaseToken);
 
+                secureUserEmail = await SecureStorage.GetAsync("userEmail");
                 await localStorage.SetItemAsync("userEmail", userEmail);
-                await localStorage.SetItemAsync("userUid", userUid);
+                await SecureStorage.SetAsync("userUid", userUid);
 
                 if (stayLoggedIn)
                 {
@@ -212,6 +253,51 @@
             Console.WriteLine($"Error saving stayLoggedIn status: {ex.Message}");
         }
     }
+    private async Task<bool> SignInWithCustomTokenAsync(string customToken)
+    {
+        try
+        {
+            var apiKey = "AIzaSyCyLKylikL5dUKQEKxMn6EkY6PnBWKmJtA"; // ✅ Din Firebase API Key
+            var url = $"https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key={apiKey}";
+
+            var payload = new
+            {
+                token = customToken,
+                returnSecureToken = true
+            };
+
+            var response = await HttpClient.PostAsJsonAsync(url, payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(json);
+
+                var idToken = result.GetProperty("idToken").GetString();
+                var uid = result.GetProperty("localId").GetString();
+
+                Console.WriteLine($"Custom token login successful. UID: {uid}");
+
+                // ✅ Spara till SecureStorage (så vi kan auto-logga in i framtiden)
+                await SecureStorage.SetAsync("firebaseToken", idToken);
+                await SecureStorage.SetAsync("userUid", uid);
+
+                return true;
+            }
+            else
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Custom token login failed. Response: {errorBody}");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception during SignInWithCustomTokenAsync: {ex.Message}");
+            return false;
+        }
+    }
+
     private string GetErrorMessage(string responseBody)
     {
         try
@@ -530,6 +616,92 @@
             background-color: #ddd; /* Linjefärg */
             border: none;
         }
+
+    .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-size: 1.2rem;
+        color: #555;
+    }
+
+    #loading-screen {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(145deg, #F0FFF0, #556B2F);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-in-out;
+    }
+
+    .loading-animation {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        width: 100px;
+    }
+
+    .loading-circle {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: white;
+        opacity: 0.3;
+        animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+        .loading-circle:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .loading-circle:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        .loading-circle:nth-child(3) {
+            animation-delay: 0s;
+        }
+
+    @@keyframes bounce {
+        0%, 80%, 100%
+
+    {
+        transform: translateY(6px) scale(0.9);
+        opacity: 0.3;
+    }
+
+    40% {
+        transform: translateY(0px) scale(1);
+        opacity: 1;
+    }
+
+    }
+    input, select, button {
+    -webkit-appearance: none;
+    appearance: none;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+input[type="email"],
+input[type="password"] {
+    font-size: 16px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+button {
+    font-size: 17px;
+    padding: 14px;
+    border-radius: 12px;
+}
+
 </style>
 <script>
     function monitorIframeNavigation(iframeId, dotNetRef) {

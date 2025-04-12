@@ -1,0 +1,72 @@
+﻿@page "/jackpot-conversion"
+@using lek4.Components.Service
+@inject JackpotService JackpotService
+@inject NavigationManager NavigationManager
+
+<h3>Update Conversion Factor and Currency</h3>
+<button @onclick="NavigateBack">← Back</button>
+
+<!-- Conversion Factor Input -->
+<div class="form-group">
+    <label for="conversionFactor">Enter Conversion Factor (0.01 - 10.0):</label>
+    <InputNumber @bind-Value="conversionFactor" id="conversionFactor" class="form-control"
+                 Min="0.01" Max="10.0" Step="0.01" />
+    <p>Current Conversion Factor: @conversionFactor</p>
+</div>
+
+<!-- Currency Symbol Input -->
+<div class="form-group">
+    <label for="currencySymbol">Enter Currency Symbol:</label>
+    <InputText @bind-Value="currencySymbol" id="currencySymbol" class="form-control" placeholder="E.g., $, €, kr" />
+    <p>Current Currency Symbol: @currencySymbol</p>
+</div>
+
+<!-- Update Button -->
+<button @onclick="UpdateSettings" class="btn btn-primary">Update</button>
+
+@if (updateMessage != null)
+{
+    <p class="@messageClass">@updateMessage</p>
+}
+
+@code {
+    private double conversionFactor = 0.1; // Default value
+    private string currencySymbol = "kr"; // Default currency symbol
+    private string updateMessage;
+    private string messageClass = "text-success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Fetch the current conversion factor and currency symbol from the backend
+        conversionFactor = await JackpotService.GetConversionFactor();
+        currencySymbol = await JackpotService.GetCurrencySymbol();
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task UpdateSettings()
+    {
+        if (conversionFactor < 0.01 || conversionFactor > 10.0)
+        {
+            updateMessage = "Please enter a value between 0.01 and 10.0.";
+            messageClass = "text-danger";
+            return;
+        }
+
+        try
+        {
+            // Update the conversion factor and currency symbol in the backend
+            await JackpotService.UpdateConversionFactor(conversionFactor);
+            await JackpotService.UpdateCurrencySymbol(currencySymbol);
+
+            updateMessage = $"Settings updated successfully: Conversion Factor = {conversionFactor}, Currency = {currencySymbol}";
+            messageClass = "text-success";
+        }
+        catch (Exception ex)
+        {
+            updateMessage = $"Failed to update settings: {ex.Message}";
+            messageClass = "text-danger";
+        }
+    }
+}

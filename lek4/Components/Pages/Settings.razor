@@ -6,6 +6,8 @@
 @inject FirebaseAuthClient AuthClient
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
 @inject NavigationManager NavigationManager
+@using Microsoft.Maui.Storage
+
 
 <div class="settings-container">
     <h3>Settings</h3>
@@ -36,7 +38,7 @@
             </div>
             <div class="info-item">
                 <label>Email:</label>
-                <span>@user?.Info.Email</span>
+                <span>@secureUserEmail</span>
             </div>
         }
         else
@@ -58,40 +60,31 @@
 @code {
     private User user;
     private ProfileModel profileModel = new ProfileModel();
+    private string secureUserEmail;
 
     protected override async Task OnInitializedAsync()
     {
-        user = AuthClient.User;
+        var uid = await SecureStorage.GetAsync("userUid");
 
-        if (user == null || string.IsNullOrEmpty(user.Uid))
+        if (string.IsNullOrEmpty(uid))
         {
             await Application.Current.MainPage.DisplayAlert("Error", "User is not logged in.", "Ok");
             NavigationManager.NavigateTo("/login");
             return;
         }
 
-        await FetchUserProfile();
+        await FetchUserProfile(uid);
     }
 
-    public async Task FetchUserProfile()
+    public async Task FetchUserProfile(string uid)
     {
         try
         {
-            if (user == null || string.IsNullOrEmpty(user.Uid))
-            {
-                throw new InvalidOperationException("User is not authenticated or UID is missing.");
-            }
-
-            // Bygg den korrekta URL:en baserat på UID
-            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json?alt=media";
-
-            // Skicka en GET-begäran till Firebase
+            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{uid}.json?alt=media";
             var response = await new HttpClient().GetStringAsync(url);
-
-            // Deserialisera användardatan
             profileModel = JsonSerializer.Deserialize<ProfileModel>(response);
 
-            Console.WriteLine($"User profile loaded for UID: {user.Uid}");
+            Console.WriteLine($"User profile loaded for UID: {uid}");
         }
         catch (HttpRequestException httpEx)
         {
@@ -105,6 +98,7 @@
         }
     }
 
+
     private void NavigateToEditProfile()
     {
         NavigationManager.NavigateTo("/edit-profile");
@@ -117,12 +111,25 @@
 
     private async Task Logout()
     {
-        // Clear the email from localStorage
-        await localStorage.RemoveItemAsync("userEmail");
-        await localStorage.ClearAsync();
+        try
+        {
+            // 🔒 Rensa secure storage
+            SecureStorage.Remove("firebaseToken");
+            SecureStorage.Remove("userUid");
+            SecureStorage.Remove("userEmail");
 
-        NavigationManager.NavigateTo("/login"); // Redirect to login page
+            // 🧹 Rensa vanlig local storage
+            await localStorage.ClearAsync();
+
+            // 🚪 Navigera till login-sidan
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during logout: {ex.Message}");
+        }
     }
+
     public class ProfileModel
     {
         public string FirstName { get; set; }

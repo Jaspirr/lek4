@@ -1,0 +1,204 @@
+﻿@page "/settings"
+@using Firebase.Auth
+@using System.Text.Json
+@using System.Text
+@using System.Net.Http
+@inject FirebaseAuthClient AuthClient
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject NavigationManager NavigationManager
+
+<div class="settings-container">
+    <h3>Settings</h3>
+
+    <div class="profile-info">
+        <h4>Profile Information</h4>
+        @if (profileModel != null)
+        {
+            <div class="info-item">
+                <label>First Name:</label>
+                <span>@profileModel.FirstName</span>
+            </div>
+            <div class="info-item">
+                <label>Last Name:</label>
+                <span>@profileModel.LastName</span>
+            </div>
+            <div class="info-item">
+                <label>Birth Date:</label>
+                <span>@profileModel.BirthDate.ToString("yyyy-MM-dd")</span>
+            </div>
+            <div class="info-item">
+                <label>City:</label>
+                <span>@profileModel.City</span>
+            </div>
+            <div class="info-item">
+                <label>Gender:</label>
+                <span>@profileModel.Gender</span>
+            </div>
+            <div class="info-item">
+                <label>Email:</label>
+                <span>@user?.Info.Email</span>
+            </div>
+        }
+        else
+        {
+            <p>Loading profile information...</p>
+        }
+    </div>
+
+    <div class="button-group">
+        <button @onclick="NavigateToEditProfile" class="edit-profile-button">Edit</button>
+        <button @onclick="Logout" class="logout-button">Logout</button>
+    </div>
+
+    <div class="button-group">
+        <button @onclick="NavigateToAccountSettings" class="account-settings-button">Account Settings</button>
+    </div>
+</div>
+
+@code {
+    private User user;
+    private ProfileModel profileModel = new ProfileModel();
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = AuthClient.User;
+
+        if (user == null || string.IsNullOrEmpty(user.Uid))
+        {
+            await Application.Current.MainPage.DisplayAlert("Error", "User is not logged in.", "Ok");
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        await FetchUserProfile();
+    }
+
+    public async Task FetchUserProfile()
+    {
+        try
+        {
+            if (user == null || string.IsNullOrEmpty(user.Uid))
+            {
+                throw new InvalidOperationException("User is not authenticated or UID is missing.");
+            }
+
+            // Bygg den korrekta URL:en baserat på UID
+            var url = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json?alt=media";
+
+            // Skicka en GET-begäran till Firebase
+            var response = await new HttpClient().GetStringAsync(url);
+
+            // Deserialisera användardatan
+            profileModel = JsonSerializer.Deserialize<ProfileModel>(response);
+
+            Console.WriteLine($"User profile loaded for UID: {user.Uid}");
+        }
+        catch (HttpRequestException httpEx)
+        {
+            Console.WriteLine($"HTTP Request Error: {httpEx.Message}");
+            await Application.Current.MainPage.DisplayAlert("Error", $"Failed to load profile information: {httpEx.Message}", "Ok");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading user profile: {ex.Message}");
+            await Application.Current.MainPage.DisplayAlert("Error", $"Failed to load profile information: {ex.Message}", "Ok");
+        }
+    }
+
+    private void NavigateToEditProfile()
+    {
+        NavigationManager.NavigateTo("/edit-profile");
+    }
+
+    private void NavigateToAccountSettings()
+    {
+        NavigationManager.NavigateTo("/account-settings");
+    }
+
+    private async Task Logout()
+    {
+        // Clear the email from localStorage
+        await localStorage.RemoveItemAsync("userEmail");
+        await localStorage.ClearAsync();
+
+        NavigationManager.NavigateTo("/login"); // Redirect to login page
+    }
+    public class ProfileModel
+    {
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public DateTime BirthDate { get; set; }
+        public string City { get; set; }
+        public string Gender { get; set; }
+        public string Email { get; set; }
+    }
+}
+
+<style>
+    .settings-container {
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #f9f9f9;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+        .settings-container h3 {
+            text-align: center;
+            color: #4a4a4a;
+            margin-bottom: 20px;
+        }
+
+    .profile-info {
+        margin-bottom: 20px;
+    }
+
+        .profile-info h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+    }
+
+        .info-item label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .info-item span {
+            color: #333;
+        }
+
+    .button-group {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 20px;
+
+    }
+
+    .logout-button,
+    .edit-profile-button,
+    .account-settings-button {
+        background-color: #556B2F; /* Ljuslila färg */
+        color: #F0FFF0;
+        border: none;
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 5px;
+        transition: background-color 0.3s ease;
+    }
+
+        .logout-button:hover,
+        .edit-profile-button:hover,
+        .account-settings-button:hover {
+            background-color: #c6a3e3; /* Mörkare nyans av ljuslila för hover-effekt */
+        }
+</style>

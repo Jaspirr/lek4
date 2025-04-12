@@ -1,0 +1,1185 @@
+﻿@page "/stats"
+@using Blazored.LocalStorage
+
+@inject UserService UserService
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager NavigationManager
+
+<div class="stats-page">
+    <div class="header-container">
+        <header class="stats-header">
+            <div class="header-flex">
+                <button @onclick="NavigateToSettings" class="settings-button">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <div class="title">
+                    <h1>Personal Stats</h1>
+                    <p>Your achievements and progress at a glance.</p>
+                </div>
+            </div>
+        </header>
+    </div>
+    <section class="stats-cards">
+        <div class="stat-card">
+            <h4>Daily Streak</h4>
+            <button class="info-button-dark" @onclick="ToggleDailyStreakInfo">
+                <i class="fas fa-info-circle"></i>
+            </button>
+            <div class="stars-container">
+                @if (userStats?.DailyStreak != null)
+                {
+                    @for (int i = 1; i <= 5; i++)
+                    {
+                        <i class="fa fa-star @(userStats.DailyStreak.Stars >= i ? "filled" : "")"></i>
+                    }
+                }
+                else
+                {
+                    <p>Loading...</p>
+                }
+            </div>
+            <p class="stars-count">@(userStats?.DailyStreak?.Stars ?? 0) / 5 </p>
+        </div>
+        <div class="stat-card">
+            <h4>Longest Streak</h4>
+            <p>@longestStreak days</p>
+        </div>
+        <div class="stat-card">
+            <h4>Starshards</h4>
+            <div class="starshard-container">
+                <div class="starshard-count-box">
+                    <span class="starshard-count">@starShards</span>
+                </div>
+                <div class="starshard-box">
+                    <img src="images/Starshard.png" alt="Starshard Icon" class="starshard-icon" />
+                </div>
+            </div>
+        </div>
+        <div class="stat-card performance-card">
+            <h4>Week Performance</h4>
+            <button class="info-button-dark" @onclick="ToggleWeekPerformanceInfo">
+                <i class="fas fa-info-circle"></i>
+            </button>
+            <div class="performance-details">
+                <div class="performance-row">
+                    <span class="label">Your Odds:</span>
+                  <span class="value"
+                      style="background: @GetOddsTextColor(userStats?.WeeklyOdds, averageOdds);
+                             -webkit-background-clip: text;
+                             -webkit-text-fill-color: transparent;">
+                    <i class="@(userStats?.WeeklyOdds >= averageOdds ? "fa fa-arrow-up" : "fa fa-arrow-down")"></i>
+                                            @userStats?.WeeklyOdds.ToString("0.0")
+                </span>
+                </div>
+                <div class="performance-row">
+                    <span class="label">Everyone's Average Odds:</span>
+                    <span class="value">@averageOdds.ToString("0.0")</span>
+                </div>
+            </div>
+            <div class="performance-bar-container">
+                <div class="performance-bar-background">
+                    <div class="performance-bar"
+                         style="background: @GetPerformanceBarColor(userStats?.WeeklyOdds, averageOdds);
+                    width: @(Math.Min(((userStats?.WeeklyOdds ?? 0) / (averageOdds > 0 ? averageOdds : 1)) * 100, 100))%;
+                    border-radius: 5px;">
+                    </div>
+                    <!-- Genomsnittsstreck -->
+                    <div class="average-line" style="left: @(Math.Min(((averageOdds > 0 ? averageOdds : 1) / (userStats?.WeeklyOdds > 0 ? userStats.WeeklyOdds : 1)) * 100, 100))%;">
+                        <span class="average-text">Average</span>
+                    </div>
+                </div>
+            </div>
+            <p class="comparison-message">
+                @comparisonMessage
+            </p>
+
+        </div>
+        <section class="space-section">
+            <div class="space-container">
+                <div class="timeline-container">
+                    <button @onclick="ToggleInfoPopup" class="info-button">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                    <!-- Central Container for Planets and Rocket -->
+                    <div class="central-container">
+                        <div class="planet-progress-container">
+                            <span class="planet-progress-text">@progressPercentage.ToString("0.0")%</span>
+                        </div>
+                        <!-- Next Planet (Top) -->
+                        @if (nextPlanetImage != null)
+                        {
+                            <div class="planet-item next-planet">
+                                <img src="@nextPlanetImage.ImageUrl" alt="@nextPlanetImage.Name" class="planet-icon" />
+                                <span class="planet-name">@nextPlanetImage.Name</span>
+
+                            </div>
+                        }
+                        <!-- Current Planet (Bottom) -->
+                       <div class="planet-item current-planet">
+                            <img src="@currentPlanetImage?.ImageUrl" alt="@currentPlanet" class="planet-icon" />
+                            <span class="planet-name">@currentPlanet</span>
+                           
+                        </div>
+                    </div>
+
+                    <!-- Vertical Progress Bar -->
+                    <div class="vertical-progress-bar">
+                        <div class="vertical-progress" style="height: @progressPercentage%;">
+                            <div class="rocket-container">
+                                <img src="images/raket6.png" alt="Rocket Icon" class="icon" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div class="stat-card">
+            <h4>All Users Odds</h4>
+            <p>@allUsersTotalOdds.ToString("0.0")</p>
+        </div>
+
+        <!-- Your Total Steps -->
+        <div class="stat-card">
+            <h4>Your Total Steps</h4>
+            <p>@yourTotalSteps</p>
+        </div>
+
+        <!-- Entire App Steps -->
+        <div class="stat-card">
+            <h4>Everyone's Steps</h4>
+            <p>@entireAppSteps</p>
+        </div>
+        <div class="stat-card">
+            <h4>Credits</h4>
+            <p>@totalCredits</p>
+        </div>
+    </section>
+
+    @if (showRewardPopup)
+    {
+        <div class="popup-container">
+            <h2>Congratulations!</h2>
+            <p>You achieved a streak of 5/5 and earned a Starshard!</p>
+            <img src="images/Starshard.png" alt="Starshard" class="starshard" />
+            <button class="close-button" @onclick="ClosePopup">Claim</button>
+        </div>
+
+    }
+    @if (showInfoPopup)
+    {
+        <div class="popup-container">
+            <h2>Information</h2>
+            <ul class="planet-info-list">
+                @foreach (var planet in planetProgression)
+                {
+                    <li>
+                        <strong>@planet.Planet:</strong> @planet.StepGoal steps 
+                    </li>
+                }
+            </ul>
+            <button class="close-button" @onclick="ToggleInfoPopup">Close</button>
+        </div>
+    }
+    @if (showWeekPerformanceInfo)
+    {
+        <div class="popup-container">
+            <div class="info-popup-content">
+               
+                <h4>Information</h4>
+                <p><strong>Your Odds:</strong> Represents your weekly performance.</p>
+                <p><strong>Everyone's Average Odds:</strong> Displays the average odds calculated from all users.</p>
+                <p><strong>Performance Bar:</strong> A visual indicator of how your odds compare to the average. The longer the bar, the better you are performing.</p>
+                <p><strong> | :</strong> The vertical line shows the average performance of all users. Use this as a benchmark to compare your progress.</p>
+                <p>
+                    <strong>Icons:</strong>
+                    <i class="fa fa-arrow-up" style="color: green;"></i> Indicates your odds are above average.
+                    <i class="fa fa-arrow-down" style="color: red;"></i> Indicates your odds are below average.
+                </p>
+                <button class="close-button" @onclick="ToggleWeekPerformanceInfo">Close</button>
+            </div>
+        </div>
+    }
+    @if (showDailyStreakInfo)
+    {
+        <div class="popup-container">
+            <div class="info-popup-content">
+                
+                <h4>Information</h4>
+                <p><strong>Daily Streak:</strong> Represents the number of consecutive days you have logged into the app and stayed active.</p>
+                <p><strong>Stars:</strong> Each star corresponds to a completed daily streak. Earn 5 stars to gain rewards.</p>
+                <button class="close-button" @onclick="ToggleDailyStreakInfo">Close</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private double totalCredits;
+    private double lockInAmount;
+    private int currentStreak;
+    private int longestStreak;
+    private bool showRewardPopup = false;
+    private int starShards;
+    private bool showPopup = false;
+    private double allUsersTotalOdds;
+    private int yourTotalSteps;
+    private int entireAppSteps;
+    private UserService.UserStats userStats;
+
+    private double averageOdds;
+    private string comparisonMessage;
+    private string comparisonIconClass;
+    private string comparisonMessageColor = "linear-gradient(to right, #32CD32, #7fff00)"; // Default gradient
+
+    private double progressPercentage;
+    private double RocketPosition => Math.Min(progressPercentage, 100);
+    private bool showInfoPopup = false;
+
+    private void ToggleInfoPopup()
+    {
+        showInfoPopup = !showInfoPopup;
+    }
+    private bool showWeekPerformanceInfo = false;
+
+    private void ToggleWeekPerformanceInfo()
+    {
+        showWeekPerformanceInfo = !showWeekPerformanceInfo;
+    }
+    private bool showDailyStreakInfo = false;
+
+    private void ToggleDailyStreakInfo()
+    {
+        showDailyStreakInfo = !showDailyStreakInfo;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var userEmail = await LocalStorage.GetItemAsync<string>("userEmail");
+
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                NavigationManager.NavigateTo("/login");
+                return;
+            }
+
+            // Uppdatera användarens daily streak
+            await UserService.UpdateDailyStreakInUserStats(userEmail);
+
+            // Hämta användarens statistik
+            userStats = await UserService.GetUserFromFirebase(userEmail);
+
+            if (userStats != null)
+            {
+                totalCredits = userStats.Credits;
+                lockInAmount = userStats.LockInAmount;
+                currentStreak = userStats.DailyStreak?.CurrentStreak ?? 0;
+                longestStreak = userStats.DailyStreak?.LongestStreak ?? 0;
+                starShards = userStats.StarShards;
+
+                // Beräkna användarens steg baserat på TotalOdds
+                yourTotalSteps = (int)(userStats.TotalOdds * 10000); // 0.1 odds motsvarar 1000 steg
+
+                // Uppdatera planetprogression
+                UpdatePlanetProgress(yourTotalSteps);
+
+                // Visa popup om Stars >= 5
+                if (userStats.DailyStreak.Stars >= 5)
+                {
+                    showRewardPopup = true;
+                }
+            }
+
+            // Hämta och bearbeta alla användares odds
+            await FetchAllUsersOdds();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading stats: {ex.Message}");
+        }
+    }
+
+    // Planetprogression: Dynamisk logik
+    private List<(string Planet, int StepGoal)> planetProgression = new List<(string, int)>
+    {
+        ("Mercury", 100000),     // 100,000 steg
+        ("Venus", 300000),       // +200,000 steg
+        ("Earth", 700000),       // +400,000 steg
+        ("Mars", 1500000),       // +800,000 steg
+        ("Jupiter", 3100000),    // +1,600,000 steg
+        ("Saturn", 6300000),     // +3,200,000 steg
+        ("Uranus", 12700000),    // +6,400,000 steg
+        ("Neptune", 25500000)    // +12,800,000 steg
+    };
+
+    private string currentPlanet = "None";
+    private int stepsToNextPlanet;
+
+    private List<PlanetOption> planets = new List<PlanetOption>
+{
+    new PlanetOption { Name = "Mercury", ImageUrl = "images/mercurus2.webp" },
+    new PlanetOption { Name = "Venus", ImageUrl = "images/Venus2.webp" },
+    new PlanetOption { Name = "Earth", ImageUrl = "images/earth2.webp" },
+    new PlanetOption { Name = "Mars", ImageUrl = "images/Mars2.webp" },
+    new PlanetOption { Name = "Jupiter", ImageUrl = "images/jupiter2.webp" },
+    new PlanetOption { Name = "Saturn", ImageUrl = "images/Saturnus2.webp" },
+    new PlanetOption { Name = "Uranus", ImageUrl = "images/uranus2.webp" },
+    new PlanetOption { Name = "Neptune", ImageUrl = "images/Neptunus2.webp" }
+};
+
+    private PlanetOption currentPlanetImage;
+    private PlanetOption nextPlanetImage;
+
+    private void UpdatePlanetProgress(int totalSteps)
+    {
+        for (int i = 0; i < planetProgression.Count; i++)
+        {
+            if (totalSteps < planetProgression[i].StepGoal)
+            {
+                currentPlanet = planetProgression[i].Planet;
+                stepsToNextPlanet = planetProgression[i].StepGoal - totalSteps;
+
+                // Sätt aktuell och nästa planetbild
+                currentPlanetImage = planets.FirstOrDefault(p => p.Name == currentPlanet);
+                nextPlanetImage = i + 1 < planetProgression.Count ? planets[i + 1] : null;
+
+                // Beräkna progress i procent mellan föregående och nuvarande planet
+                int previousGoal = i == 0 ? 0 : planetProgression[i - 1].StepGoal;
+                progressPercentage = ((double)(totalSteps - previousGoal) / (planetProgression[i].StepGoal - previousGoal)) * 100;
+
+                return;
+            }
+        }
+
+        // Om användaren har fler steg än den sista planetens mål
+        currentPlanet = "All planets visited!";
+        stepsToNextPlanet = 0;
+        currentPlanetImage = null;
+        nextPlanetImage = null;
+        progressPercentage = 100;
+    }
+
+
+    public class PlanetOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+
+    private string GetPerformanceBarColor(double? userOdds, double averageOdds)
+    {
+        var ratio = (userOdds ?? 0) / (averageOdds > 0 ? averageOdds : 1);
+        return GetUnifiedGradient(ratio);
+    }
+
+    private string GetOddsTextColor(double? userOdds, double averageOdds)
+    {
+        var ratio = (userOdds ?? 0) / (averageOdds > 0 ? averageOdds : 1);
+        return GetUnifiedGradient(ratio);
+    }
+
+    private string GetComparisonMessageColor(double userOdds, double averageOdds)
+    {
+        var ratio = userOdds / (averageOdds > 0 ? averageOdds : 1);
+        return GetUnifiedGradient(ratio);
+    }
+
+    private string GetUnifiedGradient(double value)
+    {
+        if (value > 2.0)
+            return "linear-gradient(to right, #00FF00, #32CD32)"; // Bright green
+        if (value > 1.5)
+            return "linear-gradient(to right, #ADFF2F, #7CFC00)"; // Lime green
+        if (value > 1.0)
+            return "linear-gradient(to right, #FFD700, #FFA500)"; // Gold-orange
+        if (value > 0.5)
+            return "linear-gradient(to right, #FFCC00, #FF9900)"; // Yellow-orange
+        if (value >= 0)
+            return "linear-gradient(to right, #7FFF00, #32CD32)"; // Light green
+        if (value > -0.5)
+            return "linear-gradient(to right, #FFD700, #FFA500)"; // Light yellow-orange
+        if (value > -1.0)
+            return "linear-gradient(to right, #FF6347, #FF4500)"; // Red-orange
+        return "linear-gradient(to right, #FF0000, #8B0000)"; // Dark red
+    }
+
+
+    private async Task FetchAllUsersOdds()
+    {
+        try
+        {
+            // Hämta data från TotalUsersOdds.json
+            var totalUsersOdds = await UserService.GetAllUsersOdds();
+
+            if (totalUsersOdds != null && totalUsersOdds.Count > 0)
+            {
+                // Summera alla användares Odds
+                allUsersTotalOdds = totalUsersOdds.Sum(u => u.Value);
+
+                // Omvandla totala Odds till steg
+                entireAppSteps = (int)(allUsersTotalOdds * 10000);
+            }
+
+            // Hämta data från TotalUsersWeeklyOdds.json
+            var totalUsersWeeklyOdds = await UserService.GetAllUsersWeeklyOdds();
+
+            if (totalUsersWeeklyOdds != null && totalUsersWeeklyOdds.Count > 0)
+            {
+                // Beräkna genomsnittliga Weekly Odds
+                averageOdds = totalUsersWeeklyOdds.Sum(u => u.Value) / totalUsersWeeklyOdds.Count;
+
+                // Jämför användarens Weekly Odds med genomsnittet
+                if (userStats != null)
+                {
+                    double oddsDifference = userStats.WeeklyOdds - averageOdds;
+
+                    if (oddsDifference > 2.0)
+                    {
+                        comparisonMessage = "You're leading the pack! Incredible performance!";
+                        comparisonIconClass = "fa fa-crown";
+                    }
+                    else if (oddsDifference > 1.5)
+                    {
+                        comparisonMessage = "You're soaring high! Keep up this amazing momentum!";
+                        comparisonIconClass = "fa fa-star";
+                    }
+                    else if (oddsDifference > 1.0)
+                    {
+                        comparisonMessage = "Fantastic progress! You're truly inspiring!";
+                        comparisonIconClass = "fa fa-trophy";
+                    }
+                    else if (oddsDifference > 0.5)
+                    {
+                        comparisonMessage = "Great job! You're above the average. Stay strong!";
+                        comparisonIconClass = "fa fa-medal";
+                    }
+                    else if (oddsDifference >= 0)
+                    {
+                        comparisonMessage = "You're on the right track! Consistency is key.";
+                        comparisonIconClass = "fa fa-thumbs-up";
+                    }
+                    else if (oddsDifference > -0.5)
+                    {
+                        comparisonMessage = "Keep pushing! You're almost at the average.";
+                        comparisonIconClass = "fa fa-compass";
+                    }
+                    else if (oddsDifference > -1.0)
+                    {
+                        comparisonMessage = "Don't give up! Small steps lead to big wins.";
+                        comparisonIconClass = "fa fa-rocket";
+                    }
+                    else
+                    {
+                        comparisonMessage = "Stay motivated! Every step forward counts.";
+                        comparisonIconClass = "fa fa-mountain";
+                    }
+
+                    comparisonMessageColor = GetComparisonMessageColor(userStats.WeeklyOdds, averageOdds);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching users odds data: {ex.Message}");
+        }
+    }
+
+    private async Task GiveStarshard(string userEmail)
+    {
+        // Lägg till en Starshard i användarens stats
+        starShards++;
+        await UserService.AddStarshardToUser(userEmail, starShards);
+    }
+    private async Task ClosePopup()
+    {
+        try
+        {
+            if (userStats?.DailyStreak != null)
+            {
+                // Kontrollera att Stars >= 5 för att säkerställa att det finns tillräckligt
+                if (userStats.DailyStreak.Stars >= 5)
+                {
+                    // Minska antalet Stars med 5
+                    userStats.DailyStreak.Stars -= 5;
+
+                    // Lägg till en Starshard till användaren
+                    userStats.StarShards++;
+                    starShards = userStats.StarShards; // Uppdatera lokala variabeln
+
+                    // Uppdatera Firebase med nya värden
+                    await UserService.UpdateUserStatsInFirebase(userStats.UserEmail, userStats);
+
+                    // Visa en bekräftelse i konsolen
+                    Console.WriteLine($"Starshard added! Current Starshards: {starShards}");
+                }
+
+                // Dölj popup och uppdatera UI
+                showRewardPopup = false;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error resetting stars: {ex.Message}");
+        }
+    }
+
+    private void NavigateToSettings()
+    {
+        NavigationManager.NavigateTo("/settings");
+    }
+}
+
+<style>
+    /* Stjärnor-container */
+    .stars-container {
+        display: flex;
+        gap: 5px;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 5px; /* Justera avståndet mellan stjärnorna och texten */
+    }
+
+    .stars-count {
+        font-size: 1rem;
+        font-weight: bold;
+        text-align: center;
+        color: #34495e; /* Anpassa färg efter behov */
+        margin-top: 5px; /* Skapa lite utrymme ovanför texten */
+    }
+
+    /* Grundläggande stjärn-ikon */
+    .fa-star {
+        font-size: 24px;
+        color: #ccc; /* Grå för ofyllda */
+        transition: color 0.3s ease;
+    }
+
+        /* Fyllda stjärnor */
+        .fa-star.filled {
+            color: #ffd700; /* Guld för fyllda */
+        }
+
+    .stats-page {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        min-height: 100vh;
+        background: linear-gradient(145deg, #ffffff, #f4f4f9);
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Header section */
+    .stats-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+        .stats-header h1 {
+            font-size: 2rem;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .stats-header p {
+            font-size: 1rem;
+            color: #7f8c8d;
+            font-weight: 400;
+        }
+
+    /* Stats cards container */
+    .stats-cards {
+        position:relative;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+        max-width: 350px;
+    }
+
+    /* Individual stat card */
+    .stat-card {
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        padding: 20px;
+        text-align: center;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h4 {
+            font-size: 1.2rem;
+            color: #34495e;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .stat-card p {
+            font-size: 2rem;
+            color: #2c3e50;
+            font-weight: bold;
+            margin: 0;
+        }
+
+    /* Floating settings button */
+    .header-container {
+        position: relative;
+        margin-bottom: 20px;
+    }
+
+    .header-flex {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Center-align title and description */
+    }
+
+    .settings-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(145deg, #ffffff, #f4f4f9);
+        color: #2c3e50;
+        border: none;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        transition: transform 0.3s, box-shadow 0.3s, background-color 0.3s;
+    }
+
+        .settings-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+            background: #e0e0e0;
+        }
+
+        .settings-button i {
+            font-size: 1.2rem;
+        }
+
+    .title {
+        margin-top: 60px; /* Add enough space for the button */
+        text-align: center;
+    }
+
+    .stats-header h1 {
+        font-size: 1.8rem;
+        color: #2c3e50;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .stats-header p {
+        font-size: 1rem;
+        color: #7f8c8d;
+        margin-top: 8px; /* Add spacing below the title */
+    }
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .stats-header h1 {
+            font-size: 1.8rem;
+        }
+
+        .stats-header p {
+            font-size: 0.9rem;
+        }
+
+        .stat-card h4 {
+            font-size: 1rem;
+        }
+
+        .stat-card p {
+            font-size: 1.8rem;
+        }
+    }
+    /* Popup för belöning */
+    .popup-container {
+        text-align: center;
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        max-width: 300px;
+        width: 90%;
+    }
+
+        .popup-container[style*="display: none;"] {
+            display: none !important;
+        }
+
+    .close-button {
+        background-color: mediumspringgreen;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 0.3s ease;
+    }
+
+        .close-button:hover {
+            background-color: #5348c7;
+        }
+
+
+    @@keyframes shimmer {
+        0% {
+            filter: drop-shadow(0 0 5px #ff7deb) brightness(1);
+        }
+
+        50% {
+            filter: drop-shadow(0 0 20px #ff7deb) brightness(1.5);
+        }
+
+        100% {
+            filter: drop-shadow(0 0 5px #ff7deb) brightness(1);
+        }
+    }
+
+    .starshard {
+        display: block;
+        margin: 20px auto;
+        width: 100px;
+        height: 100px;
+        animation: shimmer 2s infinite;
+    }
+
+    /* Container för rund ikon och box med siffror */
+    .starshard-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px; /* Mellanrum mellan ikon och rektangulär box */
+        margin-top: 10px;
+    }
+
+    /* Rund box för Starshard-ikonen */
+    .starshard-box {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #f9f9f9;
+        border-radius: 50%;
+        width: 70px;
+        height: 70px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .starshard-icon {
+        width: 50px;
+        height: 50px;
+        animation: shimmer 2s infinite;
+    }
+
+    /* Rektangulär box för siffran */
+    .starshard-count-box {
+        background-color: white;
+        border-radius: 8px;
+        padding: 10px 15px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .starshard-count {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #34495e;
+    }
+
+    .fa-trophy {
+        color: gold;
+    }
+
+    .fa-thumbs-up {
+        color: blue;
+    }
+
+    .performance-card {
+        position: relative;
+        text-align: center;
+        padding: 15px;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        background: white;
+    }
+
+    .performance-details {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 15px;
+    }
+
+    .performance-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 1.2rem;
+    }
+
+        .performance-row .label {
+            font-weight: bold;
+            color: #34495e;
+            font-size: 1rem;
+        }
+
+        .performance-row .value {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: bold;
+        }
+
+            .performance-row .value i {
+                font-size: 1.2rem; /* Gör pilen lite större */
+            }
+
+
+    .performance-bar-container {
+        width: 100%;
+        background-color: #f5f5f5;
+        border-radius: 10px;
+        overflow: hidden;
+        height: 25px;
+        margin: 15px 0;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .performance-bar-background {
+        position: relative;
+        height: 100%;
+        width: 100%;
+        border-radius: 10px;
+    }
+
+    .average-line {
+        position: absolute;
+        top: -5px; /* Gör att linjen sticker ut ovanför och nedanför baren */
+        width: 2.5px;
+        height: calc(100% + 10px); /* Gör linjen längre än själva baren */
+        background-color: black; /* Färg på linjen, ändra efter behov */
+        z-index: 2; /* Gör att linjen visas ovanför andra element */
+        pointer-events: none; /* Gör linjen icke-klickbar */
+    }
+
+    .average-text {
+        position: absolute;
+        top: -20px; /* Placera texten ovanför linjen */
+        left: -10px; /* Centrerar texten horisontellt */
+        font-size: 0.8rem;
+        color: #FF6347;
+        white-space: nowrap;
+    }
+
+    .performance-bar {
+        height: 100%;
+        transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
+        border-radius: 5px;
+    }
+
+    .comparison-message {
+        font-size: 0.9rem; /* Anpassa storleken så att den matchar resten av texten */
+        font-weight: 500; /* Samma vikt som andra texter */
+        margin-top: 8px;
+        text-align: center;
+        color: #34495e; /* Använd samma färg som de andra texterna i sektionen */
+    }
+
+ /* Space Section */
+.space-section {
+    position: relative;
+    width: 100%;
+    padding: 50px 20px;
+    background: radial-gradient(circle at center, #0b132b, #1c2541, #3a506b);
+    color: #fff;
+    overflow: hidden;
+    z-index: 1;
+    border-radius: 20px; /* Rounded corners */
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4); /* Depth */
+}
+
+.space-container {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Timeline Container */
+.timeline-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 500px;
+    margin: 0 auto;
+}
+
+/* Central container for planets and rocket */
+.central-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    height: 140%;
+    width: 120px; /* Adjusted width for planets and rocket */
+    z-index: 2;
+}
+
+/* Next Planet */
+    .next-planet {
+        margin-bottom: 0px; /* Reduced spacing below next planet */
+    }
+
+    .vertical-progress-bar {
+        position: absolute;
+        left: 50%;
+        bottom: 70px;
+        transform: translateX(-50%);
+        width: 18px; /* Bredden ökad för att passa raketen */
+        height: 70%; /* Höjd för progressområdet */
+        background-color: rgba(255, 255, 255, 0.1); /* Ljus bakgrund för tydlighet */
+        border-radius: 10px;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        overflow: hidden; /* Hindrar överflödande element */
+        z-index: 1;
+    }
+
+    .vertical-progress {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 0; /* Dynamisk höjd */
+        background: linear-gradient(to top, #ff7eb3, #ff758c); /* Progressfärg */
+        transition: height 0.4s ease-in-out; /* Smidig animation */
+        border-radius: 10px;
+        display: flex;
+        align-items: flex-end; /* Placera raketen längst fram */
+        justify-content: center; /* Centrerar raketen horisontellt */
+    }
+
+    /* Rocket container */
+    .rocket-container {
+        position: absolute;
+        bottom: 0; /* Raketen är längst fram i progress */
+        transform: translateY(50%);
+        z-index: 2; /* Gör att raketen syns ovanför progressfärgen */
+    }
+
+    /* Rocket icon */
+    .icon {
+        width: 40px; /* Anpassad storlek för raketen */
+        height: 40px;
+        animation: vibrate 1s infinite ease-in-out; /* Lätt vibrationseffekt */
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)); /* Ljusglöd */
+    }
+
+    /* Vibration animation */
+    @@keyframes vibrate {
+        0%, 100% {
+            transform: translateX(-50%);
+        }
+
+        25% {
+            transform: translateX(-51%);
+        }
+
+        50% {
+            transform: translateX(-49%);
+        }
+
+        75% {
+            transform: translateX(-50.5%);
+        }
+    }
+/* Current Planet */
+.current-planet .highlight-circle {
+    position: absolute;
+    width: 90px;
+    height: 90px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.4), transparent);
+    border-radius: 50%;
+    z-index: -1;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.current-planet .planet-icon {
+    box-shadow: 0 0 15px #ff7eb3;
+}
+
+/* Planet item */
+.planet-item {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100px;
+}
+
+/* Planet icon */
+.planet-icon {
+    width: 110px; /* Adjusted width */
+    height: 110px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: none;
+    background: radial-gradient(circle, rgba(58, 80, 107, 0.8) 0%, transparent 70%);
+    transition: all 0.3s ease;
+}
+
+/* Planet name label */
+.planet-name {
+    font-size: 0.8rem;
+    color: #ffffff;
+    margin-top: 10px;
+    white-space: nowrap;
+    text-align: center;
+}
+
+/* Progress container */
+    .planet-progress-container {
+        position: absolute; /* Ensure it's positioned relative to the central container */
+        top: 70px; /* Move it higher up */
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        z-index: 5; /* Ensure it's above other elements */
+    }
+
+    /* Progress text styling */
+    .planet-progress-text {
+        font-size: 0.9rem;
+        color: #ffffff;
+        font-weight: bold;
+    }
+    /* Info Icon Button */
+    .info-button {
+        position: absolute;
+        top: -35px; /* Flyttar upp ikonen närmare toppen */
+        right: -5px; /* Justerar till högra kanten */
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.2rem; /* Minskar storleken på ikonen */
+        cursor: pointer;
+    }
+
+        .info-button:hover {
+            transform: scale(1.1); /* Gör ikonen större vid hover */
+            background: #3a506b; /* Ljusare nyans vid hover */
+        }
+
+    /* Popup Styling */
+    .popup-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        text-align: center;
+        max-width: 300px;
+        width: 90%;
+    }
+
+    .planet-info-list {
+        list-style: none;
+        padding: 0;
+        margin: 20px 0;
+    }
+
+        .planet-info-list li {
+            margin-bottom: 10px;
+            font-size: 1rem;
+            color: #34495e;
+            font-weight: bold;
+        }
+
+    .close-button {
+        background: #ff758c;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+        .close-button:hover {
+            background: #ff4d6d;
+        }
+
+    .info-button-dark {
+        position: absolute;
+        top: 0px; /* Flyttar upp ikonen närmare toppen */
+        right: 5px; /* Justerar till högra kanten */
+        background: none; /* Ta bort bakgrundsfärg */
+        color: #3a506b; /* Sätt ikonens färg */
+        font-size: 1.2rem;
+        border: none; /* Ingen border */
+        border-radius: 50%; /* Rund knapp */
+        padding: 8px; /* Mindre padding för att balansera storlek */
+        cursor: pointer;
+        transition: transform 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+    }
+
+        .info-button-dark:hover {
+            transform: scale(1.1); /* Gör ikonen större vid hover */
+        }
+
+        .info-button-dark i {
+            pointer-events: none; /* Förhindrar att endast ikonen blir klickbar */
+        }
+</style>
+<script>
+    document.querySelector('.popup-container').classList.add('animated-popup');
+
+    @@keyframespopup {
+        0 % {
+            transform: scale(0.5);
+            opacity: 0;
+        }
+        100 % {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+            .animated - popup {
+        animation: popup 0.5s ease - out;
+    }
+</script>

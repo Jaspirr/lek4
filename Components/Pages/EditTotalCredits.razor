@@ -1,0 +1,165 @@
+﻿@page "/admin-total-credits"
+@using System.Text.Json
+@using System.Text
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+
+<h3>Admin Total Credits</h3>
+<button @onclick="NavigateBack">← Back</button>
+<div class="admin-container">
+    @if (totalCredits == null)
+    {
+        <p>Loading total credits...</p>
+    }
+    else
+    {
+        <p><strong>Total Credits:</strong> @totalCredits</p>
+
+        <div class="form-group">
+            <label for="amount">Enter Amount:</label>
+            <input type="number" id="amount" @bind="amount" />
+        </div>
+
+        <button @onclick="AddCredits" class="action-button add-button">Add Credits</button>
+        <button @onclick="SubtractCredits" class="action-button subtract-button">Subtract Credits</button>
+    }
+</div>
+
+@code {
+    private int? totalCredits;
+    private int amount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTotalCredits();
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task LoadTotalCredits()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2Ftotalcredits.json?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<JsonElement>(json);
+
+                if (data.TryGetProperty("totalCredits", out var credits))
+                {
+                    totalCredits = credits.GetInt32();
+                }
+            }
+            else
+            {
+                Console.WriteLine("Failed to load total credits.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading total credits: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateTotalCredits(int newTotal)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(new { totalCredits = newTotal });
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await HttpClient.PostAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FUserStats%2Ftotalcredits.json?alt=media", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Total credits updated successfully.");
+                totalCredits = newTotal;
+            }
+            else
+            {
+                Console.WriteLine("Failed to update total credits.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating total credits: {ex.Message}");
+        }
+    }
+
+    private async Task AddCredits()
+    {
+        if (totalCredits.HasValue)
+        {
+            var newTotal = totalCredits.Value + amount;
+            await UpdateTotalCredits(newTotal);
+        }
+    }
+
+    private async Task SubtractCredits()
+    {
+        if (totalCredits.HasValue)
+        {
+            var newTotal = totalCredits.Value - amount;
+            if (newTotal < 0)
+            {
+                Console.WriteLine("Total credits cannot be negative.");
+                return;
+            }
+            await UpdateTotalCredits(newTotal);
+        }
+    }
+}
+
+<style>
+    .admin-container {
+        margin: 20px;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            padding: 8px;
+            width: 100%;
+            max-width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+    .action-button {
+        margin-right: 10px;
+        padding: 10px 20px;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+        .action-button.add-button {
+            background-color: #28a745; /* Grön färg */
+        }
+
+            .action-button.add-button:hover {
+                background-color: #218838; /* Mörkare grön vid hover */
+            }
+
+        .action-button.subtract-button {
+            background-color: #dc3545; /* Röd färg */
+        }
+
+            .action-button.subtract-button:hover {
+                background-color: #c82333; /* Mörkare röd vid hover */
+            }
+</style>

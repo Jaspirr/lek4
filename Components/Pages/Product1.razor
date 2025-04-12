@@ -1,0 +1,1465 @@
+﻿﻿
+@page "/product/{productNumber:int}"
+
+@inject NavigationManager NavigationManager
+@inject lek4.Components.Service.NumberService NumberService
+@inject lek4.Components.Service.ProductService ProductService
+@inject FirebaseAuthClient FirebaseAuthClient
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject DrawService DrawService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject NumberService NumberService;
+@inject StatsService StatsService;
+@inject JackpotService JackpotService;
+@inject UserService UserService;
+@inject HttpClient HttpClient;
+
+
+@using System.Security.Claims
+@using Firebase.Auth
+@using Microsoft.AspNetCore.Components.Authorization
+@using Plugin.MauiMTAdmob
+@using Plugin.MauiMTAdmob.Extra
+@using System.Text.Json
+@using System.Globalization
+@using lek4.Components.Service
+
+@code {
+    [Parameter]
+    public int productNumber { get; set; }
+    private double price;
+    private string winningChance;
+    private double totalLockedInAmount;
+    private string currentModal;
+    private double lockInAmount;
+    private double totalOdds = 1.0;
+    private bool isJackpotSelected = false;
+    private double lockedInOdds;
+    private string errorMessage;
+    private bool isSuccess;
+    private bool exceedsTotalOdds;
+    private string timeRemaining;
+    private Timer timer;
+    private bool shouldLockIn = false;
+    private bool adReadyToWatch = false;
+    private bool adWatched = false;
+    private DayOfWeek selectedDay = DayOfWeek.Monday;
+    private bool productExists = true;
+    private TimeSpan remainingTime;
+    private string winner;
+    private bool showPopup = false;
+    private string userEmail;
+    private ProductService.ProductData productData;
+
+    private double jackpotAmount = 0;
+    private List<string> jackpotParticipants;
+    private int credits = 0;
+    private bool canJoinJackpot = false;
+    private int joinCost = 0;
+    private int ticketCostToDisplay = 0;
+    private int userCredits;
+    private string starAnimationClass = "";
+    private string currencySymbol = "kr";
+
+    private double startValue = 0.0;
+    private double endValue = 100000000000.0;
+
+    private bool isOutcomeProduct = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // Fetch product information (productInfo.json) from Firebase
+        productData = await ProductService.GetProductFromFirebaseAsync(productNumber);
+
+        if (productData != null)
+        {
+            productExists = true;
+            price = productData.Price;
+            isJackpotSelected = productData.IsJackpot;
+            isOutcomeProduct = productData.IsOutcomeProduct;
+
+            if (productData.DrawDate != DateTime.MinValue) // Ensure DrawDate is valid
+            {
+                remainingTime = productData.DrawDate - DateTime.Now;
+                timeRemaining = FormatRemainingTime(remainingTime);
+            }
+            else
+            {
+                timeRemaining = "Draw date not set";
+            }
+
+            await DisplayTicketCost();
+            // Check if the product is a jackpot
+            if (isJackpotSelected)
+            {
+                // Fetch the winner directly after fetching product information
+                winner = await ProductService.GetWinnerFromFirebase(productNumber);
+
+                // If there is a winner, navigate to the jackpot winner view page
+                if (!string.IsNullOrEmpty(winner))
+                {
+                    // Redirect to the jackpot winner page
+                    NavigationManager.NavigateTo($"/viewjackpotwinner/{productNumber}");
+                    return; // Exit early after redirection
+                }
+            }
+
+            // Fetch lock-in amount
+            await FetchTicketCost();
+            currencySymbol = await JackpotService.GetCurrencySymbol();
+            // Initialize totalOdds and lockInAmount based on the "number" from the Home page
+            totalOdds = NumberService.Number;
+            lockInAmount = NumberService.Number;
+
+            // Fetch user credits
+            await FetchUserCredits();
+        }
+        else
+        {
+            productExists = false;
+            errorMessage = "This Product is not active";
+            NavigationManager.NavigateTo("/products");
+            return;
+        }
+
+        // Initialize ads and timer
+        InitializeAds();
+        timer = new Timer(UpdateTimer, null, 0, 1000);
+
+        // Calculate initial winning chance
+        await UpdateWinningChance();
+    }
+
+
+    private string FormatRemainingTime(TimeSpan timeSpan)
+    {
+        return $"{timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m";
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadJackpotData(); // Kör jackpot-laddningen efter första rendering
+        }
+    }
+    private async Task<int> FetchTicketCost()
+    {
+        try
+        {
+            var response = await HttpClient.GetStringAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Jackpot%2ticketCost.json?alt=media");
+            return int.Parse(response); // Förutsätter att kostnaden är lagrad som en siffra
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching ticket cost: {ex.Message}");
+            return 100; // Standardvärde om hämtningen misslyckas
+        }
+    }
+    private async Task DisplayTicketCost()
+    {
+        try
+        {
+            Console.WriteLine("Fetching ticket cost...");
+            var response = await HttpClient.GetStringAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FticketCost.json?alt=media");
+            var ticketCostData = JsonSerializer.Deserialize<Dictionary<string, int>>(response);
+            ticketCostToDisplay = ticketCostData["ticketCost"];
+
+            Console.WriteLine($"Ticket cost fetched successfully: {ticketCostToDisplay}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching ticket cost: {ex.Message}");
+            ticketCostToDisplay = 100; // Default om något går fel
+        }
+
+        StateHasChanged(); // Uppdatera UI med det nya värdet
+    }
+    private async Task FetchUserCredits()
+    {
+        userEmail = await localStorage.GetItemAsync<string>("userEmail");
+        if (!string.IsNullOrEmpty(userEmail))
+        {
+            var user = await UserService.GetUserFromFirebase(userEmail);
+            userCredits = user?.Credits ?? 0; // Spara värdet i userCredits
+            Console.WriteLine($"Fetched user credits: {userCredits} for user {userEmail}");
+        }
+        else
+        {
+            Console.WriteLine("No user email found in local storage.");
+        }
+    }
+
+
+
+    private void InitializeAds()
+    {
+        CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
+        CrossMauiMTAdmob.Current.OnUserEarnedReward += OnUserEarnedReward;
+        CrossMauiMTAdmob.Current.LoadRewarded("ca-app-pub-3940256099942544/5224354917"); // Replace with your actual ad ID
+    }
+
+    private void OnRewardedAdLoaded(object sender, EventArgs e)
+    {
+        adReadyToWatch = true;
+        StateHasChanged();
+    }
+
+    private void OnUserEarnedReward(object sender, MTEventArgs e)
+    {
+        adWatched = true;
+        CompleteLockInPrice();
+    }
+  
+
+    private async Task LoadJackpotData()
+    {
+        try
+        {
+            // Fetch the calculated jackpot amount
+            double newJackpotAmount = await JackpotService.GetCalculatedJackpotAmount();
+
+            // Fetch the currency symbol dynamically
+            string newCurrencySymbol = await JackpotService.GetCurrencySymbol();
+
+            // Use JSRuntime to animate the value transition if the jackpot amount has changed
+            if (Math.Abs(newJackpotAmount - jackpotAmount) > 0.01)
+            {
+                await JSRuntime.InvokeVoidAsync("animateValue", "jackpotAmount", jackpotAmount, newJackpotAmount, 2000);
+                jackpotAmount = newJackpotAmount; // Update the jackpotAmount with the fetched value
+            }
+
+            // Update the currency symbol
+            currencySymbol = newCurrencySymbol;
+
+            // Update the UI
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading jackpot data: {ex.Message}");
+        }
+    }
+
+    private void NavigateToJackpot()
+    {
+        NavigationManager.NavigateTo("/jackpot");
+    }
+    private async Task LockInPrice()
+    {
+        if (!productExists) return;
+
+        if (lockInAmount > 0 && lockInAmount <= 9.0)
+        {
+            if (NumberService.HasEnoughOdds(lockInAmount))
+            {
+                shouldLockIn = true;
+
+                if (adReadyToWatch && !adWatched)
+                {
+                    ShowAd();
+                }
+                else if (adWatched)
+                {
+                    await SaveProductData();
+                    totalLockedInAmount += lockInAmount; // Update totalLockedInAmount with the new lock-in amount
+                    await ProductService.UpdateTotalUsers(productNumber, userEmail); // Save to Firebase
+                    lockInAmount = 0.0; // Reset lockInAmount after saving
+                    await UpdateWinningChance(); // Recalculate winning chance
+                    StateHasChanged(); // Refresh the UI
+                }
+                else
+                {
+                    errorMessage = "Ad is not ready yet.";
+                }
+            }
+            else
+            {
+                isSuccess = false;
+                errorMessage = "You don't have enough odds.";
+            }
+        }
+        else
+        {
+            isSuccess = false;
+            errorMessage = "Please enter a value between 0.0 and 100.0.";
+        }
+    }
+
+    private async Task FetchLockInAmount()
+    {
+        // Retrieve the user's email from local storage
+        var storedEmail = await localStorage.GetItemAsync<string>("userEmail");
+
+        if (string.IsNullOrEmpty(storedEmail))
+        {
+            Console.WriteLine("No email found in local storage.");
+            totalLockedInAmount = 0.0;
+            return;
+        }
+
+        // Fetch lock-in data from totalusers.json
+        var totalUsers = await ProductService.GetTotalUsersFromFirebase(productNumber);
+
+        // Check if the user's lock-in amount exists in totalUsers data
+        if (totalUsers.TryGetValue(storedEmail, out double amount))
+        {
+            totalLockedInAmount = amount; // Set totalLockedInAmount to the value retrieved from Firebase
+            Console.WriteLine($"Total locked-in amount for {storedEmail} is {totalLockedInAmount}.");
+        }
+        else
+        {
+            totalLockedInAmount = 0.0; // Default to 0 if no data is found
+            Console.WriteLine($"No lock-in data found for {storedEmail}.");
+        }
+    }
+
+
+    private async Task SaveProductData()
+    {
+        // Retrieve email from local storage
+        var userEmail = await localStorage.GetItemAsync<string>("userEmail");
+
+        if (!string.IsNullOrEmpty(userEmail))
+        {
+            // Lock in the user, and save lock-in amount in a separate file under the product folder
+            await ProductService.LockInUser(productNumber, userEmail, lockInAmount); // Ensure user and amount are saved correctly
+
+            // Update the local service with locked-in details
+            NumberService.LockInProduct(productNumber, userEmail, lockInAmount);
+        }
+        else
+        {
+            // If no user email, save as "Anonymous"
+            await ProductService.LockInUser(productNumber, "Anonymous", lockInAmount);
+
+            // Update the local service with anonymous user details
+            NumberService.LockInProduct(productNumber, "Anonymous", lockInAmount);
+        }
+
+        // Adjust lock-in odds and other properties
+        lockedInOdds += lockInAmount;
+        isSuccess = true;
+        errorMessage = null;
+        shouldLockIn = false;
+
+        GoBack();
+    }
+
+    private async Task CompleteLockInPrice()
+    {
+        if (shouldLockIn)
+        {
+            await SaveProductData();
+        }
+    }
+
+    private void ShowAd()
+    {
+        if (adReadyToWatch)
+        {
+            CrossMauiMTAdmob.Current.ShowRewarded();
+        }
+        else
+        {
+            errorMessage = "Ad is not ready yet.";
+            StateHasChanged();
+        }
+    }
+
+    private void UpdateTimer(object state)
+    {
+        if (!productExists || productData.DrawDate == DateTime.MinValue) return;
+
+        var now = DateTime.Now;
+        remainingTime = productData.DrawDate - now;
+
+        if (remainingTime.TotalSeconds <= 0)
+        {
+            // Time has elapsed
+            Task.Run(async () =>
+            {
+                winner = await ProductService.GetWinnerFromFirebase(productNumber); // Fetch the winner
+                if (winner != null)
+                {
+                    showPopup = false;
+                    InvokeAsync(StateHasChanged); // Update UI after async task completes
+                }
+            });
+            timeRemaining = "Time is up!";
+        }
+        else
+        {
+            timeRemaining = FormatRemainingTime(remainingTime);
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private DateTime GetNextSelectedDayAt20()
+    {
+        var today = DateTime.Today;
+        var daysUntilSelectedDay = ((int)selectedDay - (int)today.DayOfWeek + 7) % 7;
+        var nextSelectedDay = today.AddDays(daysUntilSelectedDay).AddHours(20);
+
+        if (nextSelectedDay < DateTime.Now)
+        {
+            nextSelectedDay = nextSelectedDay.AddDays(7);
+        }
+
+        return nextSelectedDay;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/products");
+    }
+
+    private void ViewWinner()
+    {
+        showPopup = true;
+        StateHasChanged();
+    }
+    private void OnSliderChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value.ToString(), out double value))
+        {
+            lockInAmount = value;
+            exceedsTotalOdds = lockInAmount > totalOdds;
+        }
+    }
+
+
+    private void NavigateToViewWinner()
+    {
+        // Navigera till ViewWinner-sidan och skicka med productNumber
+        NavigationManager.NavigateTo($"/winner/{productNumber}");
+    }
+    private async Task UpdateWinningChance()
+    {
+        var totalStats = await StatsService.GetTotalStatsFromFirebase(productNumber);
+        if (totalStats != null && totalStats.TotalLockInAmount > 0)
+        {
+            var ratio = totalLockedInAmount / totalStats.TotalLockInAmount;
+
+            // Update with 5 winning chance levels
+            if (ratio >= 0.8)
+                winningChance = "V-High";
+            else if (ratio >= 0.6)
+                winningChance = "High";
+            else if (ratio >= 0.4)
+                winningChance = "Med";
+            else if (ratio >= 0.2)
+                winningChance = "Low";
+            else
+                winningChance = "V-Low";
+        }
+        else
+        {
+            winningChance = "Very Low"; // Default or fallback option if no stats
+        }
+    }
+    private string GetWinningChanceClass()
+    {
+        return winningChance switch
+        {
+            "Very Low" => "V-Low",
+            "Low" => "Low",
+            "Medium" => "Med",
+            "High" => "High",
+            "Very High" => "V-High",
+            _ => ""
+        };
+    }
+    private void IncreaseLockInAmount()
+    {
+        if (lockInAmount + 0.1 <= 100.0) // Max value check
+        {
+            lockInAmount = Math.Round(lockInAmount + 0.1, 1);
+            StateHasChanged();
+        }
+    }
+
+    private void DecreaseLockInAmount()
+    {
+        if (lockInAmount - 0.1 >= 0.0) // Min value check
+        {
+            lockInAmount = Math.Round(lockInAmount - 0.1, 1);
+            StateHasChanged();
+        }
+    }
+    private void OpenModal(string modalId)
+    {
+        currentModal = modalId;
+    }
+
+    private void CloseModal()
+    {
+        currentModal = null;
+    }
+       private void OpenWinningChanceModal()
+    {
+        OpenModal("winningChanceModal");
+    }
+
+    private void OpenTotalOddsModal()
+    {
+        OpenModal("totalOddsModal");
+    }
+
+    private void OpenTotalLockedInAmountModal()
+    {
+        OpenModal("totalLockedInAmountModal");
+    }
+    private async Task JoinJackpot()
+    {
+        Console.WriteLine($"Försöker gå med i jackpot med användare: {userEmail} och credits: {credits}");
+
+        if (credits >= joinCost)
+        {
+            try
+            {
+                await JackpotService.JoinJackpot(userEmail, productNumber);
+                credits -= joinCost;
+                canJoinJackpot = credits >= joinCost;
+
+                Console.WriteLine("Lyckades gå med i jackpot, omdirigerar till biljettvalssidan.");
+                NavigationManager.NavigateTo($"/jackpot/{productNumber}/select-ticket");
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Kunde inte gå med i jackpot: {ex.Message}";
+                Console.WriteLine(errorMessage);
+            }
+        }
+        else
+        {
+            errorMessage = "Du har inte tillräckligt med credits för att delta i jackpotten.";
+            Console.WriteLine(errorMessage);
+        }
+    }
+
+    private async Task LockInJackpot()
+    {
+        Console.WriteLine("LockInJackpot method was called.");
+
+        // Hämta ticketCost dynamiskt från Firebase
+        int ticketCost = await JackpotService.GetTicketCost();
+        Console.WriteLine($"Fetched ticket cost: {ticketCost}");
+
+        // Hämta det senaste värdet av userCredits från Firebase
+        userCredits = await FetchUserCreditsFromFirebase(userEmail);
+        Console.WriteLine($"Current user credits after fetch: {userCredits}");
+
+        if (userCredits >= ticketCost) // Kontrollera om användaren har tillräckligt med credits
+        {
+            // Dra av ticketCost och uppdatera användarens saldo
+            userCredits -= ticketCost;
+
+            bool creditsUpdated = await UserService.UpdateUserCredits(userEmail, userCredits);
+            Console.WriteLine($"Credits updated in Firebase: {creditsUpdated}");
+
+            if (creditsUpdated)
+            {
+                // Uppdatera jackpot med användarens e-post och låsta credits
+                bool jackpotUpdated = await JackpotService.UpdateJackpotTotalLockin(userEmail, ticketCost);
+                Console.WriteLine($"Jackpot lock-in updated: {jackpotUpdated}");
+
+                if (jackpotUpdated)
+                {
+                    Console.WriteLine("Successfully locked in jackpot and updated credits.");
+                    NavigationManager.NavigateTo($"/jackpot/{productNumber}/SelectTicket");
+                }
+                else
+                {
+                    Console.WriteLine("Failed to update jackpot lock-in.");
+                    errorMessage = "Ett fel uppstod vid uppdatering av jackpot-låset.";
+                }
+            }
+            else
+            {
+                Console.WriteLine("Failed to update user credits.");
+                errorMessage = "Ett fel uppstod vid uppdatering av dina krediter.";
+            }
+        }
+        else
+        {
+            errorMessage = $"Du har inte tillräckligt med credits ({userCredits}) för att betala ticket cost ({ticketCost}).";
+            Console.WriteLine(errorMessage);
+        }
+
+        StateHasChanged(); // Uppdatera UI för att reflektera eventuella ändringar
+    }
+
+    private async Task<int> FetchUserCreditsFromFirebase(string userEmail)
+    {
+        try
+        {
+            Console.WriteLine($"Fetching user credits for {userEmail} from Firebase...");
+
+            var user = await UserService.GetUserFromFirebase(userEmail);
+            int credits = user?.Credits ?? 0; // Returnera 0 om användaren inte hittas
+
+            Console.WriteLine($"Fetched credits: {credits}");
+            return credits;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching user credits: {ex.Message}");
+            return 0; // Returnera 0 vid fel
+        }
+    }
+    private string FormattedJackpotAmount
+    {
+        get
+        {
+            if (jackpotAmount > 999.99)
+            {
+                return Math.Floor(jackpotAmount).ToString("#,0", new CultureInfo("sv-SE"));
+            }
+
+            return jackpotAmount % 1 == 0
+                ? jackpotAmount.ToString("#,0", new CultureInfo("sv-SE"))
+                : jackpotAmount.ToString("#,0.00", new CultureInfo("sv-SE"));
+        }
+    }
+}
+
+
+<div class="product-container">
+   
+    <div class="product-details" style="@(productData != null && !string.IsNullOrEmpty(productData.ImageUrl) ? $"background-image: url('{productData.ImageUrl}'); background-size: cover; background-position: center;" : "")">
+        <button @onclick="GoBack" class="icon-button">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        @if (!productExists)
+        {
+            <p>The product you are trying to view no longer exists.</p>
+            <button @onclick="GoBack">Back to Products</button>
+        }
+        else if (isOutcomeProduct) // NY: Separat design för Outcome
+        {
+
+            <div class="outcome-container">
+                <div class="outcome-prize-box">
+                    <h2 class="outcome-prize-text">@productData.PrizeType</h2>
+                </div>
+
+                @if (productData.PrizeType == "Credits")
+                {
+                    <div class="outcome-image-credit">
+                        <img src="images/Voidglas2.webp" alt="Voidglas Icon" class="voidglas-icon-large" />
+                    </div>
+                }
+                else
+                {
+                    <img class="outcome-image" src="@productData.ImageUrl" alt="Outcome Image" />
+                }
+
+                @if (productData.PrizeType != "Credits")
+                {
+                    <div class="outcome-info-box">
+                        <div class="credits-price-wrapper">
+                            <span class="outcome-text black-text">@productData.ProductName</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="outcome-info-box">
+                    @if (productData.PrizeType == "Credits")
+                    {
+                        <div class="credits-price-wrapper">
+                            <span class="credits-price">@productData.Price</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="credits-price-wrapper">
+                            <span class="outcome-text black-text">@productData.Price @currencySymbol</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="outcome-info-box">
+                    <div class="credits-price-wrapper">
+                        <span class="outcome-text black-text">🎯 @productData.CorrectAnswersRequired</span>
+                    </div>
+                </div>
+                @if (productData.PrizeType != "Credits")
+                {
+                    <a class="outcome-website" href="@productData.WebsiteUrl" target="_blank">Visit Website</a>
+                }
+            </div>
+        }
+        else
+        {
+            <!-- Back Button and Timer (always visible) -->
+            <button @onclick="GoBack" class="icon-button">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div class="countdown-timer">
+                <h4>@productData?.DrawDate.ToString("yyyy-MM-dd HH:mm")</h4>
+                <p>@timeRemaining</p>
+            </div>
+
+            @if (isJackpotSelected)
+            {
+                <div class="jackpot-details">
+                    <p id="jackpotAmount" class="jackpotamount">
+                        @FormattedJackpotAmount
+                        <span class="currency-symbol">@currencySymbol</span>
+                    </p>
+                    <!-- Lock In Button with Credits Box Above -->
+                    <div class="jackpot-credits-wrapper">
+                        <div class="jackpot-credits-box">
+                            <div class="jackpot-star-wrapper @starAnimationClass">
+                                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+                                <img src="images/Voidglas2.webp" alt="Starshard Icon" class="voidglas-icon" />
+                            </div>
+                            <span class="jackpot-credits-count">@userCredits</span>
+                        </div>
+
+                        <!-- Uppdaterad Lock-In-knapp med dynamisk biljettkostnad -->
+                        <button @onclick="LockInJackpot" class="jackpot-lock-in-button" disabled="@(userCredits < ticketCostToDisplay)">
+                            @(userCredits < ticketCostToDisplay ? "Not enough" : "LOCK IN")
+
+                            @if (userCredits < ticketCostToDisplay)
+                            {
+                                <div class="insufficient-credits-box">@ticketCostToDisplay:-</div> <!-- Red box indicating insufficient credits -->
+                            }
+                        </button>
+                    </div>
+
+                    <!-- Visa biljettkostnad -->
+                    <div class="ticket-cost">
+                        <p>To participate: @ticketCostToDisplay</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Regular Product View -->
+                @if (winner == null)
+                {
+                    <!-- Show the product details if no winner is set -->
+                    <h3 class="price">$@price</h3>
+
+                    <div class="stats-container">
+                        <div class="stat-item" @onclick="OpenWinningChanceModal">
+                            <p class="stat-value @GetWinningChanceClass()">@winningChance</p>
+                        </div>
+                        <div class="stat-item" @onclick="OpenTotalOddsModal">
+                            <p class="stat-value">@totalOdds.ToString("0.0")x</p>
+                        </div>
+                        <div class="stat-item" @onclick="OpenTotalLockedInAmountModal">
+                            <p class="stat-value">@totalLockedInAmount.ToString("0.0")<i class="fas fa-lock stat-icon"></i></p>
+                        </div>
+                    </div>
+
+                    <!-- Slider for Lock-In Amount -->
+                    <input type="range" id="lockInAmount" min="0.0" max="20.0" step="0.1" value="@lockInAmount" @oninput="OnSliderChanged" class="slider" />
+
+                    <!-- Display Lock-In Amount with Increment and Decrement Buttons -->
+                    <div class="lockin-controls">
+                        <button @onclick="DecreaseLockInAmount" class="adjust-button">-</button>
+                        <span class="slider-value">@lockInAmount.ToString("0.0")</span>
+                        <button @onclick="IncreaseLockInAmount" class="adjust-button">+</button>
+                    </div>
+
+                    <!-- Lock In Button -->
+                    <button @onclick="LockInPrice" class="lock-in-button @(isSuccess ? "success" : (string.IsNullOrEmpty(errorMessage) ? (exceedsTotalOdds ? "exceeds" : "") : "error"))">LOCK IN</button>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <p class="error-message">@errorMessage</p>
+                    }
+                }
+                else
+                {
+                    <!-- Show only the View Winner button if there is a winner -->
+                    <div class="centered-container">
+                        <button @onclick="NavigateToViewWinner" class="view-winner-button">View Winner</button>
+                    </div>
+                }
+            }
+
+            <!-- Popup to show the winner -->
+            @if (showPopup)
+            {
+                <div class="popup">
+                    <h4>Winner for Product @productNumber</h4>
+                    @if (winner != null)
+                    {
+                        <p><strong>Winner: @winner</strong></p>
+                    }
+                    <button @onclick="() => showPopup = false">Close</button>
+                </div>
+            }
+
+            <!-- Modals for Winning Chance, Total Odds, and Total Locked In Amount -->
+            @if (currentModal == "winningChanceModal")
+            {
+                <div class="modal-overlay" @onclick="CloseModal">
+                    <div class="modal-content">
+                        <p>Your Winning Chance is @winningChance</p>
+                        <button class="lock-in-button" @onclick="CloseModal">Close</button>
+                    </div>
+                </div>
+            }
+            @if (currentModal == "totalOddsModal")
+            {
+                <div class="modal-overlay" @onclick="CloseModal">
+                    <div class="modal-content">
+                        <p>Total Odds: @totalOdds.ToString("0.0")x</p>
+                        <button class="lock-in-button" @onclick="CloseModal">Close</button>
+                    </div>
+                </div>
+            }
+            @if (currentModal == "totalLockedInAmountModal")
+            {
+                <div class="modal-overlay" @onclick="CloseModal">
+                    <div class="modal-content">
+                        <p>Total Locked In Amount: @totalLockedInAmount.ToString("0.0")</p>
+                        <button class="lock-in-button" @onclick="CloseModal">Close</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<style>
+    .ticket-cost {
+        margin-top: 0px; /* Litet mellanrum från knappen */
+        font-size: 0.6em; /* Gör texten mindre */
+        color: white;
+        text-align: center; /* Centrerar texten under knappen */
+    }
+
+    .jackpot-details {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .jackpotamount {
+        max-height: 80px;
+        border: 2px solid #FFD700; /* Guld */
+        border-radius: 10px;
+        padding-left: 10px;
+        padding-right: 10px;
+        background: linear-gradient(135deg, #fff4d7, #ffe8a3); /* Mjuk gul gradient */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Mjuk skugga */
+        font-weight: bold;
+        color: #b38b00; /* Lyxig guldfärg */
+        text-align: center;
+        font-size: 2em;
+        margin-bottom: 370px;
+    }
+
+    .jackpot-credits-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .jackpot-credits-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        background-color: #F0FFF0;
+        padding: 8px 12px;
+        border-radius: 20px;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        font-weight: bold;
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 25px;
+    }
+
+    .jackpot-star-wrapper {
+        display: inline-block;
+        margin-right: 5px;
+    }
+
+    .jackpot-credits-count {
+        font-size: 16px;
+        background-color: #F0FFF0;
+        color: #333;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+        position: relative;
+    }
+
+    .jackpot-lock-in-button {
+        position: relative;
+        padding: 10px 20px;
+        font-size: 16px;
+        color: #F0FFF0;
+        background-color: #556B2F; /* Change as needed */
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease-in-out;
+    }
+
+
+    .insufficient-credits-box {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background-color: red;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        padding: 2px 6px;
+        border-radius: 3px;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+    }
+    .product-container {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .error-message {
+        color: #D8000C; /* Red color for errors */
+        background-color: #FFD2D2; /* Light red background for visibility */
+        padding: 10px;
+        border: 1px solid #D8000C;
+        border-radius: 5px;
+        font-weight: bold;
+        font-size: 1em;
+        text-align: center;
+        margin-top: 10px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    }
+
+
+    .product-name {
+        font-size: 1.5em;
+        color: #F0FFF0; /* Honeydew */
+        text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.7); /* Shadow for readability */
+        margin-bottom: 10px; /* Space between name and product */
+    }
+
+    .product-details {
+        text-align: center;
+        margin: 20px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        position: relative;
+        transition: box-shadow 0.3s ease-in-out;
+        color: #F0FFF0; /* Honeydew */
+        background-color: white; /* Dark Olive Green */
+    }
+
+        .product-details:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .product-details h3.price {
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #F0FFF0; /* Honeydew */
+            text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.7); /* Shadow for better readability */
+        }
+
+    .stats-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        margin-top: 10px;
+        margin-bottom: 135px; /* Space between stats and the slider */
+    }
+
+    .stat-item {
+        display: inline-block; /* Ensure the value and icon are in the same line */
+        vertical-align: middle;
+        background-color: #F0FFF0; /* Honeydew */
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        padding: 5px;
+        max-width: 60px;
+        max-height: 30px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin: 5px;
+    }
+
+    .stat-icon {
+        font-size: 0.7em; /* Reduce the size of the lock icon */
+        margin-left: 2px;
+        margin-bottom: 2px; /* Add left margin */
+        vertical-align: middle;
+    }
+
+    .stat-value {
+        font-size: 0.9rem; /* Adjusted font size */
+        margin: 0;
+        color: #556B2F; /* Dark Olive Green */
+    }
+
+    input[type="range"].slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 5px;
+        outline: none;
+        background: linear-gradient(to right, #556B2F 0%, #556B2F var(--slider-fill, 0%), silver var(--slider-fill, 0%), silver 100%);
+        transition: background 0.3s ease-in-out;
+    }
+
+        input[type="range"].slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #556B2F;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        input[type="range"].slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #556B2F;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+    .modal-overlay { 
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6); /* Mörk overlay för fokus */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000; /* För att alltid visas över andra element */
+    }
+
+    .modal-content {
+        background-color: #ffffff;
+        color: #556B2F;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.2);
+        max-width: 80%;
+        text-align: center;
+        margin: auto; /* Centerat modalfönster */
+    }
+
+    .modal-content p,
+    .modal-content ul li {
+        font-size: 0.8em; /* Adjusted to make text smaller */
+        line-height: 1.0em; /* Slightly increased line height for readability */
+    }
+    .close-button {
+        background-color: #556B2F; /* Honeydew */
+        color: #F0FFF0; /* Dark Olive Green */
+        float: right;
+        font-size: 18px;
+        font-weight: bold;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .lockin-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        margin-top: 10px;
+    }
+
+    .adjust-button {
+        background-color: transparent; /* Fully transparent background */
+        color: #556B2F; /* Button text color */
+        font-size: 1.5em;
+        padding: 5px 10px;
+        cursor: pointer;
+        outline: none; /* Removes focus outline */
+        border: none; /* Ensures no border is displayed */
+    }
+
+    .slider-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #556B2F;
+        display: inline-block;
+        text-align: center;
+        min-width: 50px; /* Ensures consistent spacing */
+    }
+
+    .slider-value {
+        font-size: 1.5rem;
+        margin: 0px;
+        font-weight: bold;
+        color: #556B2F; /* Honeydew */
+        text-align: center; /* Center the text horizontally */
+        display: flex;
+        justify-content: center; /* Horizontal centering using flexbox */
+    }
+
+    .lock-in-button {
+        background-color: #556B2F; /* Honeydew */
+        color: #F0FFF0; /* Dark Olive Green */
+        padding: 10px 20px;
+        font-size: 1em;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+    }
+
+        .lock-in-button:hover {
+            background-color: rebeccapurple;
+        }
+
+        .lock-in-button.success {
+            background-color: #28a745;
+        }
+
+        .lock-in-button.error, .lock-in-button.exceeds {
+            background-color: red;
+        }
+
+    .icon-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.2em;
+        position: absolute;
+        top: 10px;
+        left: 6px;
+    }
+
+    .countdown-timer {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #556B2F; /* Honeydew */
+        border: 1px solid #556B2F; /* Honeydew */
+        padding: 3px 7px;
+        border-radius: 3px;
+        color: #F0FFF0; /* Dark Olive Green */
+        font-size: 0.75em;
+        text-align: center;
+    }
+
+        .countdown-timer h4 {
+            margin: 0;
+            font-size: 0.75em;
+            font-weight: normal;
+        }
+
+        .countdown-timer p {
+            margin: 0;
+            font-size: 0.75em;
+            color: #F0FFF0; /* Dark Olive Green */
+        }
+
+    .view-winner-button {
+        max-height: 50px;
+        border: 2px solid #FFD700; /* Guld */
+        border-radius: 10px;
+        padding-left: 10px;
+        padding-right: 10px;
+        background: linear-gradient(135deg, #fff4d7, #ffe8a3); /* Mjuk gul gradient */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Mjuk skugga */
+        font-weight: bold;
+        color: #b38b00; /* Lyxig guldfärg */
+        text-align: center;
+        font-size: 1.1em;
+    }
+
+        .view-winner-button:hover {
+            background-color: rebeccapurple;
+        }
+
+
+    /* Centering container for View Winner button */
+    .centered-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 40vh; /* Centers the button in the viewport */
+    }
+    .very-low-chance {
+        color: #FF4500; /* OrangeRed */
+        content: "V-Low";
+    }
+
+    .low-chance {
+        color: #FFA500; /* Orange */
+        content: "Low";
+    }
+
+    .medium-chance {
+        color: #FFD700; /* Gold */
+        content: "Med";
+    }
+
+    .high-chance {
+        color: #32CD32; /* LimeGreen */
+        content: "High";
+    }
+
+    .very-high-chance {
+        color: #228B22; /* ForestGreen */
+        content: "V-High";
+    }
+
+    .roller-digit {
+        display: inline-block;
+        font-weight: bold;
+        font-size: 2em;
+        transition: transform 0.2s ease-in-out; /* Smooth rolling effect */
+    }
+
+    .voidglas-icon {
+        width: 38px; /* Öka bredden för att göra den större */
+        height: 38px; /* Anpassa höjden så att den matchar bredden */
+        margin-right: 10px; /* Ge lite extra utrymme mellan ikonen och texten */
+        border-radius: 50%; /* Gör bilden rund om den är fyrkantig */
+        object-fit: cover; /* Behåll proportionerna för bilden */
+        box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2); /* Förbättra skuggan något */
+    }
+
+    .outcome-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: linear-gradient(145deg, #F0FFF0, #556B2F);
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.2);
+        max-width: 400px;
+        margin: auto;
+    }
+
+    .outcome-header {
+        font-size: 1.8em;
+        font-weight: bold;
+        color: #F0FFF0;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    .outcome-image {
+        width: 120px;
+        height: 120px;
+        border-radius: 15px;
+        object-fit: cover;
+        margin-bottom: 15px;
+        box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .outcome-info-box {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+        padding: 10px 15px;
+        margin-bottom: 10px;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1em;
+        font-weight: bold;
+        color: #FFD700;
+        transition: transform 0.2s ease-in-out, box-shadow 0.3s;
+    }
+
+        .outcome-info-box:hover {
+            transform: translateY(-3px);
+            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+    .outcome-icon {
+        font-size: 1.2em;
+        margin-right: 10px;
+        color: #FFD700;
+    }
+
+    .outcome-text {
+        color: #F0FFF0;
+        font-size: 1em;
+        font-weight: normal;
+    }
+
+    .outcome-website {
+        text-align: center;
+        font-size: 1.1em;
+        color: darkseagreen;
+        text-decoration: none;
+        font-weight: bold;
+        margin-top: 10px;
+        transition: color 0.3s ease-in-out;
+    }
+
+        .outcome-website:hover {
+            color: #ffffff;
+            text-decoration: underline;
+        }
+
+    .outcome-prize-box {
+        max-width: 90%;
+        padding: 10px 15px;
+        border: 2px solid #FFD700; /* Guld */
+        border-radius: 8px;
+        background: linear-gradient(135deg, #fff4d7, #ffe8a3); /* Mjuk gul gradient */
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15); /* Mjukare skugga */
+        text-align: center;
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #b38b00; /* Lyxig guldfärg */
+        margin-bottom: 15px;
+        text-transform: uppercase;
+    }
+
+    .outcome-prize-text {
+        margin: 0;
+        font-weight: bold;
+        font-size: 1.5em;
+        letter-spacing: 0.5px;
+    }
+
+    .outcome-image-credit {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 10px;
+    }
+
+    .voidglas-icon-large {
+        width: 120px;
+        height: 120px;
+        background-color: white;
+        border-radius: 20px;
+        padding: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    .credits-price-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .credits-price {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #556B2F;
+    }
+
+    .voidglas-icon-outcome {
+        width: 26px;
+        height: 26px;
+        object-fit: contain;
+    }
+
+    .black-text {
+        color: black !important;
+    }
+
+</style>
+
+<script>
+    document.addEventListener('input', function (event) {
+        if (event.target.classList.contains('slider')) {
+            const sliderValue = (event.target.value - event.target.min) / (event.target.max - event.target.min) * 100;
+            event.target.style.setProperty('--slider-fill', `${sliderValue}%`);
+        }
+    }, false);
+
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = "block";
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = "none";
+    }
+
+    window.onclick = function (event) {
+        if (event.target.classList.contains("modal")) {
+            event.target.style.display = "none";
+        }
+    }
+    function animateValue(id, start, end, duration, currencySymbol) {
+        const valueSpan = document.getElementById("jackpotValue");
+        const symbolSpan = document.getElementById("currencySymbol");
+
+        if (!valueSpan || !symbolSpan) {
+            console.warn("Required elements not found.");
+            return;
+        }
+
+        // Early exit if start and end are the same
+        if (start === end) {
+            valueSpan.innerText = formatNumber(end);
+            symbolSpan.innerText = currencySymbol; // Update currency symbol
+            return;
+        }
+
+        const range = end - start;
+        let current = start;
+        const increment = range / (duration / 10); // Increment value for smooth animation
+        const stepTime = 10; // Update every 10ms for smoother animation
+
+        const timer = setInterval(() => {
+            current += increment;
+
+            // Apply rolling effect by animating transform
+            valueSpan.style.transform = "translateY(-10px)";
+            setTimeout(() => {
+                valueSpan.style.transform = "translateY(0)";
+            }, 100);
+
+            valueSpan.innerText = formatNumber(current);
+            symbolSpan.innerText = currencySymbol; // Keep updating the currency symbol
+
+            if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                clearInterval(timer);
+                valueSpan.innerText = formatNumber(end); // Ensure final value is accurate
+                symbolSpan.innerText = currencySymbol; // Ensure the final currency symbol is accurate
+            }
+        }, stepTime);
+    }
+
+    function formatNumber(value) {
+        return value > 999.99
+            ? Math.floor(value).toLocaleString() // Remove decimals and add thousands separator
+            : value.toFixed(2); // Show two decimals for smaller values
+    }
+</script>

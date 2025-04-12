@@ -1,0 +1,413 @@
+﻿@page "/change-products"
+@using System.Text.Json
+@using lek4.Components.Service
+@using static lek4.Components.Service.ProductService
+@inject ProductDrawDateService ProductDrawDateService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime js
+@inject lek4.Components.Service.ProductService ProductService
+@inject NavigationManager NavigationManager
+@inject HttpClient Http
+
+
+<h2>Manage Products</h2>
+<button @onclick="NavigateBack">← Back</button>
+<div class="product-list">
+    @if (products != null && products.Count > 0)
+    {
+        @foreach (var product in products)
+        {
+            <div class="product-item">
+                <img src="@product.ImageUrl" alt="@product.ProductName" class="product-image" />
+                <div class="product-info">
+                    <p><strong>Product Name:</strong> @product.ProductName</p>
+                    <p><strong>Product Number:</strong> @product.ProductNumber</p>
+                    <p><strong>Price:</strong> $@product.Price</p>
+                    <p><strong>Type:</strong> @(product.IsJackpot ? "Jackpot" : "Standard")</p>
+                    <p><strong>Draw Date:</strong> @(ProductDrawDateService.GetDrawDate(product.ProductNumber)?.ToString("yyyy-MM-dd HH:mm") ?? "Not set")</p>
+
+                    <p><strong>Locked-In Users:</strong></p>
+                    <ul>
+                        @if (lockedInUsers.ContainsKey(product.ProductNumber))
+                        {
+                            @foreach (var user in lockedInUsers[product.ProductNumber])
+                            {
+                                <li>@user.UserEmail - Locked in amount: @user.LockInAmount</li>
+                            }
+                        }
+                        else
+                        {
+                            <li>No users</li>
+                        }
+                    </ul>
+                </div>
+                <div class="product-actions">
+                    <button @onclick="() => EditProduct(product.ProductNumber)" class="edit-button">Edit</button>
+                    <button @onclick="() => RemoveProduct(product.ProductNumber)" class="remove-button">Remove</button>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <p>No products available.</p>
+    }
+</div>
+
+<h3>Add New Product</h3>
+<div class="add-product-form">
+    <label for="newProductNumber">Product Number</label>
+    <input type="number" id="newProductNumber" min="1" @bind="newProductNumber" />
+
+    <label for="newProductName">Product Name</label>
+    <input type="text" id="newProductName" @bind="newProductName" />
+
+    <label for="newProductPrice">Product Price</label>
+    <input type="number" id="newProductPrice" min="0" step="0.01" @bind="newProductPrice" />
+
+    <label for="newProductImageUrl">Product Image URL</label>
+    <input type="text" id="newProductImageUrl" @bind="newProductImageUrl" />
+
+    <div class="jackpot-option">
+        <input type="checkbox" id="isJackpotProduct" @bind="isJackpotProduct" />
+        <label for="isJackpotProduct">Jackpot Product</label>
+    </div>
+    <!-- Checkbox för att använda ett outcome som en produkt -->
+    <div class="jackpot-option">
+        <input type="checkbox" id="useOutcomeAsProduct" @bind="useOutcomeAsProduct" />
+        <label for="useOutcomeAsProduct">Use Outcome as Product</label>
+    </div>
+
+    @if (useOutcomeAsProduct)
+    {
+        <label for="selectedOutcome">Select Outcome:</label>
+        <p>Total outcomes found: @OutcomeConfigurations.Count</p>
+        <select id="selectedOutcome" @bind="selectedOutcomeId">
+            <option value="">-- Select Outcome --</option>
+            @foreach (var outcome in OutcomeConfigurations)
+            {
+                <option value="@outcome.CorrectAnswersRequired">@($"{outcome.CorrectAnswersRequired} - {outcome.Message} - {outcome.PrizeType}")</option>
+            }
+        </select>
+    }
+    <!-- New Draw Date input with max date 31 days from today -->
+    <label for="drawDate">Draw Date</label>
+    <input type="datetime-local" id="drawDate" @bind="newDrawDate" min="@minDate" max="@maxDate" />
+
+    <button @onclick="AddProduct" class="add-button">Add Product</button>
+</div>
+
+@code {
+    private List<ProductData> products = new List<ProductData>();
+    private int newProductNumber;
+    private string newProductName;
+    private double newProductPrice;
+    private string newProductImageUrl;
+    private bool isJackpotProduct = false;
+    private DateTime newDrawDate = DateTime.Now.AddDays(1); // Default to 1 day from now
+
+    private Dictionary<int, List<ProductData>> lockedInUsers = new Dictionary<int, List<ProductData>>();
+    private string minDate = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
+    private string maxDate = DateTime.Now.AddDays(31).ToString("yyyy-MM-ddTHH:mm");
+
+    private bool useOutcomeAsProduct = false;
+    private int selectedOutcomeId;
+    private List<OutcomeConfiguration> OutcomeConfigurations = new List<OutcomeConfiguration>();
+
+    private bool isOutcomeProduct = false; // Lägg till denna rad
+
+    public class OutcomeConfiguration
+    {
+        public int CorrectAnswersRequired { get; set; }
+        public string Message { get; set; }
+        public string IconClass { get; set; }
+        public string BackgroundColor { get; set; }
+        public string AnimationClass { get; set; }
+        public string PrizeType { get; set; }
+        public double PrizeValue { get; set; }
+        public string CompanyName { get; set; } // For GiftCard
+        public string ProductName { get; set; } // For Product
+        public string ImageUrl { get; set; }    // Image for GiftCard, Product, and Jackpot
+        public string WebsiteUrl { get; set; }
+
+    }
+    private async Task LoadOutcomeConfigurations()
+    {
+        try
+        {
+            var response = await Http.GetAsync("https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2Foutcomeconfigurations.json?alt=media");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                OutcomeConfigurations = JsonSerializer.Deserialize<List<OutcomeConfiguration>>(responseBody) ?? new List<OutcomeConfiguration>();
+
+                Console.WriteLine($"Loaded {OutcomeConfigurations.Count} outcome configurations.");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to load outcome configurations. Status: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching outcome configurations: {ex.Message}");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await ProductService.FetchAllProductsFromFirebaseAsync();
+        await LoadOutcomeConfigurations();
+        await LoadLockedInUsersForAllProducts();
+        StateHasChanged();
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private async Task LoadLockedInUsersForAllProducts()
+    {
+        foreach (var product in products)
+        {
+            var users = await ProductService.GetUsersForProduct(product.ProductNumber);
+            lockedInUsers[product.ProductNumber] = users;
+        }
+    }
+
+    private async Task AddProduct()
+    {
+        if (newProductNumber > 0 && newProductPrice > 0 && !string.IsNullOrEmpty(newProductName))
+        {
+            ProductService.ProductData newProduct;
+
+            if (useOutcomeAsProduct && selectedOutcomeId > 0)
+            {
+                var selectedOutcome = OutcomeConfigurations.FirstOrDefault(o => o.CorrectAnswersRequired == selectedOutcomeId);
+                if (selectedOutcome != null)
+                {
+                    newProductPrice = selectedOutcome.PrizeValue;
+                    newProductImageUrl = selectedOutcome.ImageUrl;
+                    isJackpotProduct = selectedOutcome.PrizeType == "Jackpot";
+                    isOutcomeProduct = true;
+
+                    string prizeType = selectedOutcome.PrizeType ?? "Unknown";
+                    string websiteUrl = selectedOutcome.WebsiteUrl ?? "";
+
+                    string finalProductName = !string.IsNullOrEmpty(selectedOutcome.CompanyName)
+                        ? $"{selectedOutcome.CompanyName}{selectedOutcome.ProductName}"
+                        : selectedOutcome.ProductName;
+
+                    newProduct = new ProductService.ProductData
+                        {
+                            ProductNumber = newProductNumber,
+                            ProductName = finalProductName,
+                            Price = newProductPrice,
+                            ImageUrl = newProductImageUrl,
+                            IsJackpot = isJackpotProduct,
+                            IsOutcomeProduct = true,
+                            DrawDate = newDrawDate,
+                            CorrectAnswersRequired = selectedOutcome.CorrectAnswersRequired,
+                            PrizeType = prizeType,
+                            WebsiteUrl = websiteUrl
+                        };
+                }
+                else
+                {
+                    Console.WriteLine("Selected outcome not found.");
+                    return;
+                }
+            }
+            else
+            {
+                isOutcomeProduct = false;
+
+                newProduct = new ProductService.ProductData
+                    {
+                        ProductNumber = newProductNumber,
+                        ProductName = newProductName,
+                        Price = newProductPrice,
+                        ImageUrl = newProductImageUrl,
+                        IsJackpot = isJackpotProduct,
+                        IsOutcomeProduct = false,
+                        DrawDate = newDrawDate,
+                        CorrectAnswersRequired = 0,
+                        PrizeType = "Manual",
+                        WebsiteUrl = ""
+                    };
+            }
+
+            // Spara produkten till Firebase
+            await ProductService.AddProductToFirebase(
+                newProduct.ProductNumber,
+                newProduct.Price,
+                "user@example.com", // Uppdatera till aktuell användare om möjligt
+                newProduct.ProductName,
+                newProduct.ImageUrl,
+                newProduct.IsJackpot,
+                newProduct.IsOutcomeProduct,
+                newProduct.DrawDate,
+                newProduct.CorrectAnswersRequired,
+                newProduct.PrizeType,
+                newProduct.WebsiteUrl
+            );
+
+            // Återställ formuläret
+            newProductNumber = 0;
+            newProductPrice = 0;
+            newProductName = "";
+            newProductImageUrl = "";
+            isJackpotProduct = false;
+            isOutcomeProduct = false;
+            selectedOutcomeId = 0;
+            newDrawDate = DateTime.Now.AddDays(1);
+
+            // Hämta produkterna igen
+            products = await ProductService.FetchAllProductsFromFirebaseAsync();
+            StateHasChanged();
+        }
+    }
+   
+    private async Task RemoveProduct(int productNumber)
+    {
+        try
+        {
+            await ProductService.RemoveProductFromFirebase(productNumber);
+            products = products.Where(p => p.ProductNumber != productNumber).ToList();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error removing product {productNumber}: {ex.Message}");
+        }
+    }
+
+    private void EditProduct(int productNumber)
+    {
+        NavigationManager.NavigateTo($"/edit-product/{productNumber}");
+    }
+}
+
+<style>
+    h2 {
+        color: #333;
+        text-align: center;
+    }
+
+    .product-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-top: 20px;
+        justify-content: center;
+    }
+
+    .product-item {
+        width: 300px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 15px;
+        background-color: #f9f9f9;
+    }
+
+    .product-image {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+
+    .product-info {
+        text-align: left;
+        width: 100%;
+    }
+
+        .product-info p {
+            margin: 5px 0;
+            font-size: 0.9em;
+            color: #333;
+        }
+
+    .product-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .edit-button,
+    .remove-button {
+        padding: 8px 16px;
+        border-radius: 5px;
+        font-size: 0.9em;
+        cursor: pointer;
+        border: none;
+    }
+
+    .edit-button {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .remove-button {
+        background-color: #f44336;
+        color: white;
+    }
+
+    .add-product-form {
+        max-width: 400px;
+        margin: 30px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+        .add-product-form label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .add-product-form input[type="number"],
+        .add-product-form input[type="text"] {
+            width: calc(100% - 10px);
+            padding: 8px;
+            margin-top: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+    .jackpot-option {
+        margin-top: 15px;
+        display: flex;
+        align-items: center;
+    }
+
+        .jackpot-option label {
+            margin-left: 5px;
+        }
+
+    .add-button {
+        width: 100%;
+        padding: 10px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        margin-top: 15px;
+    }
+
+        .add-button:hover {
+            background-color: #45a049;
+        }
+</style>
+ 

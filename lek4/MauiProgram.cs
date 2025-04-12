@@ -10,6 +10,8 @@ using System.Net.Http;
 using System;
 using Blazored.LocalStorage;
 using Plugin.Maui.Audio;
+using Microsoft.Extensions.Configuration;
+
 
 namespace lek4
 {
@@ -50,7 +52,7 @@ namespace lek4
             builder.Services.AddScoped<Authorization>();
 
             builder.Services.AddBlazoredLocalStorage();
-
+         
             // Registrera andra tjänster
             builder.Services.AddSingleton<GoogleFitService>();
             builder.Services.AddSingleton<AutoDrawService>();
@@ -71,6 +73,9 @@ namespace lek4
             builder.Services.AddScoped<SpecialService>();
             builder.Services.AddScoped<WinnerCleanupService>();
             builder.Services.AddScoped<StorageService>();
+
+            builder.Services.AddSingleton<AuthStorageService>();
+
 
             builder.Services.AddSingleton(AudioManager.Current);
             builder.Services.AddTransient<MainPage>();

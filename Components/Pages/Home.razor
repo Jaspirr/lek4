@@ -1,0 +1,958 @@
+﻿@page "/"
+@using Plugin.MauiMTAdmob
+@using Plugin.MauiMTAdmob.Extra
+@using System.Text.Json
+@using lek4.Components.Pages
+@inject NavigationManager NavigationManager
+@inject lek4.Components.Service.NumberService NumberService
+@inject GoogleFitService GoogleFitService
+@inject UserService UserService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IJSRuntime JSRuntime
+@inject HttpClient HttpClient
+
+<!-- Info-knapp i övre vänstra hörnet -->
+<button @onclick="ToggleInfoPopup" class="info-button">
+    <i class="fas fa-info-circle"></i>
+</button>
+
+<!-- Info-popup -->
+@if (showInfoPopup)
+{
+    <div class="popup-container">
+        <div id="info-content">
+            <div class="info-page active">
+                <h3>What is the number 0.0?</h3>
+                <p>
+                    <br>1000 steps you take equals 0.1<br>
+                    The more you move, the higher your chances. 
+                    Once you've built up enough odds, you'll level up and get a credit <img src='images/Voidglas2.webp' alt='Voidglas Icon' class='inline-voidglas'/>
+                    <br>Odds reset every week so everyone starts fresh — giving everyone the same chance each week!<br />
+                </p>
+            </div>
+
+            <div class="info-page">
+                <h3>What are credits for?</h3>
+                <p><img src="images/Voidglas2.webp" alt="Voidglas Icon" class="inline-voidglas" /> are used to buy tickets for the <strong>BIG BANG draw</strong>.</p>
+                <p>
+                    The prize pool for <strong>BIG BANG</strong> grows based on how many <img src="images/Voidglas2.webp" alt="Voidglas Icon" class="inline-voidglas" /> <br>users collect together.<br />
+                    Invite your friends to boost the amount!
+                </p>
+            </div>
+            <div class="info-page compact">
+                <h3>BIG BANG Jackpot</h3>
+                <p>
+                    Join the BIG BANG by locking in <strong>credits</strong> for a chance to win the full jackpot!
+                </p>
+
+                <h4>How it works:</h4>
+                <ul class="info-list">
+                    <li><strong>1.</strong> Lock in using <img src="images/Voidglas2.webp" alt="Voidglas Icon" class="inline-voidglas" /> credits.</li>
+                    <li><strong>2.</strong> Each entry costs e.g. <span class="highlight-box">50</span> credits.</li>
+                    <li><strong>3.</strong> Create your ticket after lock-in.</li>
+                    <li><strong>4.</strong> A random ticket generates on draw day.</li>
+                    <li>
+                        <strong>5.</strong> Prizes by matches:
+                        <ul class="sublist">
+                            <li><strong>6/6:</strong> BIG BANG prize money win! 🎉</li>
+                            <li><strong>5/6:</strong> Big prize (e.g. gift cards, premium products)</li>
+                            <li><strong>4/6:</strong> Medium prize (gift cards, premium products or credits)</li>
+                            <li><strong>3/6:</strong> Small prize (credits or mystery item)</li>
+                            <li><strong>0–2:</strong> Maybe a smal credit bonus 💫</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <div class="info-page">
+                <h3>Create Your Ticket</h3>
+                <p>
+                    In 6 quick steps, you build your unique ticket for the <strong>BIG BANG draw</strong>:
+                    <br /><br />
+                    <div class="left-aligned-list">
+                        <p><strong>1.</strong> Pick a number (1–50)</p>
+                        <p><strong>2.</strong> Choose a color</p>
+                        <p><strong>3.</strong> Select a symbol (like <i class="fas fa-star"></i>, <i class="fas fa-dragon"></i>, <i class="fas fa-bolt"></i>)</p>
+                        <p><strong>4.</strong> Pick a star sign</p>
+                        <p><strong>5.</strong> Choose a planet 🌍🪐</p>
+                        <p><strong>6.</strong> Pick an element (Earth, Fire, Water, Air)</p>
+                    </div>
+                </p>
+                <p>
+                    Your combo = your ticket.<br />
+                    The more tickets you hold, the higher your chance to win BIG!
+                </p>
+            </div>
+            <div class="info-page">
+                <h3>How do  <i class="fas fa-boxes"></i> page work?</h3>
+                <p>
+                    On this page, you’ll find <strong>BIG BANG</strong> and different products you can unlock based on your current <strong>Credits</strong> value or <strong>Odds</strong> level.
+                </p>
+                <p>
+                    Some products require you to collect enough odds, while others — like special prices — show a number like this:
+                    <span class="outcome-box inline-box"><span class="outcome-text">3</span></span>
+                    This means you need to match 3 answers correctly in the <strong>BIG BANG draw</strong> to win the reward.
+                </p>
+                <p>
+                    When your <strong>Credits</strong> or <strong>Odds</strong> match the product’s requirement, then you can <strong>LOCK IN</strong> to get the chance to win.
+                </p>
+            </div>
+            <div class="info-page">
+                <h3>How do <i class="fas fa-hand-holding-heart"></i> page work?</h3>
+                <p>
+                    <br>The <i class="fas fa-hand-holding-heart"></i> page lets you collect even more credits
+                    through daily rewards, helping friends, charities, and other events <br/>
+                    <br>It's the good way to boost your chances in the <strong>BIG BANG draw</strong>!<br />
+                </p>
+            </div>
+        </div>
+       
+
+        <!-- Navigeringspilar -->
+        <div class="carousel-controls">
+            <button class="nav-button" onclick="previousPage()">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="nav-button" onclick="nextPage()">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+
+        <button class="close-button" @onclick="ToggleInfoPopup">Close</button>
+    </div>
+}
+<div class="container" style="background-color: @(GetBackgroundColor())">
+    <!-- Credits display in top-right corner -->
+    <div class="credits-box">
+        <div class="star-wrapper @starAnimationClass">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+            <img src="images/Voidglas2.webp" alt="Starshard Icon" class="voidglas-icon" />
+        </div>
+        <span class="credits-count">@credits</span>
+    </div>
+
+
+    <!-- Tre lager av förvrängda cirklar -->
+    <div class="oval-background oval-background-layer1" style="background-color: @(GetNextColor())"></div>
+    <div class="oval-background oval-background-layer2"></div>
+    <div class="oval-background oval-background-layer3"></div>
+
+    <div class="main-number-container">
+        <div class="main-number @GetSizeClass() @explodeClass">
+            @number.ToString("0.0x")
+        </div>
+        @if (ShouldShowLockIcon())
+        {
+            <i class="fas fa-lock lock-icon" @onclick="() => UnlockAd()"></i>
+        }
+        @if (adReadyToWatch)
+        {
+            <i class="fas fa-unlock unlock-icon visible" @onclick="ShowAd"></i>
+        }
+    </div>
+    <div class="step-count">
+        Steps: @steps
+    </div>
+</div>
+
+<StepCounter OnStepsChanged="UpdateNumber" />
+
+    <div>
+        <button @onclick="DecrementNumber">-</button>
+        <span>@number.ToString("0.0")</span>
+        <button @onclick="IncrementNumber">+</button>
+    </div>
+    <div class="update-credits-section">
+        <label for="creditsInput">Ange nya credits:</label>
+        <input type="number" id="creditsInput" @bind="newCredits" min="0" />
+        <button @onclick="UpdateUserCredits">Uppdatera Credits</button>
+    </div>
+
+    <button @onclick="FetchStepsFromGoogleFit">Fetch Steps from Google Fit</button>
+    <button @onclick="ShowAd">Watch Ad</button> <!-- Button to show ad -->
+    <button @onclick="GoToAdminPage">Admin Page</button> <!-- Button to navigate to Admin Page -->
+
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert">@message</div>
+}
+<style>
+   .credits-box {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    background-color: #F0FFF0; /* Light yellow background */
+    padding: 8px 12px;
+    border-radius: 20px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    font-weight: bold;
+    font-size: 16px;
+    color: #333;
+    z-index: 10;
+}
+
+.star-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.credits-icon {
+    font-size: 20px;
+        width: 20px; /* Adjust to fit the box */
+        height: 20px;
+        color: #ffca28; /* Gold color for icon */
+}
+
+    .credits-count {
+        font-size: 16px;
+        background-color: #F0FFF0; /* White background for circle */
+        color: #333; /* Text color */
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%; /* Makes it a circle */
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+        font-size: 16px;
+}
+
+/* Animation class */
+    .animate-star {
+        animation: flyToRightSmooth 1.5s ease-in-out forwards; /* Increased duration for smoother effect */
+    }
+
+@@keyframes flyToRightSmooth {
+    0% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    30% {
+        transform: translateX(10px);
+        opacity: 1;
+    }
+    60% {
+        transform: translateX(20px);
+        opacity: 0.8;
+    }
+    80% {
+        transform: translateX(22px) scale(1.1);
+        opacity: 0.6;
+    }
+    100% {
+        transform: translateX(25px) scale(1.2);
+        opacity: 0;
+    }
+}
+    /* Stil för info-knappen */
+    .info-button {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: none;
+        border: none;
+        color: gainsboro;
+        font-size: 1.5rem;
+        cursor: pointer;
+    }
+
+        .info-button:hover {
+            transform: scale(1.1);
+            color: darkolivegreen;
+        }
+
+    /* Stil för popup */
+    /* Stil för popup */
+    .popup-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        text-align: center;
+        max-width: 320px;
+        width: 90%;
+    }
+
+    /* Navigeringsknappar */
+    .carousel-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 100px; /* Lägger till mellanrum mellan pilarna */
+        margin-top: 15px;
+    }
+
+    /* Stil för pilar */
+    .nav-button {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out, color 0.2s ease-in-out;
+    }
+
+        .nav-button i {
+            color: darkolivegreen; /* Färg på pilar */
+            transition: color 0.2s ease-in-out;
+        }
+
+        /* Effekt vid hover */
+        .nav-button:hover i {
+            transform: scale(1.3);
+            color: black; /* Ändrar färg vid hover */
+        }
+
+    /* Sida-indikator */
+    .page-indicator {
+        font-size: 1rem;
+        margin: 0 10px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    /* Stäng-knapp */
+    .close-button {
+        background: darkolivegreen;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        margin-top: 10px;
+    }
+
+        .close-button:hover {
+            background: #ff4d6d;
+        }
+
+    .left-aligned-list {
+        text-align: left;
+        margin: 0 auto;
+        max-width: 300px; /* Optional, for clean layout */
+    }
+    /* Make outcome box inline-friendly */
+    .inline-box {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: bold;
+        padding: 3px 6px;
+        border-radius: 6px;
+        margin: 0 6px;
+        min-width: 24px;
+        min-height: 24px;
+        line-height: 1;
+        vertical-align: middle;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+
+        .inline-box .outcome-text {
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+    .info-page.compact {
+        font-size: 0.85em;
+        padding: 10px;
+    }
+
+    .info-page.compact .info-list {
+        padding-left: 16px;
+    }
+
+    .info-page.compact .sublist {
+        padding-left: 12px;
+        font-size: 0.82em;
+    }
+
+    .inline-voidglas {
+        width: 16px;
+        height: 16px;
+        vertical-align: middle;
+    }
+
+    .info-page {
+        padding: 20px;
+        max-width: 700px;
+        margin: auto;
+        color: #333;
+        background-color: #fdfdfd;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .info-page h3 {
+        font-size: 1.8em;
+        color: #556B2F;
+        margin-bottom: 10px;
+    }
+
+    .info-page h4 {
+        margin-top: 20px;
+        font-size: 1.3em;
+        color: #333;
+    }
+
+    .info-list {
+        list-style: none;
+        padding-left: 0;
+    }
+
+        .info-list li {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+    .sublist {
+        list-style-type: circle;
+        margin-left: 20px;
+        margin-top: 5px;
+    }
+
+    .highlight-box {
+        display: inline-block;
+        padding: 2px 8px;
+        background-color: #556B2F;
+        color: white;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+
+    .jackpot-highlight {
+        color: #b38b00;
+        font-weight: bold;
+    }
+
+    .tip {
+        margin-top: 20px;
+        font-style: italic;
+        color: #888;
+    }
+
+    .inline-voidglas {
+        width: 20px;
+        height: 20px;
+        margin-bottom: -4px;
+    }
+
+    ul.info-list li {
+        text-align: left;
+    }
+
+    ul.sublist {
+        margin-top: 5px;
+        margin-left: 20px;
+        padding-left: 15px;
+        list-style-type: disc; /* eller none om du vill ta bort punkterna */
+        text-align: left;
+    }
+
+</style>
+@code {
+    private int credits = 0; 
+    private string starAnimationClass = "";// Display credits in the UI
+    private List<string> adminEmails = new();
+    private bool isAdmin = false;
+    private HashSet<double> AdTriggerPoints = new HashSet<double>();
+
+    private double number
+    {
+        get => Math.Round((double)NumberService.Number, 1); // Explicit typkonvertering till double
+        set
+        {
+            NumberService.Number = Math.Round((double)value, 1); // Explicit typkonvertering till double
+            CheckAndShowAd();
+        }
+    }
+    private bool showInfoPopup = false;
+    private int currentPage = 0;
+
+    private string[] infoPages = new string[]
+      {
+        "Välkommen! Här kan du se din statistik och prestationer.",
+        "För att öka dina odds, gå in varje dag och vara aktiv.",
+        "Planeterna visar din framgång – fortsätt röra dig framåt!",
+        "Du kan tjäna Starshards genom att hålla en streak!",
+        "Lycka till och fortsätt framåt!"
+      };
+
+    private void ToggleInfoPopup()
+    {
+        showInfoPopup = !showInfoPopup;
+    }
+
+    private void NextPage()
+    {
+        currentPage = (currentPage + 1) % infoPages.Length; // Går runt i en loop
+    }
+
+    private void PreviousPage()
+    {
+        currentPage = (currentPage - 1 + infoPages.Length) % infoPages.Length; // Går runt i en loop
+    }
+
+    private int steps = 0;
+    private string explodeClass = string.Empty;
+    private string message;
+    private bool adWatched = false;
+    private bool adReadyToWatch = false;
+  
+   private async Task FetchAdTriggerPoints()
+{
+    try
+    {
+        // URL to the JSON file in Firebase
+        var configUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fads%2FAdsSpan.json?alt=media";
+        var response = await HttpClient.GetStringAsync(configUrl);
+        var config = JsonSerializer.Deserialize<AdConfiguration>(response);
+
+        if (config != null && config.TriggerPoints != null)
+        {
+            AdTriggerPoints = new HashSet<double>(config.TriggerPoints);
+            Console.WriteLine($"Fetched AdTriggerPoints: {string.Join(", ", AdTriggerPoints)}");
+        }
+        else
+        {
+            Console.WriteLine("No AdTriggerPoints found in the configuration file.");
+            AdTriggerPoints = new HashSet<double>();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error fetching AdTriggerPoints: {ex.Message}");
+    }
+}
+
+// Class to match the JSON structure
+private class AdConfiguration
+{
+    public List<double> TriggerPoints { get; set; }
+    public string SelectedPreset { get; set; }
+}
+
+
+    private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
+    private int newCredits; // Variabel för att hålla det nya kreditvärdet
+
+    private async Task UpdateUserCredits()
+    {
+        var email = await localStorage.GetItemAsync<string>("userEmail");
+
+        if (string.IsNullOrEmpty(email))
+        {
+            Console.WriteLine("No email found in local storage.");
+            return;
+        }
+
+        // Uppdatera användarens credits i Firebase
+        bool isUpdated = await UserService.UpdateUserCredits(email, newCredits);
+
+        if (isUpdated)
+        {
+            credits = newCredits; // Uppdatera UI med nya värdet
+            Console.WriteLine($"Credits for {email} updated to {newCredits}.");
+        }
+        else
+        {
+            Console.WriteLine($"Failed to update credits for {email}.");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        base.OnInitialized();
+        InitializeAds();
+
+        // Fetch credits specifically for the credits display box
+        await FetchCreditsForDisplay();
+        await CheckIfUserIsAdmin();
+        await FetchAdTriggerPoints();
+    }
+    private async Task CheckIfUserIsAdmin()
+    {
+        try
+        {
+            // Hämta den inloggade användarens e-post från LocalStorage
+            var userEmail = await localStorage.GetItemAsync<string>("userEmail");
+
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                Console.WriteLine("No email found in local storage.");
+                return;
+            }
+
+            // URL till adminlistan i Firebase Storage
+            var adminFileUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/admins%2Falladmins.json?alt=media";
+
+            // Hämta adminlistan
+            var response = await HttpClient.GetStringAsync(adminFileUrl);
+            adminEmails = JsonSerializer.Deserialize<List<string>>(response) ?? new List<string>();
+
+            // Kontrollera om användarens e-post finns i adminlistan
+            isAdmin = adminEmails.Contains(userEmail);
+
+            Console.WriteLine($"User is admin: {isAdmin}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking admin status: {ex.Message}");
+        }
+    }
+    private async Task FetchCreditsForDisplay()
+    {
+        var email = await localStorage.GetItemAsync<string>("userEmail");
+
+        if (string.IsNullOrEmpty(email))
+        {
+            Console.WriteLine("No email found in local storage.");
+            credits = 0;
+            return;
+        }
+
+        var user = await UserService.GetUserFromFirebase(email);
+        var newCredits = user?.Credits ?? 0;
+
+        // Avrunda och konvertera till int
+        credits = (int)Math.Round((double)newCredits, 1); // Explicit konvertering till double
+
+        // Check if credits have increased to trigger animation
+        if (newCredits > credits)
+        {
+            TriggerStarAnimation();
+        }
+
+        StateHasChanged(); // Ensure UI updates
+    }
+
+    private void TriggerStarAnimation()
+    {
+        // Trigger animation class
+        starAnimationClass = "animate-star";
+        StateHasChanged();
+
+        // Reset animation class after a short delay to allow re-triggering
+        Task.Delay(1000).ContinueWith(_ =>
+        {
+            starAnimationClass = "";
+            InvokeAsync(StateHasChanged);
+        });
+    }
+    private async void UnlockAd()
+    {
+        adReadyToWatch = true;
+        StateHasChanged();
+        await Task.Delay(1000);
+        ShowAd();
+
+        // Retrieve email from localStorage
+        var email = await localStorage.GetItemAsync<string>("userEmail");
+
+        // Lägg till en kredit till användaren
+        if (!string.IsNullOrEmpty(email))
+        {
+            await UserService.AddCreditToUser(email, 1); // Kalla metoden direkt utan tilldelning
+            await FetchCreditsForDisplay(); // Uppdatera credits i UI
+        }
+        else
+        {
+            Console.WriteLine("User email not found in localStorage.");
+        }
+    }
+
+    private void InitializeAds()
+    {
+        CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
+        CrossMauiMTAdmob.Current.OnRewardedFailedToLoad += OnRewardedAdFailedToLoad;
+        CrossMauiMTAdmob.Current.OnRewardedFailedToShow += OnRewardedFailedToShow;
+        CrossMauiMTAdmob.Current.OnRewardedOpened += OnRewardedOpened;
+        CrossMauiMTAdmob.Current.OnRewardedClosed += OnRewardedClosed;
+        CrossMauiMTAdmob.Current.OnRewardedImpression += OnRewardedImpression;
+        CrossMauiMTAdmob.Current.OnUserEarnedReward += OnUserEarnedReward;
+    }
+    private string[] colorSequence = new string[]
+      {
+        "#98FB98", // PaleGreen
+        "#FF1493", // DeepPink
+        "#cc99ff", // LightPurple
+        "#7FFF00", // Chartreuse
+        "#FFFF00", // Yellow
+        "#ffcc99", // Peach
+        "#ffff99", // LightYellow
+        "#99ccff", // LightBlue
+        "#99ff99"  // LightGreen
+      };
+
+    private string GetNextColor()
+    {
+        int colorIndex = Math.Min((int)number, colorSequence.Length - 1);
+        return colorSequence[colorIndex];
+    }
+
+    private void OnRewardedImpression(object sender, EventArgs e)
+    {
+        Console.WriteLine("On Reward Impression");
+    }
+
+    private void OnRewardedClosed(object sender, EventArgs e)
+    {
+        Console.WriteLine("On Reward Closed");
+        adReadyToWatch = false;
+        StateHasChanged();
+    }
+
+    private void OnRewardedOpened(object sender, EventArgs e)
+    {
+        Console.WriteLine("On Reward Opened");
+    }
+
+    private void OnUserEarnedReward(object sender, MTEventArgs e)
+    {
+        Console.WriteLine($"User Earned Reward: {e.RewardType} - {e.RewardAmount}");
+        adWatched = true;
+        adReadyToWatch = false;
+        StateHasChanged(); // Update the UI to reflect the change
+    }
+
+    private void OnRewardedFailedToShow(object sender, MTEventArgs e)
+    {
+        Console.WriteLine($"Reward Failed To Show: {e.ErrorCode} - {e.ErrorMessage}");
+    }
+
+    private void OnRewardedAdLoaded(object sender, EventArgs e)
+    {
+        Console.WriteLine("Rewarded Ad Loaded");
+        adReadyToWatch = true;
+        StateHasChanged(); // Update the UI to reflect the change
+    }
+
+    private void OnRewardedAdFailedToLoad(object sender, MTEventArgs e)
+    {
+        Console.WriteLine($"Rewarded Ad Failed To Load: {e.ErrorCode} - {e.ErrorMessage}");
+    }
+
+    private void UpdateNumber(int stepCount)
+    {
+        steps = stepCount;
+        number = Math.Round(steps / 1000.0, 1);
+        TriggerExplosionEffect();
+    }
+
+    private void TriggerExplosionEffect()
+    {
+        explodeClass = "explode";
+        StateHasChanged();
+        Task.Delay(600).ContinueWith(_ =>
+        {
+            explodeClass = string.Empty;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task FetchStepsFromGoogleFit()
+    {
+        try
+        {
+            await GoogleFitService.InitializeServiceAsync();
+            DateTime startDate = DateTime.Now.AddDays(-7);
+            DateTime endDate = DateTime.Now;
+            steps = await GoogleFitService.GetTotalStepsAsync(startDate, endDate);
+            UpdateNumber(steps);
+            message = $"Total steps in the last week: {steps}";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    public string GetProductUrl()
+    {
+        return $"/products/{number:F1}";
+    }
+
+    private string GetBackgroundColor()
+    {
+        if (number >= 9.0) return "#98FB98"; // PaleGreen
+        if (number >= 8.0) return "#FF1493"; // DeepPink
+        if (number >= 7.0) return "#cc99ff"; // LightPurple
+        if (number >= 6.0) return "#7FFF00"; // Chartreuse
+        if (number >= 5.0) return "#FFFF00"; // Yellow
+        if (number >= 4.0) return "#ffcc99"; // Peach
+        if (number >= 3.0) return "#ffff99"; // LightYellow
+        if (number >= 2.0) return "#99ccff"; // LightBlue
+        if (number >= 1.0) return "#99ff99"; // LightGreen
+        return "#ffffff"; // White
+    }
+
+    private string GetSizeClass()
+    {
+        if (number >= 9.0) return "size-9";
+        if (number >= 8.0) return "size-8";
+        if (number >= 7.0) return "size-7";
+        if (number >= 6.0) return "size-6";
+        if (number >= 5.0) return "size-5";
+        if (number >= 4.0) return "size-4";
+        if (number >= 3.0) return "size-3";
+        if (number >= 2.0) return "size-2";
+        if (number >= 1.0) return "size-1";
+        return "size-0";
+    }
+    private async void IncrementNumber()
+    {
+        if (ShouldShowLockIcon())
+        {
+            message = "Please watch the ad to continue.";
+            return;
+        }
+
+        var previousNumber = number; // Spara det gamla värdet
+        number = Math.Round((double)Math.Min(number + 0.1, 9.0), 1); // Avrunda till double
+
+        if (number > previousNumber) // Kontrollera om talet faktiskt ökades
+        {
+            await UpdateTotalOdds(number - previousNumber); // Lägg till skillnaden i totalodds
+        }
+
+        Console.WriteLine($"Number incremented to: {number}");
+        adWatched = false; // Reset flag
+    }
+
+    private void DecrementNumber()
+    {
+        number = Math.Round((double)Math.Max(number - 0.1, 0.0), 1); // Avrunda till double
+        Console.WriteLine($"Number decremented to: {number}");
+    }
+
+    private void GoToProducts()
+    {
+        NavigationManager.NavigateTo(GetProductUrl());
+    }
+
+    private void CheckAndShowAd()
+    {
+        Console.WriteLine($"Checking if ad should be shown for number: {number}");
+        // No need to show ad automatically
+    }
+
+    private void ShowAd()
+    {
+        ((MainPage)Application.Current.MainPage).LoadRewardedAd();
+    }
+    private void GoToAdminPage()
+    {
+        NavigationManager.NavigateTo("/admin"); // Replace with the correct route to your Admin page
+    }
+
+    private bool ShouldShowLockIcon()
+    {
+        // Check if the rounded number is in the list of trigger points
+        return !adWatched && AdTriggerPoints.Contains(number) && !adReadyToWatch;
+    }
+
+    private bool ShouldShowUnlockIcon()
+    {
+        // Show unlock icon if ad is ready to watch
+        return adReadyToWatch;
+    }
+    private async Task UpdateTotalOdds(double valueToAdd)
+    {
+        try
+        {
+            var email = await localStorage.GetItemAsync<string>("userEmail");
+            if (string.IsNullOrEmpty(email))
+            {
+                Console.WriteLine("No email found in local storage.");
+                return;
+            }
+
+            // Hämta användarens data
+            var userStats = await UserService.GetUserFromFirebase(email);
+
+            if (userStats != null)
+            {
+                // Avrunda TotalOdds och WeeklyOdds
+                userStats.TotalOdds = Math.Round((double)(userStats.TotalOdds + valueToAdd), 1);
+                userStats.WeeklyOdds = Math.Round((double)(userStats.WeeklyOdds + valueToAdd), 1);
+
+                // Spara tillbaka till Firebase
+                await UserService.UpdateUserStatsInFirebase(email, userStats);
+
+                Console.WriteLine($"Updated totalodds and weeklyodds for {email} by {valueToAdd}. New totalodds: {userStats.TotalOdds}, New weeklyodds: {userStats.WeeklyOdds}");
+            }
+            else
+            {
+                Console.WriteLine($"User stats not found for {email}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating totalodds and weeklyodds: {ex.Message}");
+        }
+    }
+}
+<style>
+    .voidglas-icon {
+        width: 38px; /* Öka bredden för att göra den större */
+        height: 38px; /* Anpassa höjden så att den matchar bredden */
+        margin-right: 10px; /* Ge lite extra utrymme mellan ikonen och texten */
+        border-radius: 50%; /* Gör bilden rund om den är fyrkantig */
+        object-fit: cover; /* Behåll proportionerna för bilden */
+        box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.2); /* Förbättra skuggan något */
+    }
+
+    .info-page {
+        display: none;
+    }
+
+        .info-page.active {
+            display: block;
+        }
+
+    .inline-voidglas {
+        width: 50px;
+        height: 50px;
+        vertical-align: middle;
+        margin-left: 4px;
+    }
+
+</style>
+<script>
+    let currentPage = 0;
+
+    function showPage(index) {
+        const pages = document.querySelectorAll('.info-page');
+        if (pages.length === 0) return;
+
+        pages.forEach(p => p.classList.remove('active'));
+        pages[index].classList.add('active');
+    }
+
+    function nextPage() {
+        const pages = document.querySelectorAll('.info-page');
+        currentPage = (currentPage + 1) % pages.length;
+        showPage(currentPage);
+    }
+
+    function previousPage() {
+        const pages = document.querySelectorAll('.info-page');
+        currentPage = (currentPage - 1 + pages.length) % pages.length;
+        showPage(currentPage);
+    }
+
+    // När popup öppnas - visa första sidan
+    document.addEventListener('DOMContentLoaded', () => {
+        showPage(0);
+    });
+</script>

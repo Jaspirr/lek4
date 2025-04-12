@@ -1,0 +1,584 @@
+﻿@page "/login"
+@using Firebase.Auth
+@using System.Text.Json
+@inject FirebaseAuthClient AuthClient
+@inject NavigationManager NavigationManager
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject HttpClient HttpClient
+@inject IJSRuntime JSRuntime
+@inject UserService UserService
+@inject AutoDrawService AutoDrawService
+@inject WinnerCleanupService WinnerCleanupService
+
+
+<div class="login-container">
+    <div class="login-form">
+        <h3>Login</h3>
+        <EditForm Model="loginModel" OnValidSubmit="LoginUser">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="form-group">
+                <InputText id="email" @bind-Value="loginModel.Email" placeholder="Email" />
+            </div>
+            <div class="form-group">
+                <InputText id="password" @bind-Value="loginModel.Password" type="password" placeholder="Password" />
+            </div>
+            <div class="stay-logged-in">
+                <label>
+                    <InputCheckbox @bind-Value="stayLoggedIn" />
+                    <span>Stay Logged In</span>
+                </label>
+            </div>
+            <button type="submit" class="login-button">Login</button>
+        </EditForm>
+
+        <div class="divider">
+            <hr class="line" />
+            <span>OR</span>
+            <hr class="line" />
+        </div>
+
+        <!-- Google Login Button -->
+        <div class="google-login-container">
+            <button class="google-login-button" @onclick="StartGoogleLogin">
+                <img src="images/g-logo.png" alt="Google Logo" />
+            </button>
+        </div>
+        <div class="login-footer">
+            <p>Don't have an account? <NavLink href="/signup">Sign up here</NavLink></p>
+        </div>
+        <div class="error-message">@errorMessage</div>
+    </div>
+
+    <!-- WebView for Google Sign-In -->
+    <div class="google-login-webview" style="display: none;" id="webViewContainer">
+        <iframe id="webView" style="width: 100%; height: 500px; border: none;" @ref="webView"></iframe>
+        <button onclick="hideWebView('webViewContainer')" style="position: absolute; top: 10px; right: 10px;">Close</button>
+    </div>
+   
+</div>
+
+@code {
+    private LoginModel loginModel = new LoginModel();
+    private string errorMessage;
+    private bool stayLoggedIn = false;
+    private ElementReference webView;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("OnInitializedAsync called for Login page");
+
+        try
+        {
+            // Kontrollera och återställ Weekly Odds vid start
+            Console.WriteLine("Starting CheckAndResetWeeklyOddsAsync...");
+            await UserService.CheckAndResetWeeklyOddsAsync();
+            Console.WriteLine("Weekly Odds checked and reset if needed.");
+
+            // Starta AutoDrawService för att schemalägga dragningar
+            Console.WriteLine("Initializing draw timers in AutoDrawService...");
+            await AutoDrawService.InitializeDrawTimersAsync();
+            Console.WriteLine("Draw timers initialized successfully.");
+
+            // Kontrollera om UID finns i LocalStorage
+            Console.WriteLine("Fetching userUid from localStorage...");
+            var userUid = await localStorage.GetItemAsync<string>("userUid");
+
+            Console.WriteLine("Checking and cleaning up winner files...");
+            await WinnerCleanupService.CheckAndCleanupWinnerFilesAsync();
+            Console.WriteLine("Winner file cleanup check completed.");
+            if (!string.IsNullOrEmpty(userUid))
+            {
+                Console.WriteLine($"userUid found: {userUid}. Fetching user data from Firebase...");
+
+                // Bygg URL till användarens data i Firebase
+                var getUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userUid}.json?alt=media";
+
+                // Skicka GET-förfrågan för att hämta användardata
+                var response = await HttpClient.GetAsync(getUrl);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonData = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"User data fetched successfully for UID: {userUid}");
+                    var userData = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonData);
+
+                    // Kontrollera om stayLoggedIn är true
+                    if (userData != null && userData.ContainsKey("stayLoggedIn") && userData["stayLoggedIn"] is bool isLoggedIn && isLoggedIn)
+                    {
+                        Console.WriteLine("User opted to stay logged in. Redirecting to home page...");
+                        NavigationManager.NavigateTo("/");
+                        return;
+                    }
+                    else
+                    {
+                        Console.WriteLine("User is not marked to stay logged in. Proceeding to login form...");
+                    }
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // Om filen inte finns, fortsätt till inloggningsformuläret
+                    Console.WriteLine($"No data file found for UID: {userUid}. Proceeding to login...");
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to fetch user data. Status code: {response.StatusCode}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No userUid found in localStorage. Proceeding to login form...");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during initialization: {ex.Message}");
+        }
+    }
+
+
+    private async Task LoginUser()
+    {
+        try
+        {
+            // Logga in användaren via Firebase
+            var userCredential = await AuthClient.SignInWithEmailAndPasswordAsync(loginModel.Email, loginModel.Password);
+            var firebaseUser = userCredential.User;
+
+            if (firebaseUser != null)
+            {
+                // Spara användarens UID och e-post till LocalStorage
+                var userEmail = firebaseUser.Info.Email;
+                var userUid = firebaseUser.Uid;
+
+                await localStorage.SetItemAsync("userEmail", userEmail);
+                await localStorage.SetItemAsync("userUid", userUid);
+
+                if (stayLoggedIn)
+                {
+                    // Spara statusen "stanna inloggad" i Firebase Storage
+                    await SaveStayLoggedInStatus(userUid, true);
+                }
+
+                // Uppdatera användarens Daily Streak i Firebase
+                await UserService.UpdateDailyStreakInUserStats(userEmail);
+
+                // Navigera till hemsidan efter lyckad inloggning
+                NavigationManager.NavigateTo("/");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = GetErrorMessage(ex.Message);
+            Console.WriteLine($"Error during login: {errorMessage}");
+        }
+    }
+
+    private async Task SaveStayLoggedInStatus(string userId, bool stayLoggedInStatus)
+    {
+        try
+        {
+            // URL to user's JSON data in Firebase
+            var getUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userId}.json?alt=media";
+
+            // Fetch existing data
+            var getResponse = await HttpClient.GetAsync(getUrl);
+            var existingDataJson = "{}"; // Default empty JSON
+
+            if (getResponse.IsSuccessStatusCode)
+            {
+                existingDataJson = await getResponse.Content.ReadAsStringAsync();
+            }
+
+            var existingData = JsonSerializer.Deserialize<Dictionary<string, object>>(existingDataJson) ?? new Dictionary<string, object>();
+
+            // Update stayLoggedIn status
+            existingData["stayLoggedIn"] = stayLoggedInStatus;
+
+            var updatedJson = JsonSerializer.Serialize(existingData);
+            var content = new StringContent(updatedJson, System.Text.Encoding.UTF8, "application/json");
+
+            // Save updated data to Firebase
+            var putUrl = $"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{userId}.json";
+            var putResponse = await HttpClient.PostAsync(putUrl, content);
+
+            if (!putResponse.IsSuccessStatusCode)
+            {
+                throw new Exception($"Failed to save stayLoggedIn status: {await putResponse.Content.ReadAsStringAsync()}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving stayLoggedIn status: {ex.Message}");
+        }
+    }
+    private string GetErrorMessage(string responseBody)
+    {
+        try
+        {
+            var responseJson = JsonSerializer.Deserialize<JsonElement>(responseBody);
+            var error = responseJson.GetProperty("error").GetProperty("message").GetString();
+            return error switch
+            {
+                "EMAIL_NOT_FOUND" => "The user does not exist. Please check your email or sign up.",
+                "INVALID_PASSWORD" => "The password is invalid. Please try again.",
+                "USER_DISABLED" => "The user account has been disabled.",
+                _ => "An error occurred during login. Please try again."
+            };
+        }
+        catch
+        {
+            return "An error occurred during login. Please try again.";
+        }
+    }
+
+    public class LoginModel
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
+    }
+    [JSInvokable]
+    public async Task OnPopupNavigated(string currentUrl)
+    {
+        Console.WriteLine($"Navigated to: {currentUrl}");
+
+        if (currentUrl.StartsWith("https://stega-426008.appspot.com"))
+        {
+            try
+            {
+                var token = ExtractGoogleAccessToken(currentUrl);
+                await CompleteGoogleLogin(token);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error during navigation: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Unexpected redirect URI or navigation.");
+        }
+    }
+
+
+    private async Task StartGoogleLogin()
+    {
+        try
+        {
+            var googleAuthUrl = "https://accounts.google.com/o/oauth2/v2/auth"
+                                + "?client_id=870131863077-inn7d8ss726rqlin37edc7kourime574.apps.googleusercontent.com" // Din Web Client ID
+                                + "&redirect_uri=https://stega-426008.appspot.com" // Redirect URI
+                                + "&response_type=token" // Viktig parameter
+                                + "&scope=email%20profile" // Åtkomst till email och profil
+                                + "&state=secure_random_state"; // Ett slumpmässigt värde för att förhindra CSRF
+
+            // Öppna popup för Google OAuth
+            await JSRuntime.InvokeVoidAsync("openPopup", googleAuthUrl);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Google Login Error: {ex.Message}");
+        }
+    }
+
+
+    private string ExtractTokenFromUrl(string url)
+    {
+        // Extract access token from the URL fragment
+        var token = url.Split('#').LastOrDefault()?.Split('&')
+            ?.FirstOrDefault(p => p.StartsWith("access_token="))?.Split('=').LastOrDefault();
+        return token;
+    }
+
+    private string ExtractGoogleAccessToken(string finalUri)
+    {
+        var uri = new Uri(finalUri);
+        var queryParams = uri.Fragment.TrimStart('#').Split('&');
+        foreach (var param in queryParams)
+        {
+            if (param.StartsWith("access_token="))
+            {
+                return param.Split('=')[1];
+            }
+        }
+
+        throw new Exception("Access token not found in redirect URI.");
+    }
+
+    private async Task<string> ExchangeGoogleTokenForFirebaseToken(string googleToken)
+    {
+        var payload = new
+        {
+            postBody = $"id_token={googleToken}&providerId=google.com",
+            requestUri = "http://localhost", // Behövs av Firebase, även om den inte används direkt
+            returnSecureToken = true
+        };
+
+        var response = await HttpClient.PostAsJsonAsync(
+            "https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=DIN_FIREBASE_API_KEY",
+            payload);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<JsonElement>(json);
+            return result.GetProperty("idToken").GetString();
+        }
+
+        throw new Exception("Failed to exchange Google token for Firebase token.");
+    }
+
+    private async Task AuthenticateWithFirebase(string firebaseToken)
+    {
+        await localStorage.SetItemAsync("firebaseToken", firebaseToken);
+        NavigationManager.NavigateTo("/"); // Redirect to the homepage
+    }
+    private async Task CompleteGoogleLogin(string token)
+    {
+        if (!string.IsNullOrEmpty(token))
+        {
+            var firebaseToken = await ExchangeGoogleTokenForFirebaseToken(token);
+
+            if (!string.IsNullOrEmpty(firebaseToken))
+            {
+                await localStorage.SetItemAsync("firebaseToken", firebaseToken);
+                NavigationManager.NavigateTo("/"); // Omdirigera användaren efter inloggning
+            }
+            else
+            {
+                Console.WriteLine("Failed to exchange Google token for Firebase token.");
+            }
+        }
+    }
+
+}
+
+
+<style>
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh; /* Full höjd */
+        background-color: #f5f5f5;
+    }
+
+    .login-form {
+        margin: 0 auto;
+        width: 80%;
+        max-width: 400px; /* Sätt en maxbredd */
+        background-color: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        font-family: 'Arial', sans-serif;
+    }
+
+    .login-form h3 {
+        margin-bottom: 20px;
+        font-size: 1.8em;
+        color: #4a4a4a;
+        font-weight: 600;
+    }
+
+    .form-group {
+        margin: 0 auto;
+        width: 80%;
+        margin-bottom: 15px;
+        text-align: left;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 10px;
+        font-size: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group input:focus {
+        border-color: #F0FFF0;
+        outline: none;
+        box-shadow: 0 0 5px rgba(168, 130, 214, 0.5);
+    }
+
+    .stay-logged-in {
+        display: flex;
+        margin-bottom: 10px;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.9rem;
+        color: #4a4a4a;
+        justify-content: center; /* Centrerar checkbox och text */
+    }
+
+    .stay-logged-in label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+    }
+
+    .stay-logged-in input[type="checkbox"] {
+        margin-right: 5px;
+        transform: scale(1.2); /* Gör checkboxen lite större */
+        accent-color: #556B2F; /* Snyggare färg för checkbox */
+    }
+
+    .login-button {
+        width: 60%;
+        padding: 12px 20px;
+        background-color: #556B2F;
+        color: #F0FFF0;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .login-button:hover {
+        background-color: #8b5fc1;
+        color: white;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .login-footer {
+        margin-top: 20px;
+        font-size: 0.9rem;
+        color: #4a4a4a;
+    }
+
+    .login-footer a {
+        color: #556B2F;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .login-footer a:hover {
+        text-decoration: underline;
+    }
+
+    .error-message {
+        color: red;
+        margin-top: 10px;
+    }
+
+    @@media (max-width: 480px) {
+        .login-form {
+            padding: 15px;
+        }
+
+        .form-group input {
+            font-size: 0.9rem;
+        }
+
+        .login-button {
+            font-size: 0.9rem;
+            padding: 10px 15px;
+        }
+    }
+
+    .google-login-container {
+        display: flex;
+        justify-content: center; /* Centrerar knappen horisontellt */
+        margin-top: 20px; /* Skapa utrymme mellan knappen och ovanstående element */
+    }
+
+    .google-login-button {
+        width: 60%; /* Fyll samma bredd som login-knappen */
+        max-width: 300px; /* Styr maxbredden */
+        height: 45px; /* Samma höjd som login-knappen */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: white; /* Google-blå */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+        .google-login-button:hover {
+            background-color: #357AE8; /* Mörkare blå vid hover */
+        }
+
+        .google-login-button img {
+            width: 24px;
+            height: 24px;
+        }
+
+    .divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px; /* Avstånd mellan linjer och text */
+        margin: 20px 0; /* Utrymme ovanför och under divider */
+        font-size: 16px;
+        font-weight: bold;
+        color: #4a4a4a; /* Textfärg */
+    }
+
+        .divider .line {
+            width: 90px; /* Sätt fast bredd för linjerna */
+            height: 1px;
+            background-color: #ddd; /* Linjefärg */
+            border: none;
+        }
+</style>
+<script>
+    function monitorIframeNavigation(iframeId, dotNetRef) {
+        const iframe = document.getElementById(iframeId);
+
+        if (!iframe) {
+            console.error(`Iframe with ID '${iframeId}' not found.`);
+            return;
+        }
+
+        iframe.onload = function () {
+            try {
+                const currentUrl = iframe.contentWindow.location.href;
+                dotNetRef.invokeMethodAsync('OnIframeNavigated', currentUrl);
+            } catch (e) {
+                console.warn('Could not access iframe URL:', e);
+            }
+        };
+    }
+
+    function setIframeSource(iframeId, url) {
+        const iframe = document.getElementById(iframeId);
+        if (iframe) {
+            iframe.src = url;
+        }
+    }
+    function openPopup(url, width = 600, height = 700) {
+        const left = (screen.width / 2) - (width / 2);
+        const top = (screen.height / 2) - (height / 2);
+        const popup = window.open(url, '_blank', `width=${width},height=${height},top=${top},left=${left}`);
+
+        const checkNavigation = setInterval(() => {
+            try {
+                const popupUrl = popup.location.href;
+                if (popupUrl.startsWith("https://stega-426008.appspot.com")) {
+                    clearInterval(checkNavigation);
+                    popup.close();
+
+                    // Notify C# method
+                    DotNet.invokeMethodAsync('lek4', 'OnPopupNavigated', popupUrl);
+                }
+            } catch (err) {
+                // Ignore cross-origin errors
+            }
+
+            if (popup.closed) {
+                clearInterval(checkNavigation);
+            }
+        }, 500);
+    }
+
+</script>

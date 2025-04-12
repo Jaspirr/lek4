@@ -1,5 +1,6 @@
 ﻿using Plugin.MauiMTAdmob;
 using Plugin.MauiMTAdmob.Extra;
+using System.Globalization;
 
 namespace lek4
 {
@@ -11,10 +12,15 @@ namespace lek4
         {
             InitializeComponent();
             InitializeAds();
+            CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
+            CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
         }
 
         private void InitializeAds()
         {
+             CrossMauiMTAdmob.Current.TestDevices = new List<string> { "C44999673C1A6EDCE0DA791B8E5436C1" };
+
+
             CrossMauiMTAdmob.Current.OnRewardedLoaded += OnRewardedAdLoaded;
             CrossMauiMTAdmob.Current.OnRewardedFailedToLoad += OnRewardedAdFailedToLoad;
             CrossMauiMTAdmob.Current.OnRewardedFailedToShow += OnRewardedFailedToShow;

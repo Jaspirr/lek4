@@ -1,3 +1,12 @@
-﻿﻿html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+﻿html, body {
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(145deg, #ffffff, #f4f4f9); /* Samma som din container */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+.main {
+    padding-bottom: env(safe-area-inset-bottom, 60px);
 }

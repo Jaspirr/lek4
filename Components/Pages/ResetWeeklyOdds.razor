@@ -1,0 +1,74 @@
+﻿@page "/reset-weekly-odds"
+@inject UserService UserService
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<h3>Reset Weekly Odds</h3>
+<button class="back-button" @onclick="NavigateBack">← Back</button>
+
+<div class="reset-container">
+    <label for="resetDay">Select a day to reset Weekly Odds:</label>
+    <select id="resetDay" @bind="selectedDay">
+        @foreach (var day in daysOfWeek)
+        {
+            <option value="@day">@day</option>
+        }
+    </select>
+
+    <button @onclick="SetResetDay" class="save-button">Save Reset Day</button>
+    <div class="status-message">@statusMessage</div>
+</div>
+
+<style>
+    .reset-container {
+        margin: 20px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .save-button {
+        margin-top: 15px;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .save-button:hover {
+        background-color: #0056b3;
+    }
+    .status-message {
+        margin-top: 10px;
+        font-size: 0.9em;
+        color: green;
+    }
+</style>
+
+@code {
+    private string selectedDay = "Sunday"; // Default day
+    private List<string> daysOfWeek = Enum.GetNames<DayOfWeek>().ToList();
+    private string statusMessage = "";
+
+    private async Task SetResetDay()
+    {
+        try
+        {
+            // Save the selected reset day to Firebase or a similar storage
+            await UserService.SetWeeklyOddsResetDay(selectedDay);
+            statusMessage = $"Reset day set to {selectedDay} successfully!";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error setting reset day: {ex.Message}");
+            statusMessage = "Failed to set reset day.";
+        }
+    }
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
+}

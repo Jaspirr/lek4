@@ -1,0 +1,332 @@
+﻿@page "/admin-generate-ticket"
+@using lek4.Components.Service
+@inject JackpotService JackpotService
+@inject NavigationManager NavigationManager
+
+<h3>Admin Ticket Generator</h3>
+<button @onclick="NavigateBack">← Back</button>
+<div class="admin-container">
+    <div class="form-group">
+        <label for="selectedNumber">Select Number:</label>
+        <select id="selectedNumber" @bind="selectedNumber" class="form-control">
+            @foreach (var number in numbers)
+            {
+                <option value="@number">@number</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="selectedColor">Select Color:</label>
+        <select id="selectedColor" @bind="selectedColor" class="form-control">
+            @foreach (var color in colors)
+            {
+                <option value="@color.Name">@color.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="selectedSymbol">Select Symbol:</label>
+        <select id="selectedSymbol" @bind="selectedSymbol" class="form-control">
+            @foreach (var symbol in symbols)
+            {
+                <option value="@symbol.Name">@symbol.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="selectedChineseSymbol">Select Chinese Symbol:</label>
+        <select id="selectedChineseSymbol" @bind="selectedChineseSymbol" class="form-control">
+            @foreach (var symbol in chineseSymbols)
+            {
+                <option value="@symbol.Name">@symbol.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="selectedPlanet">Select Planet:</label>
+        <select id="selectedPlanet" @bind="selectedPlanet" class="form-control">
+            @foreach (var planet in planets)
+            {
+                <option value="@planet.Name">@planet.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="selectedElement">Select Element:</label>
+        <select id="selectedElement" @bind="selectedElement" class="form-control">
+            @foreach (var element in elements)
+            {
+                <option value="@element.Name">@element.Name</option>
+            }
+        </select>
+    </div>
+
+    <button class="btn btn-primary" @onclick="GenerateAndSaveTicket">Generate Ticket</button>
+
+    @if (!string.IsNullOrEmpty(generatedTicket))
+    {
+        <div class="ticket-summary">
+            <h4>Generated Ticket:</h4>
+            <p><strong>Number:</strong> @selectedNumber</p>
+            <p><strong>Color:</strong> @selectedColor</p>
+            <p><strong>Symbol:</strong> @selectedSymbol</p>
+            <p><strong>Chinese Symbol:</strong> @selectedChineseSymbol</p>
+            <p><strong>Planet:</strong> @selectedPlanet</p>
+            <p><strong>Element:</strong> @selectedElement</p>
+        </div>
+    }
+</div>
+
+@code {
+    private int selectedNumber;
+    private string selectedColor;
+    private string selectedSymbol;
+    private string selectedChineseSymbol;
+    private string selectedPlanet;
+    private string selectedElement;
+    private string generatedTicket;
+
+    private List<int> numbers = Enumerable.Range(1, 50).ToList();
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+    private List<string> imageUrls = new List<string>
+    {
+        "images/Orion.webp",
+        "images/Andromeda.webp",
+        "images/Lejonet.webp",
+        "images/Skytten.webp",
+        "images/Skorpionen.webp",
+        "images/Vaduren.webp",
+        "images/Tvillingarna.webp",
+        "images/Oxen.webp",
+        "images/Vagen.webp",
+        "images/Jungfrun.webp",
+        "images/Kraftan.webp",
+        "images/Storabjornen.webp",
+        "images/Stenbocken.webp",
+        "images/Fiskarna.webp",
+        "images/Draken.webp",
+        "images/Ornen.webp",
+        "images/Kentauren.webp",
+        "images/Lyra.webp",
+        "images/Orionhunden.webp",
+        "images/Delfinen.webp",
+        "images/Korpen.webp",
+        "images/Krukan.webp",
+        "images/Hydran.webp",
+        "images/Kameleonten.webp",
+        "images/Teleskopet.webp",
+        "images/Svardfisken.webp",
+        "images/Pafageln.webp",
+        "images/Fenix.webp",
+        "images/Flygfisken.webp",
+        "images/Vargen.webp",
+        "images/Enhorningen.webp",
+        "images/Kaninen.webp"
+        };
+
+    private List<ColorOption> colors = new List<ColorOption>
+    {
+        new ColorOption { Name = "Red", ColorCode = "#FF5733" },
+        new ColorOption { Name = "Green", ColorCode = "#33FF57" },
+        new ColorOption { Name = "Blue", ColorCode = "#3357FF" },
+        new ColorOption { Name = "Yellow", ColorCode = "#FFFF33" },
+        new ColorOption { Name = "Purple", ColorCode = "#9B33FF" },
+        new ColorOption { Name = "Orange", ColorCode = "#FF8C33" },
+        new ColorOption { Name = "Pink", ColorCode = "#FF33A8" },
+        new ColorOption { Name = "Brown", ColorCode = "#8B4513" },
+        new ColorOption { Name = "Cyan", ColorCode = "#33FFF6" },
+        new ColorOption { Name = "Magenta", ColorCode = "#FF33FF" },
+        new ColorOption { Name = "Teal", ColorCode = "#008080" },
+        new ColorOption { Name = "Lime", ColorCode = "#BFFF00" },
+        new ColorOption { Name = "Olive", ColorCode = "#808000" },
+        new ColorOption { Name = "Maroon", ColorCode = "#800000" },
+        new ColorOption { Name = "Navy", ColorCode = "#000080" },
+        new ColorOption { Name = "Gold", ColorCode = "#FFD700" },
+        new ColorOption { Name = "Silver", ColorCode = "#C0C0C0" },
+        new ColorOption { Name = "Coral", ColorCode = "#FF7F50" },
+        new ColorOption { Name = "Turquoise", ColorCode = "#40E0D0" },
+        new ColorOption { Name = "Indigo", ColorCode = "#4B0082" },
+        new ColorOption { Name = "Lavender", ColorCode = "#E6E6FA" },
+        new ColorOption { Name = "Salmon", ColorCode = "#FA8072" },
+        new ColorOption { Name = "SlateBlue", ColorCode = "#6A5ACD" },
+        new ColorOption { Name = "Mint", ColorCode = "#98FF98" },
+        new ColorOption { Name = "Crimson", ColorCode = "#DC143C" },
+        new ColorOption { Name = "Peach", ColorCode = "#FFE5B4" },
+        new ColorOption { Name = "ForestGreen", ColorCode = "#228B22" },
+        new ColorOption { Name = "SkyBlue", ColorCode = "#87CEEB" },
+        new ColorOption { Name = "Violet", ColorCode = "#EE82EE" },
+        new ColorOption { Name = "Tan", ColorCode = "#D2B48C" },
+        new ColorOption { Name = "Sienna", ColorCode = "#A0522D" },
+        new ColorOption { Name = "Khaki", ColorCode = "#F0E68C" },
+        new ColorOption { Name = "Orchid", ColorCode = "#DA70D6" },
+        new ColorOption { Name = "Chocolate", ColorCode = "#D2691E" },
+        new ColorOption { Name = "Tomato", ColorCode = "#FF6347" },
+        new ColorOption { Name = "SteelBlue", ColorCode = "#4682B4" },
+        new ColorOption { Name = "Periwinkle", ColorCode = "#CCCCFF" },
+        new ColorOption { Name = "Lemon", ColorCode = "#FFF44F" },
+        new ColorOption { Name = "SeaGreen", ColorCode = "#2E8B57" },
+        new ColorOption { Name = "Fuchsia", ColorCode = "#FF00FF" },
+        new ColorOption { Name = "Aqua", ColorCode = "#00FFFF" },
+        new ColorOption { Name = "Amethyst", ColorCode = "#9966CC" },
+        new ColorOption { Name = "Copper", ColorCode = "#B87333" },
+        new ColorOption { Name = "Ruby", ColorCode = "#E0115F" },
+        new ColorOption { Name = "Emerald", ColorCode = "#50C878" },
+        new ColorOption { Name = "Charcoal", ColorCode = "#36454F" },
+        new ColorOption { Name = "Ivory", ColorCode = "#FFFFF0" },
+        new ColorOption { Name = "Sand", ColorCode = "#C2B280" },
+        new ColorOption { Name = "MidnightBlue", ColorCode = "#191970" },
+        new ColorOption { Name = "Rose", ColorCode = "#FF007F" }
+    };
+    private List<SymbolOption> symbols = new List<SymbolOption>
+    {
+        new SymbolOption { Name = "Anchor", IconClass = "fas fa-anchor" },
+        new SymbolOption { Name = "Frog", IconClass = "fas fa-frog" },
+        new SymbolOption { Name = "Balance Scale", IconClass = "fas fa-balance-scale" },
+        new SymbolOption { Name = "Bell", IconClass = "fas fa-bell" },
+        new SymbolOption { Name = "Bicycle", IconClass = "fas fa-bicycle" },
+        new SymbolOption { Name = "Binoculars", IconClass = "fas fa-binoculars" },
+        new SymbolOption { Name = "Bolt", IconClass = "fas fa-bolt" },
+        new SymbolOption { Name = "Bomb", IconClass = "fas fa-bomb" },
+        new SymbolOption { Name = "Book", IconClass = "fas fa-book" },
+        new SymbolOption { Name = "Briefcase", IconClass = "fas fa-briefcase" },
+        new SymbolOption { Name = "Camera", IconClass = "fas fa-camera" },
+        new SymbolOption { Name = "Car", IconClass = "fas fa-car" },
+        new SymbolOption { Name = "Certificate", IconClass = "fas fa-certificate" },
+        new SymbolOption { Name = "Cloud", IconClass = "fas fa-cloud" },
+        new SymbolOption { Name = "Code", IconClass = "fas fa-code" },
+        new SymbolOption { Name = "Coffee", IconClass = "fas fa-coffee" },
+        new SymbolOption { Name = "Compass", IconClass = "fas fa-compass" },
+        new SymbolOption { Name = "Crown", IconClass = "fas fa-crown" },
+        new SymbolOption { Name = "Dice", IconClass = "fas fa-dice" },
+        new SymbolOption { Name = "Dragon", IconClass = "fas fa-dragon" },
+        new SymbolOption { Name = "Feather", IconClass = "fas fa-feather" },
+        new SymbolOption { Name = "Fire", IconClass = "fas fa-fire" },
+        new SymbolOption { Name = "Football", IconClass = "fas fa-football-ball" },
+        new SymbolOption { Name = "Ghost", IconClass = "fas fa-ghost" },
+        new SymbolOption { Name = "Globe", IconClass = "fas fa-globe" },
+        new SymbolOption { Name = "Guitar", IconClass = "fas fa-guitar" },
+        new SymbolOption { Name = "Heart", IconClass = "fas fa-heart" },
+        new SymbolOption { Name = "Horse", IconClass = "fas fa-horse" },
+        new SymbolOption { Name = "Key", IconClass = "fas fa-key" },
+        new SymbolOption { Name = "Leaf", IconClass = "fas fa-leaf" },
+        new SymbolOption { Name = "Lightbulb", IconClass = "fas fa-lightbulb" },
+        new SymbolOption { Name = "Magic", IconClass = "fas fa-magic" },
+        new SymbolOption { Name = "Medal", IconClass = "fas fa-medal" },
+        new SymbolOption { Name = "Mobile", IconClass = "fas fa-mobile-alt" },
+        new SymbolOption { Name = "Moon", IconClass = "fas fa-moon" },
+        new SymbolOption { Name = "Music", IconClass = "fas fa-music" },
+        new SymbolOption { Name = "Paper Plane", IconClass = "fas fa-paper-plane" },
+        new SymbolOption { Name = "Paw", IconClass = "fas fa-paw" },
+        new SymbolOption { Name = "Plane", IconClass = "fas fa-plane" },
+        new SymbolOption { Name = "Robot", IconClass = "fas fa-robot" },
+        new SymbolOption { Name = "Rocket", IconClass = "fas fa-rocket" },
+        new SymbolOption { Name = "Skull", IconClass = "fas fa-skull" },
+        new SymbolOption { Name = "Snowflake", IconClass = "fas fa-snowflake" },
+        new SymbolOption { Name = "Star", IconClass = "fas fa-star" },
+        new SymbolOption { Name = "Sun", IconClass = "fas fa-sun" },
+        new SymbolOption { Name = "Theater Masks", IconClass = "fas fa-theater-masks" },
+        new SymbolOption { Name = "Thumbs Up", IconClass = "fas fa-thumbs-up" },
+        new SymbolOption { Name = "Tree", IconClass = "fas fa-tree" },
+        new SymbolOption { Name = "Umbrella", IconClass = "fas fa-umbrella" },
+        new SymbolOption { Name = "Volleyball", IconClass = "fas fa-volleyball-ball" }
+    };
+
+    private List<ChineseSymbolOption> chineseSymbols = new List<ChineseSymbolOption>
+    {
+        new ChineseSymbolOption { Name = "Orion", ImageUrl = "images/Orion.webp" },
+        new ChineseSymbolOption { Name = "Andromeda", ImageUrl = "images/Andromeda.webp" },
+        new ChineseSymbolOption { Name = "Leo", ImageUrl = "images/Lejonet.webp" },
+        new ChineseSymbolOption { Name = "Sagittarius", ImageUrl = "images/Skytten.webp" },
+        new ChineseSymbolOption { Name = "Scorpius", ImageUrl = "images/Skorpionen.webp" },
+        new ChineseSymbolOption { Name = "Aries", ImageUrl = "images/Vaduren.webp" },
+        new ChineseSymbolOption { Name = "Gemini", ImageUrl = "images/Tvillingarna.webp" },
+        new ChineseSymbolOption { Name = "Taurus", ImageUrl = "images/Oxen.webp" },
+        new ChineseSymbolOption { Name = "Libra", ImageUrl = "images/Vagen.webp" },
+        new ChineseSymbolOption { Name = "Virgo", ImageUrl = "images/Jungfrun.webp" },
+        new ChineseSymbolOption { Name = "Cancer", ImageUrl = "images/Kraftan.webp" },
+        new ChineseSymbolOption { Name = "Ursa Major", ImageUrl = "images/Storabjornen.webp" },
+        new ChineseSymbolOption { Name = "Capricornus", ImageUrl = "images/Stenbocken.webp" },
+        new ChineseSymbolOption { Name = "Pisces", ImageUrl = "images/Fiskarna.webp" },
+        new ChineseSymbolOption { Name = "Draco", ImageUrl = "images/Draken.webp" },
+        new ChineseSymbolOption { Name = "Aquila", ImageUrl = "images/Ornen.webp" },
+        new ChineseSymbolOption { Name = "Centaurus", ImageUrl = "images/Kentauren.webp" },
+        new ChineseSymbolOption { Name = "Lyra", ImageUrl = "images/Lyra.webp" },
+        new ChineseSymbolOption { Name = "Canis Major", ImageUrl = "images/Orionhunden.webp" },
+        new ChineseSymbolOption { Name = "Delphinus", ImageUrl = "images/Delfinen.webp" },
+        new ChineseSymbolOption { Name = "Corvus", ImageUrl = "images/Korpen.webp" },
+        new ChineseSymbolOption { Name = "Crater", ImageUrl = "images/Krukan.webp" },
+        new ChineseSymbolOption { Name = "Hydra", ImageUrl = "images/Hydran.webp" },
+        new ChineseSymbolOption { Name = "Chamaeleon", ImageUrl = "images/Kameleonten.webp" },
+        new ChineseSymbolOption { Name = "Telescopium", ImageUrl = "images/Teleskopet.webp" },
+        new ChineseSymbolOption { Name = "Dorado", ImageUrl = "images/Svardfisken.webp" },
+        new ChineseSymbolOption { Name = "Pavo", ImageUrl = "images/Pafageln.webp" },
+        new ChineseSymbolOption { Name = "Phoenix", ImageUrl = "images/Fenix.webp" },
+        new ChineseSymbolOption { Name = "Volans", ImageUrl = "images/Flygfisken.webp" },
+        new ChineseSymbolOption { Name = "Lupus", ImageUrl = "images/Vargen.webp" },
+        new ChineseSymbolOption { Name = "Monoceros", ImageUrl = "images/Enhorningen.webp" },
+        new ChineseSymbolOption { Name = "Lepus", ImageUrl = "images/Kaninen.webp" },
+    };
+
+    private List<PlanetOption> planets = new List<PlanetOption>
+    {
+        new PlanetOption { Name = "Mercury", ImageUrl = "images/mercurus2.webp" },
+        new PlanetOption { Name = "Venus", ImageUrl = "images/Venus2.webp" },
+        new PlanetOption { Name = "Earth", ImageUrl = "images/earth2.webp" },
+        new PlanetOption { Name = "Mars", ImageUrl = "images/Mars2.webp" },
+        new PlanetOption { Name = "Jupiter", ImageUrl = "images/jupiter2.webp" },
+        new PlanetOption { Name = "Saturn", ImageUrl = "images/Saturnus2.webp" },
+        new PlanetOption { Name = "Uranus", ImageUrl = "images/uranus2.webp" },
+        new PlanetOption { Name = "Neptune", ImageUrl = "images/Neptunus2.webp" }
+    };
+    private List<ElementOption> elements = new List<ElementOption>
+    {
+        new ElementOption { Name = "Earth", ImageUrl = "/images/Jord2.webp" },
+        new ElementOption { Name = "Fire", ImageUrl = "/images/Fire2.webp" },
+        new ElementOption { Name = "Water", ImageUrl = "/images/Water2.webp" },
+        new ElementOption { Name = "Air", ImageUrl = "/images/Air2.webp" },
+    };
+
+    private async Task GenerateAndSaveTicket()
+    {
+        generatedTicket = $"{selectedNumber}, {selectedColor}, {selectedSymbol}, {selectedChineseSymbol}, {selectedPlanet}, {selectedElement}";
+
+        // Save the ticket data using the same service method
+        await JackpotService.SaveUserTicketAsSingleLine(0, "jesper.erlandsson@hotmail.com", generatedTicket);
+        Console.WriteLine($"Generated Ticket: {generatedTicket}");
+    }
+
+    public class ColorOption
+    {
+        public string Name { get; set; }
+        public string ColorCode { get; set; }
+    }
+    public class SymbolOption
+    {
+        public string Name { get; set; }
+        public string IconClass { get; set; } // Add this line
+    }
+    public class PlanetOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+    public class ElementOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+    public class ChineseSymbolOption
+    {
+        public string Name { get; set; }
+        public string ImageUrl { get; set; }
+    }
+
+}

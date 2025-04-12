@@ -1,4 +1,6 @@
 ﻿using lek4;
+using Plugin.MauiMTAdmob;
+
 
 namespace lek4
 {
@@ -7,7 +9,9 @@ namespace lek4
         public App()
         {
             InitializeComponent();
-            MainPage = new MainPage(); // Set MainPage as the starting page
+
+            MainPage = new MainPage();
         }
+
     }
 }

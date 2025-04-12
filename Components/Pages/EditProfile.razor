@@ -1,0 +1,302 @@
+﻿@page "/edit-profile"
+@using Firebase.Auth
+@using System.Text.Json
+@using System.Text
+@using System.Net.Http
+@inject FirebaseAuthClient AuthClient
+@inject NavigationManager NavigationManager
+
+<div class="settings-container">
+    <h3>Edit Profile</h3>
+    @if (profileModel != null)
+    {
+        <EditForm Model="profileModel" OnValidSubmit="UpdateProfile">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="info-item">
+                <label for="firstName">First Name:</label>
+                <InputText id="firstName" @bind-Value="profileModel.FirstName" />
+            </div>
+            <div class="info-item">
+                <label for="lastName">Last Name:</label>
+                <InputText id="lastName" @bind-Value="profileModel.LastName" />
+            </div>
+            <div class="info-item">
+                <label for="birthDate">Birth Date:</label>
+                <span>@profileModel.BirthDate.ToString("yyyy-MM-dd")</span> 
+            </div>
+            <div class="info-item">
+                <label for="city">City:</label>
+                <InputSelect id="city" @bind-Value="profileModel.City">
+                    @foreach (var city in cities)
+                    {
+                        <option value="@city">@city</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="info-item">
+                <label for="gender">Gender:</label>
+                <InputSelect id="gender" @bind-Value="profileModel.Gender">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Non-binary">Non-binary</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                </InputSelect>
+            </div>
+            <div class="button-group">
+                <button type="submit" class="save-button">Save</button>
+            </div>
+        </EditForm>
+    }
+    else
+    {
+        <p>Loading profile information...</p>
+    }
+</div>
+
+
+@code {
+    private User user;
+    private ProfileModel profileModel = new ProfileModel();
+    private int selectedYear;
+    private int selectedMonth;
+    private int selectedDay;
+
+    private List<int> years = new List<int>();
+    private Dictionary<string, int> months = new Dictionary<string, int>
+    {
+        {"January", 1},
+        {"February", 2},
+        {"March", 3},
+        {"April", 4},
+        {"May", 5},
+        {"June", 6},
+        {"July", 7},
+        {"August", 8},
+        {"September", 9},
+        {"October", 10},
+        {"November", 11},
+        {"December", 12}
+    };
+    private List<int> days = Enumerable.Range(1, 31).ToList();
+
+    private List<string> cities = new List<string>
+    {
+        "Stockholm",
+        "Göteborg",
+        "Malmö",
+        "Uppsala",
+        "Västerås",
+        "Örebro",
+        "Linköping",
+        "Helsingborg",
+        "Jönköping",
+        "Norrköping",
+        "Lund",
+        "Umeå",
+        "Gävle",
+        "Borås",
+        "Eskilstuna",
+        "Södertälje",
+        "Karlstad",
+        "Täby",
+        "Växjö",
+        "Halmstad",
+        "Sundsvall",
+        "Luleå",
+        "Trollhättan",
+        "Östersund",
+        "Borlänge",
+        "Tumba",
+        "Kalmar",
+        "Skövde",
+        "Karlskrona",
+        "Kristianstad"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = AuthClient.User;
+        await FetchUserProfile();
+        for (int i = 1900; i <= DateTime.Now.Year; i++)
+        {
+            years.Add(i);
+        }
+        selectedYear = profileModel.BirthDate.Year;
+        selectedMonth = profileModel.BirthDate.Month;
+        selectedDay = profileModel.BirthDate.Day;
+    }
+
+    private async Task FetchUserProfile()
+    {
+        try
+        {
+            var client = new HttpClient();
+            var response = await client.GetStringAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json?alt=media");
+            profileModel = JsonSerializer.Deserialize<ProfileModel>(response);
+        }
+        catch (HttpRequestException httpEx)
+        {
+            Console.WriteLine($"HTTP Request Error: {httpEx.Message}");
+            await Application.Current.MainPage.DisplayAlert("Error", $"Failed to load profile information: {httpEx.Message}", "Ok");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"General Error: {ex.Message}");
+            await Application.Current.MainPage.DisplayAlert("Error", $"Failed to load profile information: {ex.Message}", "Ok");
+        }
+    }
+
+    private async Task UpdateProfile()
+    {
+        try
+        {
+            profileModel.BirthDate = new DateTime(selectedYear, selectedMonth, selectedDay);
+            var profileData = new
+            {
+                FirstName = profileModel.FirstName,
+                LastName = profileModel.LastName,
+                BirthDate = profileModel.BirthDate.ToString("yyyy-MM-dd"),
+                City = profileModel.City,
+                Gender = profileModel.Gender,
+                Email = profileModel.Email
+            };
+
+            var json = JsonSerializer.Serialize(profileData);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var client = new HttpClient();
+            var response = await client.PostAsync($"https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2F{user.Uid}.json", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Failed to update profile: {responseBody}");
+            }
+
+            await Application.Current.MainPage.DisplayAlert("Success", "Profile updated successfully!", "Ok");
+            NavigationManager.NavigateTo("/settings");
+        }
+        catch (Exception ex)
+        {
+            await Application.Current.MainPage.DisplayAlert("Error", $"Failed to update profile: {ex.Message}", "Ok");
+        }
+    }
+
+    public class ProfileModel
+    {
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public DateTime BirthDate { get; set; }
+        public string City { get; set; }
+        public string Gender { get; set; }
+        public string Email { get; set; }
+    }
+}
+
+<style>
+    .settings-container {
+        max-width: 400px;
+        margin: 50px auto;
+        padding: 25px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        font-family: 'Arial', sans-serif;
+    }
+
+    .settings-container h3 {
+        text-align: center;
+        color: #4a4a4a;
+        font-size: 1.8em;
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 15px;
+    }
+
+    .info-item label {
+        font-weight: bold;
+        color: #555;
+        margin-bottom: 5px;
+    }
+
+    .info-item input,
+    .info-item select {
+        padding: 10px;
+        font-size: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        width: 100%;
+    }
+
+    .info-item select {
+        cursor: pointer;
+        background-color: #f9f9f9;
+    }
+
+    .info-item input:focus,
+    .info-item select:focus {
+        border-color: #a882d6;
+        outline: none;
+        box-shadow: 0 0 5px rgba(168, 130, 214, 0.5);
+    }
+
+    .date-picker {
+        display: flex;
+        gap: 10px;
+    }
+
+    .date-picker select {
+        flex: 1;
+    }
+
+    .button-group {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .save-button {
+        background-color: #556B2F; /* Ljuslila färg */
+        color: #F0FFF0;
+        border: none;
+        padding: 12px 20px;
+        font-size: 1rem;
+        cursor: pointer;
+        border-radius: 5px;
+        transition: all 0.3s ease;
+    }
+
+    .save-button:hover {
+        background-color: #8b5fc1; /* Mörkare lila för hover */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .save-button:disabled {
+        background-color: #e3d7f1;
+        cursor: not-allowed;
+    }
+
+    @@media (max-width: 480px) {
+        .settings-container {
+            padding: 15px;
+            margin: 20px;
+        }
+
+        .info-item input,
+        .info-item select {
+            font-size: 0.9rem;
+        }
+
+        .save-button {
+            font-size: 0.9rem;
+            padding: 10px 15px;
+        }
+    }
+</style>

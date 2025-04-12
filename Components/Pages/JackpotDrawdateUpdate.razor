@@ -1,0 +1,203 @@
+﻿@page "/admin-jackpot-config"
+@using System.Text.Json
+@using System.Text
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<div class="admin-container">
+    <h2>🎰 Jackpot Draw Configuration</h2>
+
+    <div class="form-container">
+        <div class="form-group">
+            <label for="daysToAdd">Days to Add for Jackpot Draw:</label>
+            <input id="daysToAdd" type="number" @bind="daysToAdd" class="styled-input" min="1" />
+        </div>
+
+        <div class="button-group">
+            <button class="save-button" @onclick="SaveConfig">💾 Save Configuration</button>
+            <button class="load-button" @onclick="LoadConfig">🔄 Load Current Configuration</button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert-message">@message</div>
+        }
+
+        <button class="back-button" @onclick="NavigateBack">← Back to Admin</button>
+    </div>
+</div>
+
+<style>
+    .admin-container {
+        max-width: 500px;
+        margin: 40px auto;
+        padding: 20px;
+        background: #1e1e2f;
+        color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+        text-align: center;
+    }
+
+    h2 {
+        font-size: 24px;
+        margin-bottom: 15px;
+        color: #FFD700;
+    }
+
+    .form-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    label {
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .styled-input {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        border: 2px solid #FFD700;
+        border-radius: 6px;
+        background: #2b2b3d;
+        color: white;
+        text-align: center;
+    }
+
+    .button-group {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .save-button, .load-button, .back-button {
+        width: 48%;
+        padding: 10px;
+        font-size: 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+
+    .save-button {
+        background: #28a745;
+        color: white;
+    }
+
+    .save-button:hover {
+        background: #218838;
+    }
+
+    .load-button {
+        background: #007bff;
+        color: white;
+    }
+
+    .load-button:hover {
+        background: #0056b3;
+    }
+
+    .back-button {
+        background: #dc3545;
+        color: white;
+        margin-top: 15px;
+        width: 100%;
+    }
+
+    .back-button:hover {
+        background: #c82333;
+    }
+
+    .alert-message {
+        padding: 10px;
+        background: #17a2b8;
+        color: white;
+        font-size: 14px;
+        border-radius: 6px;
+        text-align: center;
+        margin-top: 10px;
+    }
+</style>
+
+@code {
+    private int daysToAdd = 7; // Standardvärde
+    private string message = "";
+    private const string ConfigUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2Fconfig%2FJackpotDrawConfig.json";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConfig();
+    }
+
+    private async Task LoadConfig()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"{ConfigUrl}?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var config = JsonSerializer.Deserialize<JackpotDrawConfig>(jsonResponse);
+                if (config != null)
+                {
+                    daysToAdd = config.DaysToAdd;
+                    message = "✅ Configuration loaded successfully.";
+                }
+            }
+            else
+            {
+                message = "⚠ No existing configuration found. Using default value.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"❌ Error loading config: {ex.Message}";
+        }
+    }
+
+    private async Task SaveConfig()
+    {
+        try
+        {
+            var config = new JackpotDrawConfig { DaysToAdd = daysToAdd };
+            var jsonData = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+
+            var response = await Http.PostAsync(ConfigUrl, content);
+            if (response.IsSuccessStatusCode)
+            {
+                message = "✅ Configuration saved successfully!";
+            }
+            else
+            {
+                message = "❌ Failed to save configuration.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"❌ Error saving config: {ex.Message}";
+        }
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
+    private class JackpotDrawConfig
+    {
+        public int DaysToAdd { get; set; }
+    }
+}

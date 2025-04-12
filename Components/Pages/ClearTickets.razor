@@ -1,0 +1,419 @@
+﻿@page "/admin-clear-tickets"
+@using System.Text.Json
+@using System.Text
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+
+<h1 class="page-title">Admin - Manage Jackpot Tickets</h1>
+
+<div class="admin-container">
+    <button class="back-button" @onclick="NavigateBack">← Back</button>
+
+    <div class="action-section">
+        <h3>Manage Jackpot Tickets</h3>
+        <button class="action-button delete-button" @onclick="ClearAndSaveTickets">Clear and Save Tickets</button>
+    </div>
+
+    <div class="saved-files-section">
+        <h3>Saved Jackpot Tickets</h3>
+
+        @if (savedFiles.Any())
+        {
+            <ul class="saved-files-list">
+                @foreach (var file in savedFiles)
+                {
+                    <li class="saved-file-item">
+                        <div class="file-info">
+                            <p><strong>Saved Date:</strong> @file.SavedDate</p>
+                            <p><strong>Users Count:</strong> @file.UserCount</p>
+                            <p><strong>Total Tickets:</strong> @file.TicketCount</p>
+                        </div>
+
+                        <!-- 🔍 Sökfält för att söka på en användares email -->
+                        <div class="search-section">
+                            <input type="text" placeholder="Enter email" @bind="searchQuery" class="search-input" />
+                            <button @onclick="() => SearchUserTickets(file.FileName)" class="search-button">Search</button>
+                        </div>
+
+                        <!-- 🎯 Visar resultat av sökningen -->
+                        @if (searchedTickets.ContainsKey(file.FileName))
+                        {
+                            <div class="search-results">
+                                <h4>Search Results for @searchQuery</h4>
+                                @if (searchedTickets[file.FileName].Any())
+                                {
+                                    <ul class="ticket-list">
+                                        @foreach (var ticket in searchedTickets[file.FileName])
+                                        {
+                                            <li class="ticket-item">@ticket</li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <p class="no-tickets">No tickets found for this user.</p>
+                                }
+                            </div>
+                        }
+
+                        <!-- 🗑️ Ta bort-knapp -->
+                        <button class="delete-button" @onclick="() => DeleteSavedFile(file.FileName)">Delete</button>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p>No saved tickets yet.</p>
+        }
+    </div>
+
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert">@message</div>
+    }
+</div>
+
+@code {
+    private const string TicketsUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FJackpot%2FJackpotConfirmedTickets.json";
+    private const string SavedInfoBaseUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2F";
+    private const string IndexFileUrl = "https://firebasestorage.googleapis.com/v0/b/stega-426008.appspot.com/o/users%2FSavedInfo%2FSavedTicketsIndex.json";
+
+    private List<SavedTicketFile> savedFiles = new List<SavedTicketFile>();
+    private string message = string.Empty;
+
+    private string searchQuery = "";
+    private Dictionary<string, List<string>> searchedTickets = new Dictionary<string, List<string>>();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSavedFiles();
+    }
+
+    private async Task LoadSavedFiles()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync($"{IndexFileUrl}?alt=media");
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var fileNames = JsonSerializer.Deserialize<List<string>>(jsonResponse) ?? new List<string>();
+
+                savedFiles.Clear();
+                foreach (var fileName in fileNames)
+                {
+                    var fileResponse = await HttpClient.GetAsync($"{SavedInfoBaseUrl}{fileName}?alt=media");
+                    if (fileResponse.IsSuccessStatusCode)
+                    {
+                        var fileContent = await fileResponse.Content.ReadAsStringAsync();
+
+                        // 🔹 Kontrollera om filen innehåller metadata
+                        if (fileContent.Contains("\"SavedDate\""))
+                        {
+                            var savedData = JsonSerializer.Deserialize<SavedTicketFile>(fileContent);
+                            if (savedData != null)
+                            {
+                                savedData.FileName = fileName;
+
+                                // Om SavedDate saknas eller är tomt, hämta från filnamnet
+                                if (string.IsNullOrEmpty(savedData.SavedDate))
+                                {
+                                    savedData.SavedDate = ExtractDateFromFileName(fileName);
+                                }
+
+                                savedFiles.Add(savedData);
+                            }
+                        }
+                        else
+                        {
+                            // Om filen bara innehåller tickets, skapa metadata från filnamnet
+                            var ticketsData = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(fileContent);
+                            if (ticketsData != null)
+                            {
+                                savedFiles.Add(new SavedTicketFile
+                                    {
+                                        FileName = fileName,
+                                        SavedDate = ExtractDateFromFileName(fileName), // 🔹 Hämtar datum från filnamnet
+                                        UserCount = ticketsData.Count,
+                                        TicketCount = ticketsData.Values.Sum(t => t.Count),
+                                        Tickets = ticketsData
+                                    });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading saved files: {ex.Message}";
+        }
+    }
+    private string ExtractDateFromFileName(string fileName)
+    {
+        try
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(fileName, @"(\d{8})");
+            if (match.Success)
+            {
+                var dateString = match.Groups[1].Value;
+                return DateTime.ParseExact(dateString, "yyyyMMdd", null).ToString("yyyy-MM-dd");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error extracting date from file name: {ex.Message}");
+        }
+        return "Unknown"; // Om det misslyckas, returnera "Unknown"
+    }
+
+    private async Task SearchUserTickets(string fileName)
+    {
+        try
+        {
+            var fileUrl = $"{SavedInfoBaseUrl}{fileName}?alt=media";
+            var response = await HttpClient.GetAsync(fileUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                // 🔹 Ladda hela JSON-objektet, eftersom filen har en struktur med metadata
+                var savedData = JsonSerializer.Deserialize<SavedTicketFile>(jsonResponse);
+
+                if (savedData != null && savedData.Tickets.ContainsKey(searchQuery))
+                {
+                    searchedTickets[fileName] = savedData.Tickets[searchQuery]; // Hitta användarens biljetter
+                }
+                else
+                {
+                    searchedTickets[fileName] = new List<string>(); // Om användaren inte finns
+                }
+            }
+            else
+            {
+                searchedTickets[fileName] = new List<string>();
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error searching tickets: {ex.Message}";
+        }
+    }
+
+    private async Task ClearAndSaveTickets()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync($"{TicketsUrl}?alt=media");
+            if (!response.IsSuccessStatusCode)
+            {
+                message = "No tickets found to save.";
+                return;
+            }
+
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(jsonResponse))
+            {
+                message = "No tickets available.";
+                return;
+            }
+
+            // ✅ Rätt JSON-format för sparning
+            var ticketsData = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(jsonResponse);
+            if (ticketsData == null || ticketsData.Count == 0)
+            {
+                message = "No tickets available to save.";
+                return;
+            }
+
+            int userCount = ticketsData.Count;
+            int ticketCount = ticketsData.Values.Sum(t => t.Count);
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            var fileName = $"JackpotTickets_{timestamp}.json";
+
+            var savedTicketFile = new SavedTicketFile
+                {
+                    FileName = fileName,
+                    SavedDate = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+                    UserCount = userCount,
+                    TicketCount = ticketCount,
+                    Tickets = ticketsData
+                };
+
+            // ✅ Se till att sparningen inkluderar metadata
+            var content = new StringContent(JsonSerializer.Serialize(savedTicketFile, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8, "application/json");
+            var saveResponse = await HttpClient.PostAsync($"{SavedInfoBaseUrl}{fileName}", content);
+
+            if (saveResponse.IsSuccessStatusCode)
+            {
+                savedFiles.Add(savedTicketFile);
+                await UpdateIndexFile(savedFiles.Select(f => f.FileName).ToList());
+
+                var clearContent = new StringContent("{}", Encoding.UTF8, "application/json");
+                await HttpClient.PostAsync(TicketsUrl, clearContent);
+
+                message = $"Tickets saved successfully as {fileName} and cleared!";
+            }
+            else
+            {
+                message = "Failed to save tickets.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error clearing and saving tickets: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteSavedFile(string fileName)
+    {
+        try
+        {
+            var deleteUrl = $"{SavedInfoBaseUrl}{fileName}";
+            var response = await HttpClient.DeleteAsync(deleteUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                savedFiles.RemoveAll(f => f.FileName == fileName);
+                await UpdateIndexFile(savedFiles.Select(f => f.FileName).ToList());
+                message = $"Successfully deleted {fileName}.";
+            }
+            else
+            {
+                message = $"Failed to delete {fileName}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error deleting file: {ex.Message}";
+        }
+    }
+
+    private async Task UpdateIndexFile(List<string> updatedIndex)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(updatedIndex), Encoding.UTF8, "application/json");
+        await HttpClient.PostAsync(IndexFileUrl, content);
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/admin");
+    }
+
+    public class SavedTicketFile
+    {
+        public string FileName { get; set; }
+        public string SavedDate { get; set; }
+        public int UserCount { get; set; }
+        public int TicketCount { get; set; }
+        public Dictionary<string, List<string>> Tickets { get; set; } = new();
+    }
+}
+<style>
+    .admin-container {
+        max-width: 800px;
+        margin: auto;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-section {
+        margin-top: 20px;
+    }
+
+    .saved-files-section {
+        margin-top: 20px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .saved-files-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .saved-file-item {
+        background: white;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .file-info {
+        margin-bottom: 10px;
+    }
+
+    .search-section {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .search-input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    .search-button {
+        padding: 8px 12px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+        .search-button:hover {
+            background-color: #2980b9;
+        }
+
+    .search-results {
+        margin-top: 10px;
+        background: #eef;
+        padding: 10px;
+        border-radius: 5px;
+    }
+
+    .ticket-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .ticket-item {
+        padding: 5px;
+        background: #fff;
+        border-radius: 3px;
+        margin-bottom: 5px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .no-tickets {
+        color: #777;
+    }
+
+    .delete-button {
+        background-color: #e74c3c;
+        color: white;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+        .delete-button:hover {
+            background-color: #c0392b;
+        }
+
+</style>

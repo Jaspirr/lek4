@@ -768,16 +768,16 @@ else
     }
 
     .product-grid {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr); /* 5 kolumner */
-        grid-template-rows: auto; /* Automatisk höjd för rader */
-        gap: 5px; /* Minska mellanrummet */
-        justify-items: center;
-        margin: 120px auto;
-        max-width: 100%; /* Full bredd så att alla produkter passar på skärmen */
-    }
-
-
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: auto;
+    justify-items: center;
+    align-items: center;
+    gap: 5px;
+    margin: 0 auto;
+    padding-top: 90px;
+}
 
     /* Större storlek för produkt 1 */
     .product:nth-child(1) {

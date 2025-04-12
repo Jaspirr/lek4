@@ -1,0 +1,43 @@
+﻿@inherits LayoutComponentBase
+@using lek4.Components.Layout
+@using lek4.Components.Pages
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+
+<div class="main">
+    @Body
+</div>
+
+<GlobalRedirect />
+
+@if (!IsLoginPage && !IsSignUpPage)
+{
+    <BottomNav />
+}
+
+<style>
+    .main {
+        padding-bottom: 60px; /* Space for bottom navigation */
+    }
+</style>
+
+@code {
+    private bool IsLoginPage => NavigationManager.Uri.EndsWith("/login", StringComparison.OrdinalIgnoreCase);
+    private bool IsSignUpPage => NavigationManager.Uri.EndsWith("/signup", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += (sender, args) =>
+        {
+            InvokeAsync(StateHasChanged);
+        };
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("hideLoadingScreen");
+        }
+    }
+}

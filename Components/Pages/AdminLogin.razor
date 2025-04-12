@@ -1,0 +1,66 @@
+﻿@page "/admin-login"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager NavigationManager
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="login-container">
+    <div class="login-form">
+        <h3 class="login-title">Admin Login</h3>
+        <EditForm Model="loginModel" OnValidSubmit="AdminLoginUser">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="form-group">
+                <InputText id="email" @bind-Value="loginModel.Email" placeholder="Email" />
+            </div>
+            <div class="form-group">
+                <InputText id="password" @bind-Value="loginModel.Password" type="password" placeholder="Password" />
+            </div>
+            <button type="submit" class="login-button">Login</button>
+            <div class="error-message">
+                @errorMessage
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new LoginModel();
+    private string errorMessage;
+
+    private async Task AdminLoginUser()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("ApiClient");
+            var response = await client.PostAsJsonAsync("Auth/admin-login", loginModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Framgångsrik inloggning som admin
+                Console.WriteLine("Admin login successful.");
+                NavigationManager.NavigateTo("/admin"); // Omdirigera till admin-sidan
+            }
+            else
+            {
+                // Visa felmeddelande om inloggningen misslyckas
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Login failed: {error}";
+                Console.WriteLine($"Login failed: {error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Hantera eventuella undantag
+            errorMessage = $"An error occurred: {ex.Message}";
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
+    }
+
+    public class LoginModel
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
+    }
+}
+

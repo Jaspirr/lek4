@@ -1,0 +1,310 @@
+﻿@page "/products"
+@page "/products/{number:double}"
+@using System.Globalization
+@using lek4.Components.Service
+
+@inject NavigationManager NavigationManager
+@inject lek4.Components.Service.NumberService NumberService
+@inject lek4.Components.Service.ProductService ProductService
+@inject IJSRuntime JS
+@inject JackpotService JackpotService
+
+
+@code {
+    [Parameter]
+    public double? number { get; set; }
+    private string currencySymbol = "kr"; // eller hämta från tjänst om du vill
+    private double jackpotAmount = 0;
+
+    private List<ProductService.ProductData> products = new List<ProductService.ProductData>();
+    private int unlockingProduct = -1;
+    private double remainingOdds;
+    private bool isLoading = true; // Flagga för att visa loading animation
+
+    private List<ProductService.ProductData> standardProducts = new List<ProductService.ProductData>();
+    private List<ProductService.ProductData> outcomeProducts = new List<ProductService.ProductData>();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!number.HasValue)
+        {
+            number = NumberService.Number;
+        }
+        jackpotAmount = await JackpotService.GetCalculatedJackpotAmount();
+        currencySymbol = await JackpotService.GetCurrencySymbol();
+
+        NumberService.Number = number.Value;
+        remainingOdds = Math.Min(NumberService.GetRemainingOdds(), 100.0);
+
+        // Hämta produkterna från Firebase
+        await FetchProductsFromFirebase();
+
+        // Hämta vinnaren för varje produkt och uppdatera UI
+        await FetchWinner();
+
+        isLoading = false; // Stäng av loading när allt är färdigladdat
+        StateHasChanged();
+    }
+
+    private async Task FetchProductsFromFirebase()
+    {
+        products = await ProductService.FetchAllProductsFromFirebaseAsync();
+        standardProducts = products.Where(p => !p.IsOutcomeProduct).ToList();
+        outcomeProducts = products.Where(p => p.IsOutcomeProduct).ToList();
+    }
+
+    private async Task FetchWinner()
+    {
+        foreach (var product in products)
+        {
+            // Hämtar vinnaren från Firebase för varje produkt
+            product.Winner = await ProductService.GetWinnerFromFirebase(product.ProductNumber);
+        }
+    }
+
+    private async Task GoToProduct(int productNumber)
+    {
+        unlockingProduct = productNumber;
+        StateHasChanged();
+
+        await JS.InvokeVoidAsync("triggerAnimation", $"product-{productNumber}");
+
+        await Task.Delay(800);
+
+        NumberService.UnlockProduct(productNumber);
+        NavigationManager.NavigateTo($"/product/{productNumber}");
+    }
+
+    private string GetProductClass(ProductService.ProductData product)
+    {
+        return isLoading ? "product loading" :
+               !string.IsNullOrEmpty(product.Winner) ? "product gold" :
+               NumberService.IsProductLockedIn(product.ProductNumber) ? "product locked-in" : "product locked";
+    }
+
+    private string GetIconClass(ProductService.ProductData product)
+    {
+        if (product.IsOutcomeProduct)
+        {
+            return ""; // Ingen ikon för outcome-products
+        }
+
+        return !string.IsNullOrEmpty(product.Winner) ? "fas fa-trophy" :
+               NumberService.IsProductUnlocked(product.ProductNumber) ? "fas fa-unlock" : "fas fa-lock";
+    }
+
+    private string GetOutcomeDisplay(ProductService.ProductData product)
+    {
+        if (product.IsOutcomeProduct)
+        {
+            return $"{product.CorrectAnswersRequired}"; // Visa antal korrekta svar
+        }
+        return null; // Annars, returnera inget
+    }
+    private string FormattedJackpotAmount
+    {
+        get
+        {
+            if (jackpotAmount > 999.99)
+            {
+                return Math.Floor(jackpotAmount).ToString("#,0", new CultureInfo("sv-SE"));
+            }
+
+            return jackpotAmount % 1 == 0
+                ? jackpotAmount.ToString("#,0", new CultureInfo("sv-SE"))
+                : jackpotAmount.ToString("#,0.00", new CultureInfo("sv-SE"));
+        }
+    }
+
+    private string GetBackgroundStyle(ProductService.ProductData product)
+    {
+        if (product.PrizeType == "Credits")
+        {
+            return "background-color: white; background-image: url('images/Voidglas2.webp'); background-size: 50%; background-repeat: no-repeat; background-position: center;";
+        }
+        else if (!string.IsNullOrEmpty(product.ImageUrl))
+        {
+            // 👇 Om det är en jackpot – använd contain istället för cover
+            var size = product.IsJackpot ? "contain" : "cover";
+
+            return $"background-image: url('{product.ImageUrl}'); background-size: {size}; background-position: center; background-repeat: no-repeat;";
+        }
+
+        return ""; // fallback
+    }
+}
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="loading-animation">
+            <div class="loading-circle"></div>
+            <div class="loading-circle"></div>
+            <div class="loading-circle"></div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="product-grid">
+        @foreach (var product in products)
+        {
+            <div id="product-@product.ProductNumber"
+                 class="@GetProductClass(product) @(product.IsJackpot ? "jackpot-card" : "") @(unlockingProduct == product.ProductNumber ? "unlocking" : "")"
+                 style="@GetBackgroundStyle(product)">
+                <a @onclick="async () => await GoToProduct(product.ProductNumber)">
+                    <div class="icon-wrapper">
+                        @if (!string.IsNullOrEmpty(product.Winner))
+                        {
+                            <i class="fas fa-trophy winner-trophy-icon"></i>
+                        }
+                        else if (product.IsJackpot)
+                        {
+                            <p class="jackpotamount-mini">
+                                @FormattedJackpotAmount
+                                <span class="currency-symbol">@currencySymbol</span>
+                            </p>
+                        }
+                        else if (product.IsOutcomeProduct)
+                        {
+                            <div class="outcome-box">
+                                <span class="outcome-text">@product.CorrectAnswersRequired</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <i class="@GetIconClass(product)"></i>
+                        }
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+<style>
+/* Laddningscontainer */
+.loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* Animation-box för att hålla cirklarna */
+.loading-animation {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: 100px; /* Justera avstånd mellan cirklar */
+}
+
+/* Cirklar */
+.loading-circle {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #F0FFF0, #556B2F); /* Gradient på hela raden */
+    opacity: 0.3;
+    animation: bounce 1.4s infinite ease-in-out both;
+}
+
+/* Fördröj animationen så att de går i följd */
+.loading-circle:nth-child(1) {
+    animation-delay: -0.32s;
+}
+.loading-circle:nth-child(2) {
+    animation-delay: -0.16s;
+}
+.loading-circle:nth-child(3) {
+    animation-delay: 0s;
+}
+
+/* Bounce-effekt */
+@@keyframes bounce {
+    0%, 80%, 100% {
+        transform: translateY(6px) scale(0.9);
+        opacity: 0.3;
+    }
+    40% {
+        transform: translateY(0px) scale(1);
+        opacity: 1;
+    }
+}
+
+    .outcome-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: white;
+        font-size: 0.7rem;
+        font-weight: bold;
+        padding: 3px 6px;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        min-width: 26px;
+        min-height: 26px;
+        line-height: 1;
+        transition: transform 0.2s ease-in-out;
+    }
+
+
+        .outcome-box i {
+            margin-right: 6px;
+            font-size: 1.3rem;
+        }
+
+        .outcome-box:hover {
+            transform: scale(1.1); /* Gör den lite större vid hover */
+        }
+
+    .outcome-text {
+        font-size: 0.85rem;
+        font-weight: bold;
+    }
+
+    .jackpot-card {
+        background-size: cover !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+    }
+
+    .jackpotamount-mini {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%); /* Både X och Y-axel */
+        font-size: 0.9rem;
+        font-weight: bold;
+        color: #b38b00;
+        background: linear-gradient(135deg, #fff4d7, #ffe8a3);
+        border: 1px solid #FFD700;
+        border-radius: 5px;
+        padding: 4px 6px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        z-index: 3;
+        text-align: center;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .jackpot-image-adjust {
+        background-size: contain !important; /* Visa hela bilden */
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+    }
+
+</style>
+
+<script>
+    function triggerAnimation(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.classList.remove("unlocking");
+            void element.offsetWidth;
+            element.classList.add("unlocking");
+        }
+    }
+</script>

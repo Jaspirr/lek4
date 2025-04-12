@@ -4,6 +4,7 @@
 @using System.Text
 @using System.Net.Http
 @using System.Net
+@using System.ComponentModel.DataAnnotations
 @inject FirebaseAuthClient AuthClient
 @inject NavigationManager NavigationManager
 @inject HttpClient HttpClient
@@ -15,81 +16,77 @@
         <EditForm Model="signupModel" OnValidSubmit="RegisterUser">
             <DataAnnotationsValidator />
             <ValidationSummary />
-            <div class="form-group">
+          <div class="form-group">
                 <label for="firstName">First Name:</label>
-                <InputText id="firstName" @bind-Value="signupModel.FirstName" />
+                <InputText id="firstName" @bind-Value="signupModel.FirstName" required />
+                <ValidationMessage For="@(() => signupModel.FirstName)" />
             </div>
             <div class="form-group">
                 <label for="lastName">Last Name:</label>
-                <InputText id="lastName" @bind-Value="signupModel.LastName" />
+                <InputText id="lastName" @bind-Value="signupModel.LastName" required />
+                <ValidationMessage For="@(() => signupModel.LastName)" />
             </div>
             <div class="form-group">
                 <label for="birthDate">Birth Date:</label>
-                <div class="date-picker">
-                    <select @bind="selectedYear">
-                        @foreach (var year in years)
-                        {
-                            <option value="@year">@year</option>
-                        }
-                    </select>
-                    <select @bind="selectedMonth">
-                        @foreach (var month in months)
-                        {
-                            <option value="@month.Value">@month.Key</option>
-                        }
-                    </select>
-                    <select @bind="selectedDay">
-                        @foreach (var day in days)
-                        {
-                            <option value="@day">@day</option>
-                        }
-                    </select>
-                </div>
+             <InputDate @bind-Value="signupModel.BirthDate"
+               class="ios-date"
+               min="1900-01-01"
+               max="@MaxAllowedBirthDate.ToString("yyyy-MM-dd")" />
+               <ValidationMessage For="@(() => signupModel.BirthDate)" />
+
+
             </div>
             <div class="form-group">
                 <label for="city">City:</label>
-                <InputSelect id="city" @bind-Value="signupModel.City">
+                <InputSelect id="city" @bind-Value="signupModel.City" required>
                     @foreach (var city in cities)
                     {
                         <option value="@city">@city</option>
                     }
                 </InputSelect>
+                <ValidationMessage For="@(() => signupModel.City)" />
             </div>
             <div class="form-group">
                 <label for="gender">Gender:</label>
-                <InputSelect id="gender" @bind-Value="signupModel.Gender">
+                <InputSelect id="gender" @bind-Value="signupModel.Gender" >
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Non-binary">Non-binary</option>
                     <option value="Prefer not to say">Prefer not to say</option>
                 </InputSelect>
+                <ValidationMessage For="@(() => signupModel.Gender)" />
             </div>
             <div class="form-group">
                 <label for="email">Email:</label>
-                <InputText id="email" @bind-Value="signupModel.Email" />
+                <InputText id="email" @bind-Value="signupModel.Email"  required  />
+                <ValidationMessage For="@(() => signupModel.Email)" />
             </div>
             <div class="form-group">
                 <label for="phoneNumber">Mobile Number:</label>
                 <div class="phone-input">
-                    <InputSelect @bind-Value="selectedCountryCode" class="country-select" @onchange="ValidatePhoneNumber">
-                        @foreach (var country in countryCodes)
-                        {
-                            <option value="@country.Code">
-                                @country.Flag @country.Code
-                            </option>
-                        }
+                  <InputSelect @bind-Value="selectedCountryCode" class="country-select" @onchange="ValidatePhoneNumber">
+                                            @* Visa alltid Sverige först *@
+                        <option value="+46">🇸🇪 +46</option>
+                                            @foreach (var country in countryCodes.Where(c => c.Code != "+46"))
+                                            {
+                                <option value="@country.Code">@country.Flag @country.Code</option>
+                                            }
                     </InputSelect>
+
                     <InputText id="phoneNumber" @bind-Value="signupModel.PhoneNumber" @oninput="ValidatePhoneNumber" placeholder="Enter number" required />
+                    <ValidationMessage For="@(() => signupModel.PhoneNumber)" />
                 </div>
                 <p style="color: red;" hidden="@isPhoneNumberValid">Invalid phone number format.</p>
             </div>
             <div class="form-group">
                 <label for="password">Password:</label>
-                <InputText id="password" @bind-Value="signupModel.Password" type="password" />
+                <InputText id="password" @bind-Value="signupModel.Password" type="password"  required  />
+                <ValidationMessage For="@(() => signupModel.Password)" />
             </div>
             <div class="form-group">
                 <label for="confirmPassword">Confirm Password:</label>
-                <InputText id="confirmPassword" @bind-Value="signupModel.ConfirmPassword" type="password" />
+                <InputText id="confirmPassword" @bind-Value="signupModel.ConfirmPassword" type="password"   required />
+                <ValidationMessage For="@(() => signupModel.ConfirmPassword)" />
             </div>
             <button class="signup-button" type="submit">Sign Up</button>
             <div class="signup-footer">
@@ -104,8 +101,12 @@
     private SignupModel signupModel = new SignupModel
         {
             City = "Stockholm", // Standardvärde för City
-            Gender = "Male"     // Standardvärde för Gender
+            Gender = "Male",     // Standardvärde för Gender
+            BirthDate = DateTime.Today.AddYears(-18)
         };
+    private DateTime MaxAllowedBirthDate => DateTime.Today.AddYears(-18);
+
+    private string selectedCountryCode = "+46";
 
     private int selectedYear;
     private int selectedMonth;
@@ -149,7 +150,6 @@
     };
 
     private bool isPhoneNumberValid = true;
-    private string selectedCountryCode = "+46";
     private List<CountryCode> countryCodes = new List<CountryCode>
     {
         new CountryCode { Code = "+46", Name = "Sweden", Flag = "🇸🇪" },
@@ -157,7 +157,19 @@
         new CountryCode { Code = "+45", Name = "Denmark", Flag = "🇩🇰" },
         new CountryCode { Code = "+358", Name = "Finland", Flag = "🇫🇮" },
         new CountryCode { Code = "+44", Name = "United Kingdom", Flag = "🇬🇧" },
-        new CountryCode { Code = "+1", Name = "United States", Flag = "🇺🇸" }
+        new CountryCode { Code = "+1", Name = "United States", Flag = "🇺🇸" },
+        new CountryCode { Code = "+33", Name = "France", Flag = "🇫🇷" },
+        new CountryCode { Code = "+49", Name = "Germany", Flag = "🇩🇪" },
+        new CountryCode { Code = "+39", Name = "Italy", Flag = "🇮🇹" },
+        new CountryCode { Code = "+34", Name = "Spain", Flag = "🇪🇸" },
+        new CountryCode { Code = "+48", Name = "Poland", Flag = "🇵🇱" },
+        new CountryCode { Code = "+90", Name = "Turkey", Flag = "🇹🇷" },
+        new CountryCode { Code = "+351", Name = "Portugal", Flag = "🇵🇹" },
+        new CountryCode { Code = "+386", Name = "Slovenia", Flag = "🇸🇮" },
+        new CountryCode { Code = "+420", Name = "Czech Republic", Flag = "🇨🇿" },
+        new CountryCode { Code = "+31", Name = "Netherlands", Flag = "🇳🇱" },
+        new CountryCode { Code = "+61", Name = "Australia", Flag = "🇦🇺" },
+        new CountryCode { Code = "+81", Name = "Japan", Flag = "🇯🇵" }
     };
     protected override void OnInitialized()
     {
@@ -247,13 +259,13 @@
             var userCredential = await AuthClient.CreateUserWithEmailAndPasswordAsync(signupModel.Email, signupModel.Password);
             Console.WriteLine($"User created with UID: {userCredential.User.Uid}");
 
-            // Spara användarprofil i Firebase
-            signupModel.PhoneNumber = $"{selectedCountryCode}{signupModel.PhoneNumber}"; // Slå ihop landskod och telefonnummer
+            signupModel.PhoneNumber = FormatPhoneNumber(selectedCountryCode, signupModel.PhoneNumber);
+
             await SaveUserProfileToStorage(userCredential.User);
             Console.WriteLine("User profile saved to storage.");
 
             // Framgångsmeddelande
-            await Application.Current.MainPage.DisplayAlert("Success", "Registration successful!", "Ok");
+            await Application.Current.MainPage.DisplayAlert("Welcome!", "Registration successful – Now you can login.", "Ok");
             NavigationManager.NavigateTo("/login");
         }
         catch (Exception ex)
@@ -271,9 +283,23 @@
 
     private void ValidatePhoneNumber()
     {
-        var fullPhoneNumber = $"{selectedCountryCode}{signupModel.PhoneNumber}";
+        var fullPhoneNumber = FormatPhoneNumber(selectedCountryCode, signupModel.PhoneNumber);
         isPhoneNumberValid = System.Text.RegularExpressions.Regex.IsMatch(fullPhoneNumber, @"^\+\d{7,15}$");
     }
+
+    private string FormatPhoneNumber(string countryCode, string localNumber)
+    {
+        // Länder där ledande 0 ska tas bort i internationellt format
+        var trimLeadingZeroCountries = new[] { "+46", "+47", "+45", "+358" };
+
+        if (trimLeadingZeroCountries.Contains(countryCode) && localNumber.StartsWith("0"))
+        {
+            localNumber = localNumber.TrimStart('0');
+        }
+
+        return $"{countryCode}{localNumber}";
+    }
+
 
     private async Task<bool> CheckIfEmailExists(string userEmail)
     {
@@ -309,7 +335,8 @@
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new Exception("Failed to save user profile.");
+            var responseContent = await response.Content.ReadAsStringAsync();
+            throw new Exception(responseContent); // skicka med hela Firebase-felet som JSON
         }
     }
     private string GetErrorMessage(string responseBody)
@@ -332,6 +359,7 @@
             return "An unexpected error occurred.";
         }
     }
+
     private int CalculateAge(DateTime birthDate)
     {
         var today = DateTime.Today;
@@ -342,16 +370,48 @@
 
     public class SignupModel
     {
+        [Required(ErrorMessage = "First name is required.")]
         public string FirstName { get; set; }
+
+        [Required(ErrorMessage = "Last name is required.")]
         public string LastName { get; set; }
+
+        [Required(ErrorMessage = "Birth date is required.")]
+        [CustomValidation(typeof(SignupModel), nameof(ValidateAge))]
         public DateTime BirthDate { get; set; }
+
+        [Required(ErrorMessage = "City is required.")]
         public string City { get; set; }
+
+        [Required(ErrorMessage = "Gender is required.")]
         public string Gender { get; set; }
+
+        [Required(ErrorMessage = "Phone number is required.")]
         public string PhoneNumber { get; set; }
+
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
         public string Email { get; set; }
+
+        [Required(ErrorMessage = "Password is required.")]
+        [MinLength(6, ErrorMessage = "Password must be at least 6 characters.")]
         public string Password { get; set; }
+
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
         public string ConfirmPassword { get; set; }
+
+        public static ValidationResult ValidateAge(DateTime birthDate, ValidationContext context)
+        {
+            var today = DateTime.Today;
+            var age = today.Year - birthDate.Year;
+            if (birthDate > today.AddYears(-age)) age--;
+
+            return age < 18
+                ? new ValidationResult("You must be at least 18 years old.")
+                : ValidationResult.Success;
+        }
     }
+
     public class CountryCode
     {
         public string Code { get; set; }
@@ -435,13 +495,13 @@
     }
 
     .signup-button:hover {
-        background-color: #8b5fc1; /* Mörkare lila för hover */
+        background-color: #57a563; /* Mörkare lila för hover */
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         color: white;
     }
 
     .signup-button:disabled {
-        background-color: #e3d7f1;
+        background-color: #b5e0b8;
         cursor: not-allowed;
     }
 
@@ -453,14 +513,15 @@
     }
 
     .signup-footer a {
-        color: #8b5fc1;
+         color: #556B2F;
         text-decoration: none;
         font-weight: 600;
     }
 
-    .signup-footer a:hover {
-        text-decoration: underline;
-    }
+
+.signup-footer a:hover {
+    text-decoration: underline;
+}
 
     @@media (max-width: 480px) {
         .signup-container {
@@ -478,4 +539,32 @@
             padding: 10px 15px;
         }
     }
+    select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 1rem;
+    font-family: inherit;
+    width: 100%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+.ios-date {
+    appearance: none;
+    -webkit-appearance: none;
+    font-size: 1.1rem;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    width: 100%;
+}
+.validation-message {
+    color: red;
+    font-size: 0.85rem;
+    margin-top: 4px;
+}
+
 </style>
